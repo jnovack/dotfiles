@@ -1,0 +1,59 @@
+" .vimrc
+
+set nocompatible
+colorscheme ozmo
+behave mswin
+
+" Show tabs as 4 spaces instead of 8
+set tabstop=4
+set shiftwidth=4
+
+" filetype plugin on
+" allow backspacing over everything in insert mode
+set backspace=indent,eol,start
+set nobackup		" DON'T keep a backup file
+
+set history=50		" keep 50 lines of command line history
+set ruler			" show the cursor position all the time
+set showcmd			" display incomplete commands
+set incsearch		" do incremental searching
+
+set number				" line numbers
+set cindent
+set autoindent
+set mouse=a				" use mouse in xterm to scroll
+set scrolloff=5 		" 5 lines bevore and after the current line when scrolling
+set ignorecase			" ignore case
+set smartcase			" but don't ignore it, when search string contains uppercase letters
+set hid 				" allow switching buffers, which have unsaved changes
+set showmatch			" showmatch: Show the matching bracket for the last ')'?
+
+" Turn off all the damn pasting/indenting options.
+set noautoindent
+set noai
+set nocompatible
+set nopaste
+
+" have % bounce between angled brackets, as well as t'other kinds:
+set matchpairs+=<:>
+
+" allow <BkSpc> to delete line breaks, beyond the start of the current
+" insertion, and over indentations:
+set backspace=eol,start,indent
+
+set nowrap				" don't wrap by default
+syn on
+set completeopt=menu,longest,preview
+set confirm
+
+set guioptions=em
+set showtabline=2
+
+:nmap <C-S-tab> :tabprevious<cr>
+:nmap <C-tab> :tabnext<cr>
+:imap <C-S-tab> <ESC>:tabprevious<cr>i
+:imap <C-tab> <ESC>:tabnext<cr>i
+:nmap <C-t> :tabnew<cr>
+:imap <C-t> <ESC>:tabnew<cr>i
+:map <C-w> :tabclose<cr>
+
