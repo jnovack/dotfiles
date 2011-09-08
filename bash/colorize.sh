@@ -33,5 +33,3 @@ if [ `id -u` = 0 ]; then
 else
 	PS1="$LtBlu[$Blu\u@$LtBlu\h $Grn\w$LtBlu]$Neu\\$ "
 fi
-
-export PATH=/opt/local/bin:/opt/local/sbin:$PATH
