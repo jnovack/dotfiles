@@ -49,33 +49,33 @@ status=$(git status --porcelain 2> /dev/null)
 
 if [ $? == 0 ]; then
 
-	color="${bldgrn}GIT${txtgrn} Status: ${txtrst}"
+	color="${bldcyn}GIT${txtcyn} Changes: ${txtrst}"
 
 	# if we have non untracked files (blue)
 	if $(echo "$status" | grep '?? ' &> /dev/null); then
-		line0="${txtwht} | ${txtblu}Untracked: ${bldblu}`git status --porcelain 2>/dev/null | grep '^?? ' | wc -l`"
+		line0="${txtwht} | ${txtred}Untracked: ${bldred}`git status --porcelain 2>/dev/null | grep '^?? ' | wc -l`"
 	fi
 
-	#  added to index (green)
-	if $(echo "$status" | grep '^A  ' &> /dev/null); then
-		line1="${txtylw}Added: ${bldylw}`git status --porcelain 2>/dev/null | grep '^A ' | wc -l`"
+	#  added to commit
+	if $(echo "$status" | grep '^[AM].' &> /dev/null); then
+		line1="${txtgrn}Staged: ${bldgrn}`git status --porcelain 2>/dev/null | grep '^[AM].' | wc -l`"
 	else
-		line1="${bldblk}Added: `git status --porcelain 2>/dev/null | grep '^A ' | wc -l`"
+		line1="${bldblk}Staged:        0"
 	fi
 
-	# updated in index (Cyan)
-	if $(echo "$status" | grep '^ M ' &> /dev/null); then
-    	line2="${txtwht} | ${bldcyn}Updated: ${txtcyn}`git status --porcelain 2>/dev/null | grep '^ M ' | wc -l`"
+	# updated after added
+	if $(echo "$status" | grep '^.[AM].' &> /dev/null); then
+    	line2="${txtwht} | ${txtylw}UnStaged: ${bldylw}`git status --porcelain 2>/dev/null | grep '^.[AM].' | wc -l`"
 	else
-    	line2="${txtwht} | ${bldblk}Updated: `git status --porcelain 2>/dev/null | grep '^ M ' | wc -l`"
+    	line2="${txtwht} | ${bldblk}UnStaged:        0"
 	fi
 
-	#  deleted from index (red)
-	if $(echo "$status" | grep '^ D ' &> /dev/null); then
-    	line3="${txtwht} | ${bldred}Deleted: ${bldred}`git status --porcelain 2>/dev/null | grep '^ D ' | wc -l`"
-	else
-		line3="${txtwht} | ${bldblk}Deleted: `git status --porcelain 2>/dev/null | grep '^ D ' | wc -l`"
-	fi
+#	#  deleted from index
+#	if $(echo "$status" | grep '^.D.' &> /dev/null); then
+#    	line3="${txtwht} | ${txtred}Deleted: ${bldred}`git status --porcelain 2>/dev/null | grep '^D ' | wc -l`"
+#	else
+#		line3="${txtwht} | ${bldblk}Deleted:        0"
+#	fi
 
 	echo "$color	$line1$line2$line3$line0"
 fi
