@@ -1,6 +1,7 @@
 #!/bin/bash
 # .bash_aliases
 
+
 alias ping='/usr/bin/grc /sbin/ping'
 alias traceroute='/usr/bin/grc /sbin/traceroute'
 alias diff='/usr/bin/grc /usr/bin/diff'
