@@ -51,31 +51,24 @@ if [ $? == 0 ]; then
 
 	color="${bldcyn}GIT${txtcyn} Changes: ${txtrst}"
 
-	# if we have non untracked files (blue)
+	#  untracked files
 	if $(echo "$status" | grep '?? ' &> /dev/null); then
 		line0="${txtwht} | ${txtred}Untracked: ${bldred}`git status --porcelain 2>/dev/null | grep '^?? ' | wc -l`"
 	fi
 
-	#  added to commit
-	if $(echo "$status" | grep '^[AM].' &> /dev/null); then
-		line1="${txtgrn}Staged: ${bldgrn}`git status --porcelain 2>/dev/null | grep '^[AM].' | wc -l`"
+	#  ready to commit / in the index
+	if $(echo "$status" | grep '^[MARC].' &> /dev/null); then
+		line1="${txtgrn}Staged: ${bldgrn}`git status --porcelain 2>/dev/null | grep '^[MARC].' | wc -l`"
 	else
 		line1="${bldblk}Staged:        0"
 	fi
 
-	# updated after added
-	if $(echo "$status" | grep '^.[AM].' &> /dev/null); then
-    	line2="${txtwht} | ${txtylw}UnStaged: ${bldylw}`git status --porcelain 2>/dev/null | grep '^.[AM].' | wc -l`"
+	#  in workspace / not in the index
+	if $(echo "$status" | grep '^.[MAD].' &> /dev/null); then
+    	line2="${txtwht} | ${txtylw}UnStaged: ${bldylw}`git status --porcelain 2>/dev/null | grep '^.[MAD].' | wc -l`"
 	else
     	line2="${txtwht} | ${bldblk}UnStaged:        0"
 	fi
-
-#	#  deleted from index
-#	if $(echo "$status" | grep '^.D.' &> /dev/null); then
-#    	line3="${txtwht} | ${txtred}Deleted: ${bldred}`git status --porcelain 2>/dev/null | grep '^D ' | wc -l`"
-#	else
-#		line3="${txtwht} | ${bldblk}Deleted:        0"
-#	fi
 
 	echo "$color	$line1$line2$line3$line0"
 fi
