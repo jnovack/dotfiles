@@ -50,8 +50,14 @@ status=$(git status --porcelain 2> /dev/null)
 if [ $? == 0 ]; then
 
 	branch=$(git status 2>/dev/null| grep "On branch" | cut -f4 -d' ')
+	isdirty=$(git status 2>/dev/null| grep "branch is ahead" | wc -l)
+	if [ $isdirty -gt 0 ]; then
+		dirty="${bldcyn}"
+	else
+		dirty="${txtcyn}"
+    fi
 
-	color="${txtcyn}{${bldcyn}$branch${txtcyn}} ${txtrst}"
+	color="${bldpur}±${txtblu}{${dirty}${branch}${txtblu}}${txtrst} "
 
 	#  untracked files
 	if $(echo "$status" | grep '?? ' &> /dev/null); then
