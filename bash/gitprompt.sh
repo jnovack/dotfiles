@@ -49,7 +49,9 @@ status=$(git status --porcelain 2> /dev/null)
 
 if [ $? == 0 ]; then
 
-	color="${bldcyn}GIT${txtcyn} Changes: ${txtrst}"
+	branch=$(git status 2>/dev/null| grep "On branch" | cut -f4 -d' ')
+
+	color="${txtcyn}{${bldcyn}$branch${txtcyn}} ${txtrst}"
 
 	#  untracked files
 	if $(echo "$status" | grep '?? ' &> /dev/null); then
