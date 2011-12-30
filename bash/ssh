@@ -83,5 +83,5 @@ set_bg "/tmp/iTermBG.$$.png"
 
 echo -ne "\033]0;"$@"\007"
 /usr/bin/ssh "$@"
-echo -ne "\033]0;\007"
+echo -ne "\033]0;"$SHELL"\007"
 
