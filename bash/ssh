@@ -34,11 +34,12 @@ function __calculate_iterm_window_dimensions {
 # Console dimensions
 DIMENSIONS=$(__calculate_iterm_window_dimensions)
 BG_COLOR="#000000"       # Background color
-FG_COLOR="#3C3C52"       # Foreground color
 GRAVITY="NorthEast"      # Text gravity (NorthWest, North, NorthEast, West, Center, East, SouthWest, South, SouthEast)
 OFFSET1="20,10"          # Text offset
-OFFSET2="20,80"          # Text offset
-FONT_SIZE="50"           # Font size in points
+OFFSET2="20,70"          # Text offset
+OFFSET3="20,100"         # Text offset
+FONT_SIZE1="50"          # Font size in points
+FONT_SIZE2="30"          # Font size in points
 FONT_STYLE="Normal"      # Font style (Any, Italic, Normal, Oblique)
 FONT="/System/Library/Fonts/Menlo.ttc"	# Font path
 HOSTNAME=`echo $@ | sed -e "s/.*@//" -e "s/ .*//"`
@@ -48,6 +49,13 @@ HOSTNAME=`echo $@ | sed -e "s/.*@//" -e "s/ .*//"`
 output=`dscacheutil -q host -a name $HOSTNAME`
 RESOLVED_HOSTNAME=`echo -e "$output"|grep '^name:'|awk '{print $2}'`
 RESOLVED_IP=`echo -e "$output"|grep '^ip_address:'|awk '{print $2}'`
+
+# FG_COLOR is an RGBA color set (11,22,33,1.0) based on the uniqueness of the hash of the resolved IP.
+#  helpful when you have multiple hosts of similar names in tabs or windows
+IP_R=`echo ${RESOLVED_IP} | md5 | cut -c 1-2`
+IP_G=`echo ${RESOLVED_IP} | md5 | cut -c 3-4`
+IP_B=`echo ${RESOLVED_IP} | md5 | cut -c 5-6`
+FG_COLOR=`echo $((0x${IP_R})),$((0x${IP_G})),$((0x${IP_B})),0.4`
 
 function set_bg {
 	local tty=$(tty)
@@ -76,8 +84,10 @@ on_exit () {
 trap on_exit EXIT
 
 convert \
-	-size "$DIMENSIONS" xc:"$BG_COLOR" -gravity "$GRAVITY" -fill "$FG_COLOR" -font "$FONT" -style "$FONT_STYLE" -pointsize "$FONT_SIZE" -antialias -draw "text $OFFSET1 '${RESOLVED_HOSTNAME:-$HOSTNAME}'" \
-	-pointsize 30 -draw "text $OFFSET2 '${RESOLVED_IP:-}'" -alpha Off \
+	-size "$DIMENSIONS" xc:"$BG_COLOR" -gravity "$GRAVITY" -fill rgba\(${FG_COLOR}\) -font "$FONT" -style "$FONT_STYLE" \
+	-pointsize "$FONT_SIZE1" -antialias -draw "text $OFFSET1 '${HOSTNAME}'" \
+   	-pointsize "$FONT_SIZE2" -antialias	-draw "text $OFFSET2 '${RESOLVED_HOSTNAME:-$HOSTNAME}'" \
+	-pointsize "$FONT_SIZE2" -antialias -draw "text $OFFSET3 '${RESOLVED_IP:-}'" -alpha on \
 	"/tmp/iTermBG.$$.png"
 set_bg "/tmp/iTermBG.$$.png"
 
