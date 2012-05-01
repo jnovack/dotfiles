@@ -1,0 +1,4 @@
+#!/bin/bash
+echo -ne "\033]0;"COM1"\007"
+screen -L /dev/tty.usbserial-FTCU9DI5
+echo -ne "\033]0;$SHELL\007"
