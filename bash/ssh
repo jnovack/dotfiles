@@ -55,7 +55,7 @@ RESOLVED_IP=`echo -e "$output"|grep '^ip_address:'|awk '{print $2}'`
 IP_R=`echo ${RESOLVED_IP} | md5 | cut -c 1-2`
 IP_G=`echo ${RESOLVED_IP} | md5 | cut -c 3-4`
 IP_B=`echo ${RESOLVED_IP} | md5 | cut -c 5-6`
-FG_COLOR=`echo $((0x${IP_R})),$((0x${IP_G})),$((0x${IP_B})),0.4`
+FG_COLOR=`echo $((0x${IP_R})),$((0x${IP_G})),$((0x${IP_B})),0.7`
 
 function set_bg {
 	local tty=$(tty)
@@ -91,7 +91,7 @@ convert \
 	"/tmp/iTermBG.$$.png"
 set_bg "/tmp/iTermBG.$$.png"
 
-echo -ne "\033]0;"$@"\007"
+echo -n -e "\033k$@\033\\"
 /usr/bin/ssh "$@"
-echo -ne "\033]0;"$SHELL"\007"
+echo -n -e "\033k$SHELL\033\\"
 
