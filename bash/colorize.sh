@@ -29,7 +29,7 @@ Neu="\[\033[0m\]"	# Neutral
 # \w = Full Path           eg.  /usr/www/html
 # \W = Current directory   eg.  html
 if [ `id -u` = 0 ]; then
-	PS1="$LtRed[$Red\u@$LtRed\h $Grn\w$LtRed]$Neu\\$ "
+	PS1="$Wht[$Pur\D{%b %d} $LtPur\A$Wht] $LtRed[$Red\u@$LtRed\h $Grn\w$LtRed]$Neu\\$ "
 else
-	PS1="$LtBlu[$Blu\u@$LtBlu\h $Grn\w$LtBlu]$Neu\\$ "
+	PS1="$Wht[$Pur\D{%b %d} $LtPur\A$Wht] $LtBlu[$Blu\u@$LtBlu\h $Grn\w$LtBlu]$Neu\\$ "
 fi
