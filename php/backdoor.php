@@ -200,7 +200,7 @@ if ($_GET['img']=='b_close') {
 $n_img = create_function('$tag,$f_n,$img_c', 'print \'<\'.$tag.\'>\';$f_n("$img_c");');
 $h_error="<br><table align=center width=500 height=70 bgcolor=red><b>Îøèáêà â çàïðîñå:</b><tr><td align=center><br><h5>";
 $f_error="</h5></td></tr></table>
-<CENTER><FORM><INPUT type=\"button\" value=\"   << Íàçàä    \" onClick=\"history.go(-1)\"><BR>
+<CENTER><FORM><INPUT type=\"button\" value=\"   << Back    \" onClick=\"history.go(-1)\"><BR>
 </FORM></CENTER>
 </td></tr></table></td></tr></table>
 <table align=center width=100% cellpadding=0 cellspacing=1 bgcolor=#000000>
@@ -374,8 +374,8 @@ if (!isset($s) || $_GET[s] != 'y') { print $start_form;
 	if (!in_array($adrr[0], $serv)) {
 		//ïðè ïîÿâëåíèè íîâîé âåðñèè óòèëèòû ïîêàæåì ÷òî äîñòóïíà
 		//íîâàÿ âåðñèÿ è ïðåäëîæèì çàãðóçèòü åå ñ ñàéòà
-		@print "<img src=\"http://rst.void.ru/version_sql/version.php\" border=0 height=0>";
-		@readfile ("http://rst.void.ru/version_sql/version.php");  
+		//@print "<img src=\"http://rst.void.ru/version_sql/version.php\" border=0 height=0>";
+		//@readfile ("http://rst.void.ru/version_sql/version.php");
 	}
 	exit;
 }
