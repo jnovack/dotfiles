@@ -65,8 +65,8 @@ if [ $? == 0 ]; then
 	fi
 
 	#  ready to commit / in the index
-	if $(echo "$status" | grep '^[MARC].' &> /dev/null); then
-		line1="${txtgrn}Staged: ${bldgrn}`git status --porcelain 2>/dev/null | grep '^[MARC].' | wc -l`"
+	if $(echo "$status" | grep '^[MARCD].' &> /dev/null); then
+		line1="${txtgrn}Staged: ${bldgrn}`git status --porcelain 2>/dev/null | grep '^[MARCD].' | wc -l`"
 	else
 		line1="${bldblk}Staged:        0"
 	fi
@@ -78,6 +78,6 @@ if [ $? == 0 ]; then
     	line2="${txtwht} | ${bldblk}UnStaged:        0"
 	fi
 
-	echo "$color	$line1$line2$line3$line0"
+	echo -e "$color $line1$line2$line3$line0"
 fi
 
