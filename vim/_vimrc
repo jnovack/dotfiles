@@ -21,12 +21,14 @@ set incsearch		" do incremental searching
 set number				" line numbers
 set cindent
 set autoindent
-set mouse=a				" use mouse in xterm to scroll
 set scrolloff=5 		" 5 lines bevore and after the current line when scrolling
 set ignorecase			" ignore case
 set smartcase			" but don't ignore it, when search string contains uppercase letters
 set hid 				" allow switching buffers, which have unsaved changes
 set showmatch			" showmatch: Show the matching bracket for the last ')'?
+
+set smartindent
+set expandtab
 
 " Turn off all the damn pasting/indenting options.
 set noautoindent
