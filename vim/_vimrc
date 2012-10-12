@@ -59,3 +59,5 @@ set showtabline=2
 :imap <C-t> <ESC>:tabnew<cr>i
 :map <C-w> :tabclose<cr>
 
+let $XIKI_DIR = "~/.rvm/rubies/ruby-1.9.3-p194/lib/ruby/gems/1.9.1/gems/xiki-0.6.5/"
+source $XIKI_DIR/etc/vim/xiki.vim
