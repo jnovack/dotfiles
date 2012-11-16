@@ -1,5 +1,6 @@
+defscrollback 10000
+caption always "%{= bW}Press CTRL-A,k to Kill Window"
 shell -/bin/bash
-caption always "%{= bW}screen : Logging to $HOME/logs/ ON"
 hardstatus alwayslastline
 hardstatus string '%{= kG}[ %{r}%H %{g}][%= %{= kw}%?%-w%? %{y}(%{C}%n %t%{y}) %{= kw}%?%+w%? %= %{g}][%{b}%Y-%m-%d %{W}%c %{g}]'
 logfile $HOME/logs/%Y%m%d%c-%n.log
