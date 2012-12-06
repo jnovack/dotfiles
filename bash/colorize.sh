@@ -45,7 +45,7 @@ txtrst='\033[m'   	# Text Reset
 # \w = Full Path           eg.  /usr/www/html
 # \W = Current directory   eg.  html
 if [ `id -u` = 0 ]; then
-	PS1="$txtwht[$txtpur\D{%b %d} $bldpur\A$txtwht] $bldred[$txtred\u@$bldred\h $txtgrn\w$bldred]$txtrst\\$ "
+	PS1="\[$txtwht[$txtpur\D{%b %d} $bldpur\A$txtwht] $bldred[$txtred\u@$bldred\h $txtgrn\w$bldred]$txtrst\\$ \]"
 else
-	PS1="$txtwht[$txtpur\D{%b %d} $bldpur\A$txtwht] $bldblu[$txtblu\u@$bldblu\h $txtgrn\w$bldblu]$txtrst\\$ "
+	PS1="\[$txtwht[$txtpur\D{%b %d} $bldpur\A$txtwht] $bldblu[$txtblu\u@$bldblu\h $txtgrn\w$bldblu]$txtrst\\$ \]"
 fi
