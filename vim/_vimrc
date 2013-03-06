@@ -7,6 +7,7 @@ behave mswin
 " Show tabs as 4 spaces instead of 8
 set tabstop=4
 set shiftwidth=4
+set expandtab
 
 " filetype plugin on
 " allow backspacing over everything in insert mode
@@ -19,20 +20,17 @@ set showcmd			" display incomplete commands
 set incsearch		" do incremental searching
 
 set number				" line numbers
-set cindent
-set autoindent
+set mouse=a				" use mouse in xterm to scroll
 set scrolloff=5 		" 5 lines bevore and after the current line when scrolling
 set ignorecase			" ignore case
 set smartcase			" but don't ignore it, when search string contains uppercase letters
 set hid 				" allow switching buffers, which have unsaved changes
 set showmatch			" showmatch: Show the matching bracket for the last ')'?
 
-set smartindent
-set expandtab
-
 " Turn off all the damn pasting/indenting options.
 set noautoindent
-set noai
+set nocindent
+set nosmartindent
 set nocompatible
 set nopaste
 
@@ -59,5 +57,3 @@ set showtabline=2
 :imap <C-t> <ESC>:tabnew<cr>i
 :map <C-w> :tabclose<cr>
 
-let $XIKI_DIR = "~/.rvm/rubies/ruby-1.9.3-p194/lib/ruby/gems/1.9.1/gems/xiki-0.6.5/"
-source $XIKI_DIR/etc/vim/xiki.vim
