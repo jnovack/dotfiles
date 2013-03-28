@@ -2,7 +2,7 @@
 # ~/bin/ssh
 
 ##########################################################################
-# Bash Coloring and Prompt Changing for git
+# iTerm Background changing for ssh connected hosts
 # -- 09/07/11 by Justin J. Novack
 #
 # Documenation:
@@ -91,7 +91,7 @@ convert \
 	"/tmp/iTermBG.$$.png"
 set_bg "/tmp/iTermBG.$$.png"
 
-echo -n -e "\033k$@\033\\"
+echo -e "\033k$@\033\\"
 /usr/bin/ssh "$@"
-echo -n -e "\033k$SHELL\033\\"
+echo -e "\033k$SHELL\033\\"
 
