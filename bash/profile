@@ -1,0 +1,5 @@
+HISTSIZE=10000
+
+function title { echo -n -e "\033k$1\033\\"; }
+export title
+echo -n -e "\033k$USER@$HOSTNAME\033\\"
