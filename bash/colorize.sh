@@ -39,7 +39,7 @@ bakblu='\[\e[44m\]'   # Blue
 bakpur='\[\e[45m\]'   # Purple
 bakcyn='\[\e[46m\]'   # Cyan
 bakwht='\[\e[47m\]'   # White
-txtrst='\[\e[m\]'   	# Text Reset
+txtrst='\[\e[0m\]'   	# Text Reset
 
 # Set Prompt
 # \w = Full Path           eg.  /usr/www/html
