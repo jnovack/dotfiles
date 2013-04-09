@@ -5,6 +5,7 @@
 # Bash Coloring and Prompt Changing
 # -- 10/26/01 by Justin J. Novack
 # Purpose: Changes Root Prompt to be Red
+# Purpose: Add in graphic for non-zero exits
 # Documentation: Copy this file to /etc/profile.d/ and chmod +x
 
 txtblk='\[\e[0;30m\]' # Black - Regular
@@ -44,6 +45,13 @@ txtrst='\[\e[0m\]'   	# Text Reset
 # Set Prompt
 # \w = Full Path           eg.  /usr/www/html
 # \W = Current directory   eg.  html
+#
+# Sample:
+#   [Jan 01 12:34] [user@hostname ~]$ true
+#   [Jan 01 12:34] [user@hostname ~]$ false
+#    ಠ╭╮ಠ ( return value: 1 )
+#   [Jan 01 12:34] [user@hostname ~]$
+
 if [ `id -u` = 0 ]; then
 	PS1="\`if [ \$? != 0 ]; then echo -e \"$bldred ಠ╭╮ಠ $txtred( return value:$bldred $? $txtred)\"; printf '\n'; fi; \`$txtwht[$txtpur\D{%b %d} $bldpur\A$txtwht] $bldred[$txtred\u@$bldred\h $txtgrn\w$bldred]$txtrst\\$ "
 else
