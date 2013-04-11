@@ -1,6 +1,6 @@
 #!/bin/bash
 # .bash_aliases
 
-alias ping='/usr/bin/grc -c conf.ping /usr/bin/script -q stdout /sbin/ping'
+alias ping='/usr/bin/grc -c conf.ping /usr/bin/script -q /dev/null /sbin/ping'
 alias traceroute='/usr/bin/grc /usr/sbin/traceroute'
 alias diff='/usr/bin/grc /usr/bin/diff'
