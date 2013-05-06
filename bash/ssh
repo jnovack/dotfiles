@@ -11,6 +11,11 @@
 #
 # Purpose:
 #   SSH with host name and IP address in background (only in iTerm.app)
+#
+# Prerequisites:
+#   ImageMagick in any form.  I prefer the custom cactuslab.com build
+#   (http://cactuslab.com/imagemagick/assets/ImageMagick6.8.5-3.pkg.zip)
+#   as it does not require homebrew or macports.
 
 # First, check to see if we have the correct terminal!
 if [ "$(tty)" == 'not a tty' ] || [ "$TERM_PROGRAM" != "iTerm.app" ] ; then
@@ -84,11 +89,11 @@ on_exit () {
 trap on_exit EXIT
 
 convert \
-	-size "$DIMENSIONS" xc:"$BG_COLOR" -gravity "$GRAVITY" -fill rgba\(${FG_COLOR}\) -font "$FONT" -style "$FONT_STYLE" \
-	-pointsize "$FONT_SIZE1" -antialias -draw "text $OFFSET1 '${HOSTNAME}'" \
-   	-pointsize "$FONT_SIZE2" -antialias	-draw "text $OFFSET2 '${RESOLVED_HOSTNAME:-$HOSTNAME}'" \
-	-pointsize "$FONT_SIZE2" -antialias -draw "text $OFFSET3 '${RESOLVED_IP:-}'" -alpha on \
-	"/tmp/iTermBG.$$.png"
+    -size "$DIMENSIONS" xc:"$BG_COLOR" -gravity "$GRAVITY" -fill rgba\(${FG_COLOR}\) -font "$FONT" -style "$FONT_STYLE" \
+    -pointsize "$FONT_SIZE1" -antialias -draw "text $OFFSET1 '${HOSTNAME}'" \
+    -pointsize "$FONT_SIZE2" -antialias -draw "text $OFFSET2 '${RESOLVED_HOSTNAME:-$HOSTNAME}'" \
+    -pointsize "$FONT_SIZE2" -antialias -draw "text $OFFSET3 '${RESOLVED_IP:-}'" -alpha on \
+    "/tmp/iTermBG.$$.png"
 set_bg "/tmp/iTermBG.$$.png"
 
 echo -e "\033k$@\033\\"
