@@ -78,6 +78,6 @@ if [ $? == 0 ]; then
     	line2="${txtwht} | ${bldblk}UnStaged:        0"
 	fi
 
-	echo "$color $line1$line2$line3$line0"
+	echo -e "$color $line1$line2$line3$line0"
 fi
 
