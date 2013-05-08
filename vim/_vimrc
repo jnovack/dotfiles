@@ -57,3 +57,5 @@ set showtabline=2
 :imap <C-t> <ESC>:tabnew<cr>i
 :map <C-w> :tabclose<cr>
 
+" Add sudo write command
+command! -bar -nargs=0 Sw  :setl nomod|silent exe 'write !sudo tee % >/dev/null'|let &mod = v:shell_error
