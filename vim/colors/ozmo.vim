@@ -24,10 +24,10 @@ hi WildMenu		guibg=#e7e7e7	guifg=#000000	gui=bold
 
 hi Directory		guibg=bg	guifg=#1e90ff	gui=none
 hi ErrorMsg		guibg=#ee2c2c	guifg=#ffffff	gui=bold
-hi DiffAdd		guibg=#008b00	guifg=fg	gui=none
-hi DiffChange		guibg=#00008b	guifg=fg	gui=none
-hi DiffDelete		guibg=#8b0000	guifg=fg	gui=none
-hi DiffText		guibg=#00008b	guifg=fg	gui=bold
+hi DiffAdd      guibg=#008b00   guifg=fg        gui=none
+hi DiffChange   guibg=#00008b   guifg=gray      gui=none
+hi DiffDelete   guibg=#8b0000   guifg=fg        gui=none
+hi DiffText     guibg=#00008b   guifg=cyan      gui=bold
 hi IncSearch		guibg=#e7e7e7	guifg=#000000	gui=bold
 hi ModeMsg		guibg=bg	guifg=fg	gui=bold
 hi MoreMsg		guibg=bg	guifg=#d0d097	gui=bold
