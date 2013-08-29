@@ -6,16 +6,28 @@ colours=magenta
 regexp=(([0-9a-fA-F]{1,4})?\:\:?[0-9a-fA-F]{1,4})+
 colours=magenta
 =======
-# time
+# time ms
 regexp=\d{1,2}\.\d+\sms
 colours=green
 =======
-# time
+# time ms
 regexp=\d{3}\.\d+\sms
 colours=yellow
 =======
-# time
+# time ms
 regexp=\d{4}\.\d+\sms
+colours=red
+=======
+# time end
+regexp=(\d{1,2}\.\d+)\/
+colours=green
+=======
+# time end
+regexp=(\d{3}\.\d+)\/
+colours=yellow
+=======
+# time end
+regexp=(\d{4}\.\d+)\/
 colours=red
 #=======
 # time
