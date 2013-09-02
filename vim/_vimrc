@@ -5,8 +5,8 @@ colorscheme ozmo
 behave mswin
 
 " Show tabs as 4 spaces instead of 8
-set tabstop=4
-set shiftwidth=4
+set tabstop=2
+set shiftwidth=2
 set expandtab
 
 " filetype plugin on
