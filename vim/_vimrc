@@ -58,4 +58,15 @@ set showtabline=2
 :map <C-w> :tabclose<cr>
 
 " Add sudo write command
-command! -bar -nargs=0 Sw  :setl nomod|silent exe 'write !sudo tee % >/dev/null'|let &mod = v:shell_error
+command! -bar -nargs=0 Sw :setl nomod|silent exe 'write !sudo tee % >/dev/null'|let &mod = v:shell_error
+
+" Add fixup command
+command -nargs=0 Fixup :call FixupWS()
+
+" Fixup Whitespace - Convert tabs to spaces and delete trailing white space
+func! FixupWS()
+  exe "normal mz"
+  %s/\s\+$//ge
+  exe "retab"
+  exe "normal `z"
+endfunc
