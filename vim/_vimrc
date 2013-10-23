@@ -46,8 +46,15 @@ syn on
 set completeopt=menu,longest,preview
 set confirm
 
+" Portrait Mode: 80 lines per page
+" Landscape Mode: 55 lines per page
+set printoptions=left:10pt,right:10pt,top:10pt,bottom:10pt
+
 set guioptions=em
 set showtabline=2
+
+:map <C-F5> :set printoptions=portrait:y
+:map <C-F6> :set printoptions=portrait:n
 
 :nmap <C-S-tab> :tabprevious<cr>
 :nmap <C-tab> :tabnext<cr>
