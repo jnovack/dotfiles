@@ -5,3 +5,6 @@ alias ping='/usr/bin/grc -c conf.ping /usr/bin/script -q /dev/null /sbin/ping'
 alias traceroute='/usr/bin/grc /usr/sbin/traceroute'
 alias diff='/usr/bin/grc /usr/bin/diff'
 alias flushdns='sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder'
+
+export LSCOLORS=ExFxBxDxCxegedabagacad
+alias ls='ls -G'
