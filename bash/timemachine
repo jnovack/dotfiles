@@ -1,0 +1,1 @@
+tmutil listbackups | grep -E -e '20(09|10)-[[:digit:]]{2}-[[:digit:]]{2}-' | while read backup; do echo "Working on backup '$backup' ..."; tmutil delete "$backup"; done
