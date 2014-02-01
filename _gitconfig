@@ -28,6 +28,7 @@
     track = "!f() { ([ $# -eq 2 ] && ( echo \"Setting tracking for branch \" $1 \" -> \" $2;git branch --set-upstream $1 $2; ) || ( git for-each-ref --format=\"local: %(refname:short) <--sync--> remote: %(upstream:short)\" refs/heads && echo --Remotes && git remote -v)); }; f"
     accept-ours = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --ours -- $files; git add -u $files; git rebase --continue }; f"
     accept-theirs = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --theirs -- $files; git add -u $files; git rebase --continue }; f"
+    catchup = "!f() { git pull --recurse-submodules; git submodule update --init; git submodule update --recursive }; f"
 
 [core]
     pager = less -r
