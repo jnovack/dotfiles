@@ -68,13 +68,16 @@ undwht=$under$white
 # \W = Current directory   eg.  html
 #
 # Sample:
-#   [Jan 01 12:34] [user@hostname ~]$ true
-#   [Jan 01 12:34] [user@hostname ~]$ false
+#   [Jan 01 13:37] [user@hostname ~]$ true
+#   [Jan 01 13:37] [user@hostname ~]$ false
 #    ಠ╭╮ಠ ( return value: 1 )
-#   [Jan 01 12:34] [user@hostname ~]$
+#   [Jan 01 13:37] [user@hostname ~]$
+#
+# Note: The second line DOES throw off bash width calculations when scrolling
+#   through your history. This is a well-known bash issue.
 
 if [ `id -u` = 0 ]; then
-	PS1="\`if [ \$? != 0 ]; then echo -e \"$bldred ಠ╭╮ಠ $txtred( return value:$bldred $? $txtred)\"; printf '\n'; fi; \`$txtwht[$txtmag\D{%b %d} $bldmag\A$txtwht] $bldred[$txtred\u@$bldred\h $txtgrn\w$bldred]$reset\\$ "
+	PS1="\`if [ \$? != 0 ]; then echo -e \"\[$bldred ಠ╭╮ಠ $txtred( return value:$bldred $? $txtred)\n\]\"; fi; \`\[$txtwht[$txtmag\D{%b %d} $bldmag\A$txtwht] $bldred[$txtred\u@$bldred\h $txtgrn\w$bldred]$reset\\# \]"
 else
-	PS1="\`if [ \$? != 0 ]; then echo -e \"$bldred ಠ╭╮ಠ $txtred( return value:$bldred $? $txtred)\"; printf '\n'; fi; \`$txtwht[$txtmag\D{%b %d} $bldmag\A$txtwht] $bldblu[$txtblu\u@$bldblu\h $txtgrn\w$bldblu]$reset\\$ "
+	PS1="\`if [ \$? != 0 ]; then echo -e \"\[$bldred ಠ╭╮ಠ $txtred( return value:$bldred $? $txtred)\n\]\"; fi; \`\[$txtwht[$txtmag\D{%b %d} $bldmag\A$txtwht] $bldblu[$txtblu\u@$bldblu\h $txtgrn\w$bldblu]$reset\\$ \]"
 fi
