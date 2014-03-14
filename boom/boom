@@ -77,6 +77,9 @@
         },
         {
           "stickydir": "sudo find . -type d -print | xargs -0 chmod g+s"
+        },
+        {
+          "node-password": "node -e console.log(Math.random().toString(36).substring(7));"
         }
       ]
     },
