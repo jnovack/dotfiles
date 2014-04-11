@@ -80,6 +80,9 @@
         },
         {
           "node-password": "node -e console.log(Math.random().toString(36).substring(7));"
+        },
+        {
+          "flushdnsosx": "sudo killall -HUP mDNSResponder"
         }
       ]
     },
