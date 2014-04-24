@@ -47,11 +47,11 @@ FONT_SIZE1="50"          # Font size in points
 FONT_SIZE2="30"          # Font size in points
 FONT_STYLE="Normal"      # Font style (Any, Italic, Normal, Oblique)
 FONT="/System/Library/Fonts/Menlo.ttc"	# Font path
-HOSTNAME=`echo $@ | sed -e "s/.*@//" -e "s/ .*//"`
+HOST=`echo $@ | sed -e "s/.*@//" -e "s/ .*//"`
 
-# RESOLVED_HOSTNAME=`nslookup $HOSTNAME|tail -n +4|grep '^Name:'|cut -f2 -d $'\t'`
-# RESOLVED_IP=`nslookup $HOSTNAME|tail -n +4|grep '^Address:'|cut -f2 -d $':'|tail -c +2`
-output=`dscacheutil -q host -a name $HOSTNAME`
+# RESOLVED_HOSTNAME=`nslookup $HOST|tail -n +4|grep '^Name:'|cut -f2 -d $'\t'`
+# RESOLVED_IP=`nslookup $HOST|tail -n +4|grep '^Address:'|cut -f2 -d $':'|tail -c +2`
+output=`dscacheutil -q host -a name $HOST`
 RESOLVED_HOSTNAME=`echo -e "$output"|grep '^name:'|awk '{print $2}'`
 RESOLVED_IP=`echo -e "$output"|grep '^ip_address:'|awk '{print $2}'`
 
@@ -90,13 +90,12 @@ trap on_exit EXIT
 
 convert \
     -size "$DIMENSIONS" xc:"$BG_COLOR" -gravity "$GRAVITY" -fill rgba\(${FG_COLOR}\) -font "$FONT" -style "$FONT_STYLE" \
-    -pointsize "$FONT_SIZE1" -antialias -draw "text $OFFSET1 '${HOSTNAME}'" \
-    -pointsize "$FONT_SIZE2" -antialias -draw "text $OFFSET2 '${RESOLVED_HOSTNAME:-$HOSTNAME}'" \
+    -pointsize "$FONT_SIZE1" -antialias -draw "text $OFFSET1 '${HOST}'" \
+    -pointsize "$FONT_SIZE2" -antialias -draw "text $OFFSET2 '${RESOLVED_HOSTNAME:-$HOST}'" \
     -pointsize "$FONT_SIZE2" -antialias -draw "text $OFFSET3 '${RESOLVED_IP:-}'" -alpha on \
     "/tmp/iTermBG.$$.png"
 set_bg "/tmp/iTermBG.$$.png"
 
 echo -e "\033k$@\033\\"
 /usr/bin/ssh "$@"
-echo -e "\033k$SHELL\033\\"
-
+echo -e "\033k$USER@$HOSTNAME\033\\"
