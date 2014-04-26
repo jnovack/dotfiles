@@ -74,9 +74,9 @@ if [ $? == 0 ]; then
 		dirty="${bldcyn}"
 	else
 		dirty="${txtcyn}"
-    fi
+  fi
 
-	color="${bldpur}±${txtblu}{${dirty}${branch}${txtblu}}${txtrst} "
+	color="${bldmag}±${txtblu}{${dirty}${branch}${txtblu}}${txtrst} "
 
 	#  untracked files
 	if $(echo "$status" | grep '?? ' &> /dev/null); then
