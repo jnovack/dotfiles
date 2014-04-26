@@ -73,11 +73,15 @@ undwht=$under$white
 #    ಠ╭╮ಠ ( return value: 1 )
 #   [Jan 01 13:37] [user@hostname ~]$
 #
-# Note: The second line DOES throw off bash width calculations when scrolling
-#   through your history. This is a well-known bash issue.
+
+__colorize_retval () {
+  if (($1)); then
+    printf "$bldred ಠ╭╮ಠ $txtred ( return value: $bldred$1$txtred )\n\r";
+  fi
+}
 
 if [ `id -u` = 0 ]; then
-	PS1="\`if [ \$? != 0 ]; then echo -e \"\[$bldred ಠ╭╮ಠ $txtred( return value:$bldred $? $txtred)\n\]\"; fi; \`\[$txtwht[$txtmag\D{%b %d} $bldmag\A$txtwht] $bldred[$txtred\u@$bldred\h $txtgrn\w$bldred]$reset\\# \]"
+	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtred\][\[$bldred\]\u\[$txtred\]@\[$bldred\]\h \[$txtgrn\]\w\[$txtred\]]\[$reset\]\\# \]"
 else
-	PS1="\`if [ \$? != 0 ]; then echo -e \"\[$bldred ಠ╭╮ಠ $txtred( return value:$bldred $? $txtred)\n\]\"; fi; \`\[$txtwht[$txtmag\D{%b %d} $bldmag\A$txtwht] $bldblu[$txtblu\u@$bldblu\h $txtgrn\w$bldblu]$reset\\$ \]"
+	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtblu\][\[$bldblu\]\u\[$txtblu\]@\[$bldblu\]\h \[$txtgrn\]\w\[$txtblu\]]\[$reset\]\\$ \]"
 fi
