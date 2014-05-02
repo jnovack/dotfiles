@@ -29,6 +29,7 @@
     accept-ours = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --ours -- $files; git add -u $files; git rebase --continue; }; f"
     accept-theirs = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --theirs -- $files; git add -u $files; git rebase --continue; }; f"
     catchup = "!f() { git pull --recurse-submodules; git submodule update --init; git submodule update --recursive; }; f"
+    branch-default = "!f() { git config branch.master.remote origin; git config branch.master.merge refs/heads/master; }; f"
 
 [core]
     pager = less -r
