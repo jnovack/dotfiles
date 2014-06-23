@@ -100,9 +100,6 @@
     {
       "cli": [
         {
-          "password": "dd if=/dev/urandom count=1 2> /dev/null | uuencode -m - | sed -ne 2p | cut -c-10"
-        },
-        {
           "stickydir": "sudo find . -type d -print | xargs -0 chmod g+s"
         },
         {
@@ -110,6 +107,9 @@
         },
         {
           "flushdnsosx": "sudo killall -HUP mDNSResponder"
+        },
+        {
+          "password": "LC_ALL=C tr -dc 'A-HJ-KM-NP-Za-hj-km-np-z2-9' < /dev/urandom | head -c 12"
         }
       ]
     },
