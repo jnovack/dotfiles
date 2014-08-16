@@ -1,6 +1,9 @@
 #!/bin/sh
 # /etc/profile.d/colorize.sh
 
+# If not running interactively, don't do anything
+[[ "$-" != *i* ]] && return
+
 ##########################################################################
 # Bash Coloring and Prompt Changing
 # -- 10/26/01 by Justin J. Novack
