@@ -1,14 +1,14 @@
 #!/bin/bash
-# gitprompt.sh
+# /etc/profile.d/gitprompt.sh
+
+[[ "$-" != *i* ]] && return
 
 ##########################################################################
 # Bash Coloring and Prompt Changing for git
 # -- 09/07/11 by Justin J. Novack
 #
-# Documentation: Add the next line to .bashrc
-#   export PROMPT_COMMAND="sh ~/gitprompt.sh"
 # Purpose: Prepends the following line above the command prompt.
-# GIT Status: 	Added:        0 | Updated:        0 | Deleted:        0
+# ±{master}  Staged:   0 | UnStaged:   0 | Untracked:   3
 
 reset=$(   tput sgr0 )
 bold=$(    tput bold )
@@ -64,44 +64,64 @@ undmag=$under$magenta
 undcyn=$under$cyan
 undwht=$under$white
 
+
+in_git_repo() {
+  # quickly traverse up (up to 10 levels) and look for a .git directory
+  dir=${1:-.}
+  count=`expr 0$2 + 1`
+
+  if [[ $count == "10" ]]; then return 1; fi
+  if [[ -d $dir/.git ]]; then return 0; fi
+
+  in_git_repo $dir/.. $count
+}
+
+git_status() {
+
+in_git_repo;
+
+if [ $? == 1 ]; then return; fi
+
 status=$(git status --porcelain 2> /dev/null)
 
 if [ $? == 0 ]; then
 
-	branch=$(git status 2>/dev/null| grep "On branch" | cut -f3 -d' ')
-	isdirty=$(git status 2>/dev/null| grep "branch is ahead" | wc -l)
-	if [ $isdirty -gt 0 ]; then
-		dirty="${bldcyn}"
-	else
-		dirty="${txtcyn}"
+    branch=$(git status 2>/dev/null| grep "On branch" | cut -f4 -d' ')
+    isdirty=$(git status 2>/dev/null| grep "branch is ahead" | wc -l)
+    if [ $isdirty -gt 0 ]; then
+        dirty="${bldcyn}"
+    else
+        dirty="${txtcyn}"
   fi
 
-	color="${bldmag}±${txtblu}{${dirty}${branch}${txtblu}}${txtrst} "
+    color="${bldmag}±${txtblu}{${dirty}${branch}${txtblu}}${txtrst} "
 
-	#  untracked files
-	if $(echo "$status" | grep '?? ' &> /dev/null); then
-		line0="${txtwht} | ${txtred}Untracked: ${bldred}`git status --porcelain 2>/dev/null | grep '^?? ' | wc -l`"
-	fi
+    #  untracked files
+    if $(echo "$status" | grep '?? ' &> /dev/null); then
+        line0="${txtwht} | ${txtred}Untracked:   ${bldred}`git status --porcelain 2>/dev/null | grep '^?? ' | wc -l`"
+    fi
 
-	#  ready to commit / in the index
-	if $(echo "$status" | grep '^[MARCD].' &> /dev/null); then
-		line1="${txtgrn}Staged: ${bldgrn}`git status --porcelain 2>/dev/null | grep '^[MARCD].' | wc -l`"
-	else
-		line1="${bldblk}Staged:        0"
-	fi
+    #  ready to commit / in the index
+    if $(echo "$status" | grep '^[MARCD].' &> /dev/null); then
+        line1="${txtgrn}Staged:   ${bldgrn}`git status --porcelain 2>/dev/null | grep '^[MARCD].' | wc -l`"
+    else
+        line1="${bldblk}Staged:   0"
+    fi
 
-	#  in workspace / not in the index
-	if $(echo "$status" | grep '^.[MAD].' &> /dev/null); then
-    	line2="${txtwht} | ${txtylw}UnStaged: ${bldylw}`git status --porcelain 2>/dev/null | grep '^.[MAD].' | wc -l`"
-	else
-    	line2="${txtwht} | ${bldblk}UnStaged:        0"
-	fi
+    #  in workspace / not in the index
+    if $(echo "$status" | grep '^.[MAD].' &> /dev/null); then
+        line2="${txtwht} | ${txtylw}UnStaged:   ${bldylw}`git status --porcelain 2>/dev/null | grep '^.[MAD].' | wc -l`"
+    else
+        line2="${txtwht} | ${bldblk}UnStaged:   0"
+    fi
 
   if [[ "$OSTYPE" =~ ^darwin ]]; then
-	  echo "$color $line1$line2$line3$line0"
+      echo "$color $line1$line2$line3$line0"
   else
-	  echo -e "$color $line1$line2$line3$line0"
+      echo -e "$color $line1$line2$line3$line0"
   fi
 
 fi
+}
 
+export PROMPT_COMMAND='git_status'
