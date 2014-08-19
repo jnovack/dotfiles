@@ -84,7 +84,7 @@ __colorize_retval () {
 }
 
 if [ `id -u` = 0 ]; then
-	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtred\][\[$bldred\]\u\[$txtred\]@\[$bldred\]\h \[$txtgrn\]\w\[$txtred\]]\[$reset\]\\#\] "
+	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtred\][\[$bldred\]\u\[$txtred\]@\[$bldred\]\h \[$txtgrn\]\w\[$txtred\]]\[$reset\]#\] "
 else
-	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtblu\][\[$bldblu\]\u\[$txtblu\]@\[$bldblu\]\h \[$txtgrn\]\w\[$txtblu\]]\[$reset\]\\$\] "
+	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtblu\][\[$bldblu\]\u\[$txtblu\]@\[$bldblu\]\h \[$txtgrn\]\w\[$txtblu\]]\[$reset\]$\] "
 fi
