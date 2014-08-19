@@ -109,10 +109,10 @@
           "node-password": "node -e console.log(Math.random().toString(36).substring(7));"
         },
         {
-          "flushdnsosx": "sudo killall -HUP mDNSResponder"
+          "password": "LC_ALL=C tr -dc 'A-HJ-KM-NP-Za-hj-km-np-z2-9' < /dev/urandom | head -c 12"
         },
         {
-          "password": "LC_ALL=C tr -dc 'A-HJ-KM-NP-Za-hj-km-np-z2-9' < /dev/urandom | head -c 12"
+          "flushdnsosx": "dscacheutil -flushcache;sudo killall -HUP mDNSResponder"
         }
       ]
     },
