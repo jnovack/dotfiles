@@ -99,6 +99,8 @@ if [ $? == 0 ]; then
     #  untracked files
     if $(echo "$status" | grep '?? ' &> /dev/null); then
         line0="${txtwht} | ${txtred}Untracked:   ${bldred}`git status --porcelain 2>/dev/null | grep '^?? ' | wc -l`"
+    else
+        line0=""
     fi
 
     #  ready to commit / in the index
