@@ -24,6 +24,7 @@
 [alias]
     summary = log --graph --decorate --pretty=oneline --abbrev-commit
     sum = log --graph --decorate --pretty=format:'%C(yellow)%h %C(magenta)%an%Creset: %s%Creset - %Cgreen%cr%C(auto)%d%Creset' --abbrev-commit --date=relative
+    what-changed = log --decorate --pretty=format:'%C(yellow)%h %C(magenta)%an%Creset: %s%Creset - %Cgreen%cr%C(auto)%d%Creset' --abbrev-commit --date=relative --stat
     history = log --pretty=format:\"%h %ad | %s%d [%an]\" --graph --date=short --color --all
     track = "!f() { ([ $# -eq 2 ] && ( echo \"Setting tracking for branch \" $1 \" -> \" $2;git branch --set-upstream $1 $2; ) || ( git for-each-ref --format=\"local: %(refname:short) <--sync--> remote: %(upstream:short)\" refs/heads && echo --Remotes && git remote -v)); }; f"
     accept-ours = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --ours -- $files; git add -u $files; git rebase --continue; }; f"
