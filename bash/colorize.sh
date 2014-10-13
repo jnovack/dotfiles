@@ -1,6 +1,9 @@
 #!/bin/sh
 # /etc/profile.d/colorize.sh
 
+# If not running interactively, don't do anything
+[[ "$-" != *i* ]] && return
+
 ##########################################################################
 # Bash Coloring and Prompt Changing
 # -- 10/26/01 by Justin J. Novack
@@ -81,7 +84,7 @@ __colorize_retval () {
 }
 
 if [ `id -u` = 0 ]; then
-	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtred\][\[$bldred\]\u\[$txtred\]@\[$bldred\]\h \[$txtgrn\]\w\[$txtred\]]\[$reset\]\\# \]"
+	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtred\][\[$bldred\]\u\[$txtred\]@\[$bldred\]\h \[$txtgrn\]\w\[$txtred\]]\[$reset\]#\] "
 else
-	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtblu\][\[$bldblu\]\u\[$txtblu\]@\[$bldblu\]\h \[$txtgrn\]\w\[$txtblu\]]\[$reset\]\\$ \]"
+	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtblu\][\[$bldblu\]\u\[$txtblu\]@\[$bldblu\]\h \[$txtgrn\]\w\[$txtblu\]]\[$reset\]$\] "
 fi
