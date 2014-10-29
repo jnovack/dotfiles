@@ -118,7 +118,7 @@
           "password": "LC_ALL=C tr -dc 'A-HJ-KM-NP-Za-hj-km-np-z2-9' < /dev/urandom | head -c 12"
         },
         {
-          "flushdnsosx": "dscacheutil -flushcache;sudo killall -HUP mDNSResponder"
+          "flushdnsosx": "sudo discoveryutil udnsflushcaches"
         }
       ]
     },
