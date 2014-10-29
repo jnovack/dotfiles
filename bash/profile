@@ -1,5 +1,7 @@
 HISTSIZE=10000
 
 function title { echo -n -e "\033k$1\033\\"; }
+function dns { nslookup $@ | tail -n+3; ping -c 2 $@; }
 export title
+export dns
 echo -n -e "\033k$USER@$HOSTNAME\033\\"
