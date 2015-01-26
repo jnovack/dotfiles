@@ -1,0 +1,32 @@
+#!/bin/bash
+# ~/bin/ssh
+
+##########################################################################
+# iTerm Background changing for ssh connected hosts
+# -- 09/07/11 by Justin J. Novack
+#
+# Documenation:
+#   cp $this ~/bin/ssh
+#   chmod +x ~/bin/ssh
+#   alias ssh=~/bin/ssh
+#
+# Purpose:
+#   SSH with host name as the title (only in iTerm.app)
+#
+
+# First, check to see if we have the correct terminal!
+if [ "$(tty)" == 'not a tty' ] || [ "$TERM_PROGRAM" != "iTerm.app" ] ; then
+	/usr/bin/ssh "$@"
+	exit $?
+fi
+
+if [[ "$@" == *mosh-server* ]]; then
+  HOST=`echo $@ | awk '{print $11}'`
+else
+  HOST=$@
+fi
+
+echo -e "\033k$HOST\033\\"
+/usr/bin/ssh "$@"
+echo -e "\033k$USER@$HOSTNAME\033\\"
+
