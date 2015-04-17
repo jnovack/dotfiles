@@ -5,7 +5,7 @@ alias ping='/usr/bin/grc -c conf.ping /usr/bin/script -q /dev/null /sbin/ping'
 alias traceroute='/usr/bin/grc /usr/sbin/traceroute'
 alias diff='/usr/bin/grc /usr/bin/diff'
 alias flushdns='sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder'
-alias sublime='/Applications/Sublime\ Text\ 2.app/Contents/SharedSupport/bin/subl'
+alias sublime='/Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl'
 
 export LSCOLORS=ExFxBxDxCxegedabagacad
 alias ls='ls -G'
