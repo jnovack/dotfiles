@@ -86,7 +86,7 @@ status=$(git status --porcelain 2> /dev/null)
 
 if [ $? == 0 ]; then
 
-    branch=$(git status --branch --short 2>/dev/null|head -1|cut -f2 -d' '|cut -f1 -d'.')
+    branch=$(git status --branch --short 2>/dev/null|head -1|cut -f2 -d' '|awk -v RS="..." '{print $1}'|head -1)
     isdirty=$(git status 2>/dev/null| grep "branch is ahead" | wc -l)
     if [ $isdirty -gt 0 ]; then
         dirty="${bldcyn}"
@@ -111,8 +111,8 @@ if [ $? == 0 ]; then
     fi
 
     #  in workspace / not in the index
-    if $(echo "$status" | grep '^.[MAD].' &> /dev/null); then
-        line2="${txtwht} | ${txtylw}UnStaged:   ${bldylw}`git status --porcelain 2>/dev/null | grep '^.[MAD].' | wc -l`"
+    if $(echo "$status" | grep '^.[MADT].' &> /dev/null); then
+        line2="${txtwht} | ${txtylw}UnStaged:   ${bldylw}`git status --porcelain 2>/dev/null | grep '^.[MADT].' | wc -l`"
     else
         line2="${txtwht} | ${bldblk}UnStaged:   0"
     fi
