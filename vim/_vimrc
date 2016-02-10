@@ -1,5 +1,7 @@
 " .vimrc
 
+:inoremap <S-Tab> <C-V><Tab>
+
 set nocompatible
 colorscheme ozmo
 behave mswin
