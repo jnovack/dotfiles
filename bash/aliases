@@ -7,5 +7,12 @@ alias diff='/usr/local/bin/grc /usr/bin/diff'
 alias flushdns='sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder'
 alias sublime='/Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl'
 
+alias jq-es-empty-indexes="/usr/local/bin/jq '[.indices|path(.[]|select(.primaries.docs.count == 0))|.[0]]'"
+
+function jq_es_indexes_where {
+	/usr/local/bin/jq '[.indices|path(.[]|select($1))|.[0]]'
+}
+export jq_es_indexes_where
+
 export LSCOLORS=ExFxBxDxCxegedabagacad
 alias ls='ls -G'
