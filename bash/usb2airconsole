@@ -1,0 +1,4 @@
+#!/bin/bash
+echo -ne "\033]0;"AIRCONSOLE"\007"
+screen -L /dev/tty.Airconsole-1
+echo -ne "\033]0;$SHELL\007"
