@@ -19,6 +19,7 @@ export jq_es_indexes_where
 export LSCOLORS=ExFxBxDxCxegedabagacad
 alias ls='ls -G'
 
+alias docker-environment=`eval "$(docker-machine env default)"`
 alias docker-volume-cleanup="docker volume rm `docker volume ls -f dangling=true -q`"
 alias docker-remove-stopped-containers="docker rm $(docker ps -a -q)"
 alias docker-remove-untagged-images="docker rmi $(docker images | grep '^<none>' | awk '{print $3}')"
