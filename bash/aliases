@@ -9,7 +9,8 @@ alias sublime='/Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl'
 
 alias jq-es-empty-indexes="/usr/local/bin/jq '[.indices|path(.[]|select(.primaries.docs.count == 0))|.[0]]'"
 
-alias jql="/usr/local/bin/jq -C '.' | less -R"
+function jql { /usr/local/bin/jq -C '.' "$1" | less -R; }
+export -f jql
 
 function jq_es_indexes_where {
 	/usr/local/bin/jq '[.indices|path(.[]|select($1))|.[0]]'
@@ -20,6 +21,7 @@ export LSCOLORS=ExFxBxDxCxegedabagacad
 alias ls='ls -G'
 
 alias docker-environment=`eval "$(docker-machine env default)"`
+alias docker-volume-dangling="docker volume ls -f dangling=true"
 alias docker-volume-cleanup="docker volume rm `docker volume ls -f dangling=true -q`"
 alias docker-remove-stopped-containers="docker rm $(docker ps -a -q)"
 alias docker-remove-untagged-images="docker rmi $(docker images | grep '^<none>' | awk '{print $3}')"
