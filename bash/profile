@@ -5,3 +5,7 @@ function dns { nslookup $@ | tail -n+3; ping -c 2 $@; }
 export title
 export dns
 echo -n -e "\033k$USER@$HOSTNAME\033\\"
+
+# Autocomplete for SSH hosts in ~/.ssh/known_hosts
+complete -W "$(echo `cat ~/.ssh/known_hosts | cut -f 1 -d ' ' | sed -e s/,.*//g | uniq | grep -v "\["`;)" ssh
+
