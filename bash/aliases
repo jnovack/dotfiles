@@ -20,14 +20,42 @@ export jq_es_indexes_where
 export LSCOLORS=ExFxBxDxCxegedabagacad
 alias ls='ls -G'
 
+
+## Docker
+
+docker_delete_stopped() {
+    local name=$1
+    local state=$(docker inspect --format "{{.State.Running}}" $name 2>/dev/null)
+
+    if [[ "$state" == "false" ]]; then
+      docker rm $name
+    fi
+}
+
+docker_cleanup() {
+    docker rm $(docker ps -aq 2>/dev/null) 2>/dev/null
+    docker rm -v $(docker ps --filter status=exited -q 2>/dev/null) 2>/dev/null
+    docker rmi $(docker images --filter dangling=true -q 2>/dev/null) 2>/dev/null
+}
+
+
 alias docker-images-pull="docker images | awk '(NR>1) && ($2!~/none/) {print $1\":\"$2}' | xargs -L1 docker pull"
-alias docker-volume-dangling="docker volume ls -f dangling=true"
-alias docker-volume-cleanup="docker volume rm `docker volume ls -f dangling=true -q`"
 alias docker-remove-stopped-containers="docker ps -a -q | xargs docker rm"
 alias docker-remove-untagged-images="docker images | grep '^<none>' | awk '{print $3}' | xargs docker rmi"
 
 alias socat-up="socat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\" > /tmp/socat.log 2> /tmp/socat.err & echo $! >> /tmp/socat.pid"
 alias socat-check="if pgrep socat > /dev/null; then echo 'Running'; else echo 'Stopped'; fi"
 alias socat-down="kill -9 `pgrep socat`; rm /tmp/socat.pid"
+
+function firefox {
+    if pgrep socat > /dev/null; then
+        echo "socat Running..."
+    else
+        echo "socat Starting..."
+	socat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\" > /tmp/socat.log 2> /tmp/socat.err & echo $! >> /tmp/socat.pid
+    fi
+
+    DISPLAY=`/sbin/ifconfig en0 | grep 'inet ' | cut -d ' ' -f2`:0; docker run -it --rm -e DISPLAY -e URL=http://fatpipe.racingchannel.com chrisdaish/firefox
+}
 
 alias redis-cli="docker run -it --rm redis redis-cli $@"
