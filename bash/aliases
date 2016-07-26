@@ -39,9 +39,9 @@ docker_cleanup() {
 }
 
 
-alias docker-images-pull="docker images | awk '(NR>1) && ($2!~/none/) {print $1\":\"$2}' | xargs -L1 docker pull"
+alias docker-images-pull="docker images | awk '(NR>1) && (\$2!~/none/) {print \$1\":\"\$2}' | xargs -L1 docker pull"
 alias docker-remove-stopped-containers="docker ps -a -q | xargs docker rm"
-alias docker-remove-untagged-images="docker images | grep '^<none>' | awk '{print $3}' | xargs docker rmi"
+alias docker-remove-untagged-images="docker images | grep '^<none>' | awk '{print \$3}' | xargs docker rmi"
 
 alias socat-up='socat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\" > /tmp/socat.log 2> /tmp/socat.err & echo $! >> /tmp/socat.pid'
 alias socat-check="if pgrep socat > /dev/null; then echo 'Running'; else echo 'Stopped'; fi"
