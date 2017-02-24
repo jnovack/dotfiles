@@ -20,6 +20,12 @@ export jq_es_indexes_where
 export LSCOLORS=ExFxBxDxCxegedabagacad
 alias ls='ls -G'
 
+## OpenSSL
+
+function openssl_check {
+	echo | openssl s_client -connect $1 2>&1 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | openssl x509 -text -noout
+}
+export openssl_check
 
 ## Docker
 
