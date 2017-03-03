@@ -64,6 +64,7 @@ set showtabline=2
 :imap <C-tab> <ESC>:tabnext<cr>i
 :nmap <C-t> :tabnew<cr>
 :imap <C-t> <ESC>:tabnew<cr>i
+:inoremap <S-Tab> <C-V><Tab>
 :map <C-w> :tabclose<cr>
 
 " Add sudo write command
