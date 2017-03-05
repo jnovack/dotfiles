@@ -44,8 +44,7 @@ docker_cleanup() {
     docker rmi $(docker images --filter dangling=true -q 2>/dev/null) 2>/dev/null
 }
 
-
-alias docker-images-pull="docker images | awk '(NR>1) && (\$2!~/none/) {print \$1\":\"\$2}' | xargs -L1 docker pull"
+alias docker-images-update="docker images | awk '(NR>1) && (\$2!~/none/) {print \$1\":\"\$2}' | xargs -L1 docker pull"
 alias docker-remove-stopped-containers="docker ps -a -q | xargs docker rm"
 alias docker-remove-untagged-images="docker images | grep '^<none>' | awk '{print \$3}' | xargs docker rmi"
 
