@@ -86,7 +86,7 @@ status=$(git status --porcelain 2> /dev/null)
 
 if [ $? == 0 ]; then
 
-    branch=$(git status --branch --short 2>/dev/null|head -1|cut -f2 -d' '|awk -v RS="..." '{print $1}'|head -1)
+    branch=$(git status --branch --short 2>/dev/null|head -1|cut -f2 -d' ')
     isdirty=$(git status 2>/dev/null| grep "branch is ahead" | wc -l)
     if [ $isdirty -gt 0 ]; then
         dirty="${bldcyn}"
