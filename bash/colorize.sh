@@ -77,14 +77,21 @@ undwht=$under$white
 #   [Jan 01 13:37] [user@hostname ~]$
 #
 
+__emoji () {
+  expressions=("(╯°□°)╯" "(>_<)" "ಠ_ಠ" "t(-_-t)" "(¬_¬)" "¯\_(ツ)_/¯");
+  echo ${expressions[$RANDOM % ${#expressions[*]}]};
+}
+
 __colorize_retval () {
-  if (($1)); then
-    printf "$bldred ಠ╭╮ಠ $txtred ( return value: $bldred$1$txtred )\n\r";
+  if [ "$OSTYPE" == 'linux-gnu' ]; then
+    if (($1)); then
+      printf "$bldred %s $txtred ( return value: $bldred$1$txtred )\n\r" $(__emoji);
+    fi
   fi
 }
 
 if [ `id -u` = 0 ]; then
-	PS1="\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtred\][\[$bldred\]\u\[$txtred\]@\[$bldred\]\h \[$txtgrn\]\w\[$txtred\]]\[$reset\]# "
+	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtred\][\[$bldred\]\u\[$txtred\]@\[$bldred\]\h \[$txtgrn\]\w\[$txtred\]]\[$reset\]# "
 else
-	PS1="\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtblu\][\[$bldblu\]\u\[$txtblu\]@\[$bldblu\]\h \[$txtgrn\]\w\[$txtblu\]]\[$reset\]$ "
+	PS1='$(__colorize_retval "$?")'"\[$txtwht\][\[$txtmag\]\D{%b %d} \[$bldmag\]\A\[$txtwht\]] \[$txtblu\][\[$bldblu\]\u\[$txtblu\]@\[$bldblu\]\h \[$txtgrn\]\w\[$txtblu\]]\[$reset\]$ "
 fi
