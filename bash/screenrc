@@ -3,5 +3,5 @@ caption always "%{= bW}Press CTRL-A,k to Kill Window"
 shell -/bin/bash
 hardstatus alwayslastline
 hardstatus string '%{= kG}[ %{r}%H %{g}][%= %{= kw}%?%-w%? %{y}(%{C}%n %t%{y}) %{= kw}%?%+w%? %= %{g}][%{b}%Y-%m-%d %{W}%c %{g}]'
-logfile $HOME/logs/%Y%m%d%c-%n.log
+logfile $HOME/logs/%Y-%m-%d-%0c-%n.log
 deflog on
