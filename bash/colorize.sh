@@ -91,13 +91,13 @@ __colorize_retval () {
 }
 
 # Set up color greps for highlight only
-hl_red() { sed --unbuffered -e s/\\\("$1"\\\)/"${bldred}"\\1"${reset}"/; }
-hl_green() { sed --unbuffered -e s/\\\("$1"\\\)/"${bldgrn}"\\1"${reset}"/; }
-hl_yellow() { sed --unbuffered -e s/\\\("$1"\\\)/"${bldylw}"\\1"${reset}"/; }
-hl_blue() { sed --unbuffered -e s/\\\("$1"\\\)/"${bldblu}"\\1"${reset}"/; }
-hl_purple() { sed --unbuffered -e s/\\\("$1"\\\)/"${bldmag}"\\1"${reset}"/; }
-hl_cyan() { sed --unbuffered -e s/\\\("$1"\\\)/"${bldcyn}"\\1"${reset}"/; }
-hl_white() { sed --unbuffered -e s/\\\("$1"\\\)/"${bldwht}"\\1"${reset}"/; }
+hl_red() { sed -e s/\\\("$1"\\\)/"${bldred}"\\1"${reset}"/; }
+hl_green() { sed -e s/\\\("$1"\\\)/"${bldgrn}"\\1"${reset}"/; }
+hl_yellow() { sed -e s/\\\("$1"\\\)/"${bldylw}"\\1"${reset}"/; }
+hl_blue() { sed -e s/\\\("$1"\\\)/"${bldblu}"\\1"${reset}"/; }
+hl_purple() { sed -e s/\\\("$1"\\\)/"${bldmag}"\\1"${reset}"/; }
+hl_cyan() { sed -e s/\\\("$1"\\\)/"${bldcyn}"\\1"${reset}"/; }
+hl_white() { sed -e s/\\\("$1"\\\)/"${bldwht}"\\1"${reset}"/; }
 export -f hl_red hl_green hl_yellow hl_blue hl_purple hl_cyan hl_white
 
 if [ `id -u` = 0 ]; then
