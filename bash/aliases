@@ -20,6 +20,33 @@ export jq_es_indexes_where
 export LSCOLORS=ExFxBxDxCxegedabagacad
 alias ls='ls -G'
 
+## awk-trim
+alias trim72='awk -v WIDTH=72 '\''
+{
+    gsub("\t"," ")
+    $0 = line $0
+    while (length <= WIDTH) {
+        line = $0
+        more = getline
+        gsub("\t"," ")
+        if (more)
+            $0 = line " " $0
+        else
+            $0 = line
+            break
+    }
+    while (length >= WIDTH) {
+        print substr($0,1,WIDTH)
+        $0 = substr($0,WIDTH+1)
+    }
+    line = $0 " "
+}
+
+END {
+    print
+}
+'\'''
+
 ## OpenSSL
 
 function openssl_check {
