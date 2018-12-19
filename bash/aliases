@@ -21,33 +21,17 @@ export LSCOLORS=ExFxBxDxCxegedabagacad
 alias ls='ls -G'
 
 ## OpenSSL
-
 function openssl_check {
 	echo | openssl s_client -connect $1 2>&1 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | openssl x509 -text -noout
 }
 export openssl_check
 
 ## Docker
-
-docker_delete_stopped() {
-    local name=$1
-    local state=$(docker inspect --format "{{.State.Running}}" $name 2>/dev/null)
-
-    if [[ "$state" == "false" ]]; then
-      docker rm $name
-    fi
-}
-
-docker_cleanup() {
-    docker rm $(docker ps -aq 2>/dev/null) 2>/dev/null
-    docker rm -v $(docker ps --filter status=exited -q 2>/dev/null) 2>/dev/null
-    docker rmi $(docker images --filter dangling=true -q 2>/dev/null) 2>/dev/null
-}
-
 alias docker-images-update="docker images | awk '(NR>1) && (\$2!~/none/) {print \$1\":\"\$2}' | xargs -L1 docker pull"
 alias docker-remove-stopped-containers="docker ps -a -q | xargs docker rm"
 alias docker-remove-untagged-images="docker images | grep '^<none>' | awk '{print \$3}' | xargs docker rmi"
 
+## SoCat
 alias socat-up='socat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\" > /tmp/socat.log 2> /tmp/socat.err & echo $! >> /tmp/socat.pid'
 alias socat-check="if pgrep socat > /dev/null; then echo 'Running'; else echo 'Stopped'; fi"
 alias socat-down="killall socat; rm /tmp/socat.pid"
