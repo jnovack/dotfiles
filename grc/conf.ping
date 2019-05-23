@@ -49,3 +49,7 @@ colours=red,bold red
 # Timeout
 regexp=Request timeout for icmp_seq.*
 colours=bold blink red on_red beep
+=======
+# Timeout
+regexp=.*No route to host.*
+colours=bold blink red on_red beep
