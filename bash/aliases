@@ -55,8 +55,8 @@ export openssl_check
 
 ## Docker
 alias docker-images-update="docker images | awk '(NR>1) && (\$2!~/none/) {print \$1\":\"\$2}' | xargs -L1 docker pull"
-alias docker-remove-stopped-containers="docker ps -a -q | xargs docker rm"
 alias docker-remove-untagged-images="docker images | grep '^<none>' | awk '{print \$3}' | xargs docker rmi"
+alias docker-volume-ls="docker volume ls --format '{{.Name}}' | xargs -L1 -I {} docker run -it --rm -v {}:/mnt alpine ls -laR /mnt"
 
 ## SoCat
 alias socat-up='socat TCP-LISTEN:6000,reuseaddr,fork UNIX-CLIENT:\"$DISPLAY\" > /tmp/socat.log 2> /tmp/socat.err & echo $! >> /tmp/socat.pid'
