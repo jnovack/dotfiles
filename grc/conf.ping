@@ -1,46 +1,50 @@
-# ip number
+# IP
 regexp=\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}
-colours=magenta
+colours=bright_magenta
 =======
 # ipv6 number
 regexp=(([0-9a-fA-F]{1,4})?\:\:?[0-9a-fA-F]{1,4})+
-colours=magenta
+colours=bright_blue
+=======
+# icmp_seq=##
+regexp=icmp_seq=(\d+)
+colours=default,yellow
+=======
+# ttl=#
+regexp=ttl=(\d+)
+colours=default,blue
+=======
+# name
+regexp=(?:[fF]rom|PING)\s(\S+)\s
+colours=default,magenta
 =======
 # time ms
-regexp=\d{1,2}\.\d+\sms
-colours=green
+regexp=(\d{4}\.\d+)\sms
+colours=red,bold red
 =======
 # time ms
-regexp=\d{3}\.\d+\sms
-colours=yellow
+regexp=(\d{3}\.\d+)\sms
+colours=yellow,bold yellow
 =======
 # time ms
-regexp=\d{4}\.\d+\sms
-colours=red
+regexp=(\d{1,2}\.\d+)\sms
+colours=green,bold green
 =======
-# time end
-regexp=(\d{1,2}\.\d+)\/
-colours=green
-=======
-# time end
-regexp=(\d{3}\.\d+)\/
-colours=yellow
-=======
-# time end
-regexp=(\d{4}\.\d+)\/
-colours=red
-#=======
-# time
-#regexp=\d+\sms
-#colours=green
-======
 # DUP
 regexp=DUP\!
-colours=red
+colours=bold red
 =======
-# (,)
-regexp=\(|\)
-colours=yellow
+# OK
+regexp=\s[0\.]{0,2}0% packet loss
+colours=bold green
+======
+# NOK
+regexp=100[\.0]{0,2}% packet loss
+colours=bold red
+=======
+# Errors
+regexp=(Destination Host Unreachable)
+colours=red
 =======
 # unknown host
 regexp=.+unknown\shost\s(.+)
@@ -49,7 +53,32 @@ colours=red,bold red
 # Timeout
 regexp=Request timeout for icmp_seq.*
 colours=bold blink red on_red beep
+======
+# TTL Exceeded
+regexp=.*(Time to live exceeded)
+colours=bold blink red on_red beep
 =======
-# Timeout
+# No route to Host
 regexp=.*No route to host.*
 colours=bold blink red on_red beep
+========
+# statistics header
+regexp=--- (\S+) ping statistics ---
+colours=bold, bold blue
+-
+# last line min/avg/max/mdev
+regexp=rtt (min)/(avg)/(max)/(mdev)
+colours=default,bright_green,bright_yellow,bright_red,bright_magenta
+-
+# last line values
+regexp=\=\s([0-9\.]+)\/([0-9\.]+)\/([0-9\.]+)\/([0-9\.]+)
+colours=default,bright_green,bright_yellow,bright_red,bright_magenta
+-
+# these are good for nping
+regexp=SENT|RCVD
+colours=red
+-
+# nping
+regexp=unreachable
+colours=red
+
