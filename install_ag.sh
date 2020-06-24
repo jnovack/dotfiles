@@ -1,7 +1,7 @@
 #!/bin/sh
 AG_VERSION=2.2.0
 XZ_VERSION=5.2.5
-PCRE_VERSION=8.4.4
+PCRE_VERSION=8.44
 
 ## Setup
 DIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -27,6 +27,7 @@ cd pcre-${PCRE_VERSION}
 ./configure --prefix=/usr/local/pcre-${PCRE_VERSION}
 make
 sudo make install
+sudo rm /usr/local/include/pcre.h
 sudo ln -s /usr/local/pcre-${PCRE_VERSION}/include/pcre.h /usr/local/include/pcre.h
 cd ../
 rm -rf /tmp/pcre-${PCRE_VERSION}*
