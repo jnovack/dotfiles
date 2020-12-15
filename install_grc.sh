@@ -6,4 +6,4 @@ tar -xzvf v1.11.3.tar.gz
 cd grc-1.11.3
 sudo ./install.sh
 sudo rm /usr/local/share/grc/conf.ping
-sudo ln -s $DIR/grc/conf.ping /usr/local/share/grc/conf.ping
+sudo curl --output /usr/local/share/grc/conf.ping https://raw.githubusercontent.com/jnovack/dotfiles/master/grc/conf.ping 
