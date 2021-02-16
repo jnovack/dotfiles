@@ -19,16 +19,16 @@ regexp=(?:[fF]rom|PING)\s(\S+)\s
 colours=default,magenta
 =======
 # time ms
-regexp=(\d{4}\.\d+)\sms
-colours=red,bold red
+regexp=(\d{1,2}\.\d+)\sms
+colours=green,bold green
 =======
 # time ms
 regexp=(\d{3}\.\d+)\sms
 colours=yellow,bold yellow
 =======
 # time ms
-regexp=(\d{1,2}\.\d+)\sms
-colours=green,bold green
+regexp=(\d{4}\.\d+)\sms
+colours=red,bold red
 =======
 # DUP
 regexp=DUP\!
