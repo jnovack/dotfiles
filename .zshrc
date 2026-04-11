@@ -71,9 +71,6 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
 
-# Brew
-eval "$(/opt/homebrew/bin/brew shellenv)"
-
 # Which plugins would you like to load?
 # Standard plugins can be found in ~/.oh-my-zsh/plugins/*
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
@@ -102,8 +99,6 @@ plugins=(
 if [[ -d "$ZSH" ]]; then
   source "$ZSH/oh-my-zsh.sh"
 fi
-
-autoload -U compinit && compinit
 
 # User configuration
 
@@ -205,13 +200,16 @@ function exit() {
   fi
 }
 
-if [[ $- =~ i ]] && [[ -z "$TMUX" ]] && [[ -n "$SSH_TTY" ]] && [[ $(which tmux) == 0 ]]; then
+if [[ $- =~ i ]] && [[ -z "$TMUX" ]] && [[ -n "$SSH_TTY" ]] && command -v tmux >/dev/null 2>&1; then
   tmux attach-session -t ssh_tmux || tmux new-session -s ssh_tmux
 fi
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+
+export SDKROOT="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null)"
 
 if [[ -x /opt/homebrew/bin/brew ]]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -220,12 +218,13 @@ elif [[ -x /usr/local/bin/brew ]]; then
 fi
 
 if command -v brew >/dev/null 2>&1; then
+  # Load azure completions
   [[ -s "$(brew --prefix)/etc/bash_completion.d/az" ]] && . "$(brew --prefix)/etc/bash_completion.d/az"
 fi
 
-export SDKROOT="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null)"
-
-export PATH="$(go env GOPATH)/bin:$PATH"
+if command -v go >/dev/null 2>&1; then
+  export PATH="$(go env GOPATH)/bin:$PATH"
+fi
 
 export PATH="$HOME/.local/bin:$PATH"
 
