@@ -118,6 +118,12 @@ else
   warn "powerlevel10k is not installed."
 fi
 
+if brew="$(brew_bin 2>/dev/null || true)" && [ -n "$brew" ] && "$brew" list --cask font-meslo-lg-nerd-font >/dev/null 2>&1; then
+  ok "Meslo Nerd Font is installed."
+else
+  warn "Meslo Nerd Font is not installed."
+fi
+
 if [ "$SHELL" = "$(command -v zsh 2>/dev/null)" ]; then
   ok "zsh is the active login shell."
 else

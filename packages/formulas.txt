@@ -9,4 +9,5 @@ watch
 coreutils
 gnu-sed
 bash-completion@2
+go
 nvm

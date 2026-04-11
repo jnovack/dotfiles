@@ -1,3 +1,5 @@
+# dotfiles
+
 This repo now serves two jobs:
 
 - bootstrap a new macOS workstation
@@ -24,7 +26,8 @@ The installer will:
 - prompt for a machine role
 - install baseline apps and tools
 - install `oh-my-zsh` and `powerlevel10k`
-- sync canonical `.zshrc` and `.gitconfig`
+- install Meslo Nerd Font for `powerlevel10k` terminal glyphs
+- sync canonical `.zshrc`, `.gitconfig`, and `.p10k.zsh`
 
 ## Sync Model
 
@@ -32,6 +35,7 @@ The repo owns the canonical shared files:
 
 - `.zshrc`
 - `.gitconfig`
+- `.p10k.zsh`
 
 They are symlinked into `$HOME` by `sync.sh`.
 
@@ -39,6 +43,7 @@ Machine-local additions live outside the repo:
 
 - `~/.zshrc.local`
 - `~/.gitconfig.local`
+- `~/.p10k.local.zsh`
 
 The canonical files load those local companions natively, so there is no generated merged file to maintain.
 

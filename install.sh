@@ -85,6 +85,32 @@ install_powerlevel10k() {
   fi
 }
 
+install_meslo_nerd_font() {
+  local brew cask
+  cask="font-meslo-lg-nerd-font"
+  brew="$(brew_bin 2>/dev/null || true)"
+  [ -n "$brew" ] || return 0
+
+  if "$brew" list --cask "$cask" >/dev/null 2>&1; then
+    ok "Meslo Nerd Font already installed."
+    return 0
+  fi
+
+  step "Installing Meslo Nerd Font for powerlevel10k"
+  if run_quiet "$brew" install --cask "$cask"; then
+    ok "Installed Meslo Nerd Font."
+    return 0
+  fi
+
+  step "Ensuring Homebrew cask-fonts tap"
+  run_quiet "$brew" tap homebrew/cask-fonts || true
+  if run_quiet "$brew" install --cask "$cask"; then
+    ok "Installed Meslo Nerd Font."
+  else
+    warn "Failed to install Meslo Nerd Font."
+  fi
+}
+
 switch_to_zsh() {
   local zsh_path current_shell
   zsh_path="$(command -v zsh 2>/dev/null || true)"
@@ -137,6 +163,7 @@ main() {
   section "Shell"
   install_oh_my_zsh
   install_powerlevel10k
+  install_meslo_nerd_font
   switch_to_zsh
 
   section "Sync"

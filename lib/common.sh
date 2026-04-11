@@ -147,12 +147,16 @@ prompt_role() {
     return 0
   fi
 
-  printf '\n%bSelect this machine role%b\n' "$C_BOLD" "$C_RESET"
-  printf '  1. personal\n'
-  printf '  2. work\n'
-  printf '  3. pairing-host\n'
-  printf 'Enter choice [1-3, default 1]: '
-  read -r answer
+  printf '\n%bSelect this machine role%b\n' "$C_BOLD" "$C_RESET" >&2
+  printf '  1. personal\n' >&2
+  printf '  2. work\n' >&2
+  printf '  3. pairing-host\n' >&2
+  printf 'Enter choice [1-3, default 1]: ' >&2
+  if [ -t 0 ] && [ -r /dev/tty ]; then
+    read -r answer </dev/tty
+  else
+    read -r answer
+  fi
   case "$answer" in
     2) role="work" ;;
     3) role="pairing-host" ;;

@@ -16,7 +16,7 @@ install_brew_list() {
   local file="$3"
   local item args
 
-  package_file_lines "$file" | while IFS= read -r item; do
+  while IFS= read -r item; do
     [ -n "$item" ] || continue
     if [ "$kind" = "cask" ]; then
       args="--cask"
@@ -24,17 +24,17 @@ install_brew_list() {
       args=""
     fi
 
-    if "$brew" list $args "$item" >/dev/null 2>&1; then
+    if "$brew" list $args "$item" >/dev/null 2>&1 </dev/null; then
       ok "$item already installed."
     else
       step "Installing $item"
       if [ "$kind" = "cask" ]; then
-        run_quiet "$brew" install --cask "$item" && ok "Installed $item." || warn "Failed to install $item."
+        run_quiet "$brew" install --cask "$item" </dev/null && ok "Installed $item." || warn "Failed to install $item."
       else
-        run_quiet "$brew" install "$item" && ok "Installed $item." || warn "Failed to install $item."
+        run_quiet "$brew" install "$item" </dev/null && ok "Installed $item." || warn "Failed to install $item."
       fi
     fi
-  done
+  done < <(package_file_lines "$file")
 }
 
 run_custom_hooks() {

@@ -9,6 +9,7 @@ SCRIPT_DIR="$(cd -P "$(dirname "$0")" && pwd)"
 CANONICAL_FILES="
 .zshrc
 .gitconfig
+.p10k.zsh
 "
 
 section "Dotfiles Sync"
@@ -16,6 +17,7 @@ section "Dotfiles Sync"
 ensure_dir "$HOME/.config"
 ensure_local_stub "$HOME/.zshrc.local" "# Machine-local zsh additions live here."
 ensure_local_stub "$HOME/.gitconfig.local" "# Machine-local git settings live here."
+ensure_local_stub "$HOME/.p10k.local.zsh" "# Machine-local p10k additions live here."
 
 sync_file() {
   local rel="$1"

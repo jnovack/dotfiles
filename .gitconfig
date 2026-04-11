@@ -26,24 +26,79 @@
     what-changed = log --decorate --pretty=format:'%C(yellow)%h %C(magenta)%an%Creset: %s%Creset - %Cgreen%cr%C(auto)%d%Creset' --abbrev-commit --date=relative --stat
     history = log --pretty=format:\"%h %ad | %s%d [%an]\" --graph --date=short --color --all
     track = "!f() { ([ $# -eq 2 ] && ( echo \"Setting tracking for branch \" $1 \" -> \" $2;git branch --set-upstream $1 $2; ) || ( git for-each-ref --format=\"local: %(refname:short) <--sync--> remote: %(upstream:short)\" refs/heads && echo --Remotes && git remote -v)); }; f"
-    accept-ours = "!f() { files=\"$@\"; [ -z \"$files\" ] && files='.'; git checkout --ours -- $files; git add -u $files; git rebase --continue; }; f"
-    accept-theirs = "!f() { files=\"$@\"; [ -z \"$files\" ] && files='.'; git checkout --theirs -- $files; git add -u $files; git rebase --continue; }; f"
+    accept-ours = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --ours -- $files; git add -u $files; git rebase --continue; }; f"
+    accept-theirs = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --theirs -- $files; git add -u $files; git rebase --continue; }; f"
     catchup = "!f() { git pull --recurse-submodules; git submodule update --init; git submodule update --recursive; }; f"
     branch-default = "!f() { git config branch.master.remote origin; git config branch.master.merge refs/heads/master; }; f"
     pull-request = "!f() { git fetch origin pull/$1/head:$1; }; f"
     sync = "!f() { git fetch upstream; git merge upstream/`git branch --show-current`; git push origin; }; f"
+    noop = "!f() { git commit --allow-empty -m "Trigger Build"; git push origin; }; f"
+    minirelease = "!f() { git commit --allow-empty -m \"$1\"; git tag -a \"$1\" -m \"Release $1\"; git push origin --follow-tags; }; f"
+    release = "!f() { \
+        set -e; \
+        test -n \"$1\" || { echo 'usage: git release major|minor|patch [message]'; echo '       git release v1.1.1 [message]'; exit 1; }; \
+        case \"$1\" in \
+            major|minor|patch) \
+            latest=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1); \
+            [ -z \"$latest\" ] && latest=\"v0.0.0\"; \
+            maj=$(printf '%s' \"$latest\" | sed -E 's/^v([0-9]+)\\..*/\\1/'); \
+            min=$(printf '%s' \"$latest\" | sed -E 's/^v[0-9]+\\.([0-9]+)\\..*/\\1/'); \
+            pat=$(printf '%s' \"$latest\" | sed -E 's/^v[0-9]+\\.[0-9]+\\.([0-9]+).*/\\1/'); \
+            case \"$1\" in \
+                major) maj=$((maj+1)); min=0; pat=0 ;; \
+                minor) min=$((min+1)); pat=0 ;; \
+                patch) pat=$((pat+1)) ;; \
+            esac; \
+            ver=\"v${maj}.${min}.${pat}\"; \
+            msg=${2:-\"Release $ver\"}; \
+            ;; \
+            v[0-9]*.[0-9]*.[0-9]*) \
+            ver=\"$1\"; \
+            msg=${2:-\"Release $1\"}; \
+            ;; \
+            *) echo 'version must be major, minor, patch, or look like v1.1.1'; exit 1 ;; \
+        esac; \
+        major=$(printf '%s' \"$ver\" | sed -E 's/^(v[0-9]+)\\..*/\\1/'); \
+        minor=$(printf '%s' \"$ver\" | sed -E 's/^(v[0-9]+\\.[0-9]+)\\..*/\\1/'); \
+        git rev-parse --verify HEAD >/dev/null; \
+        git tag -a \"$ver\" -m \"$msg\"; \
+        git tag -f \"$minor\"; \
+        git tag -f \"$major\"; \
+        git push origin -f \"$minor\" \"$major\"; \
+        git push origin \"$ver\"; \
+        }; f"
+    squash = "!f(){ \
+        target=\"$1\"; \
+        [ -z \"$target\" ] && { echo 'usage: git squash <branch-or-commit>'; exit 1; }; \
+        old_head=$(git rev-parse HEAD) || exit 1; \
+        git rev-parse --verify \"$target^{commit}\" >/dev/null 2>&1 || { echo \"invalid ref: $target\"; exit 1; }; \
+        base=$(git merge-base \"$old_head\" \"$target\") || exit 1; \
+        [ \"$base\" = \"$old_head\" ] && { echo 'nothing to squash'; exit 1; }; \
+        msg=$(git log --reverse --format='%s' \"$base..$old_head\"); \
+        git reset --soft \"$base\" && git commit --edit -m \"${msg:-squash}\"; \
+    }; f"
 
 [core]
-    pager = less -r
+	pager = less -r
+	excludesfile = /Users/jnovack/.gitignore
 
 [credential]
     helper = osxkeychain
 
+[difftool "sourcetree"]
+	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
+	path =
+
+[mergetool "sourcetree"]
+	cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
+	trustExitCode = true
+
 [commit]
-    gpgsign = true
+	template = /Users/jnovack/.stCommitMsg
+	gpgsign = true
 
 [init]
-    defaultBranch = master
+	defaultBranch = main
 
 [include]
     path = ~/.gitconfig.local
