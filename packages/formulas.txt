@@ -1,0 +1,12 @@
+git
+gh
+jq
+ripgrep
+tmux
+gnupg
+mosh
+watch
+coreutils
+gnu-sed
+bash-completion@2
+nvm

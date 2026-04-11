@@ -1,21 +1,64 @@
-This is my personal store of dotfiles, installation scripts and customizations
-(Oh My!).  It is by no means complete, and caution is suggested when blindly
-installing something.  It is shared with the intent that you take what you
-need and ignore the rest.
+This repo now serves two jobs:
 
-If you find problems, make an issue. Have a suggestion, submit a pull request.
+- bootstrap a new macOS workstation
+- keep shared shell and git configuration synchronized with local escape hatches
 
+The current system is built around three commands:
 
-## New Installation
+- `install.sh` for first-run setup
+- `sync.sh` for canonical dotfile linking
+- `audit.sh` for migration guidance on existing machines
+
+## Bootstrap
+
+Run this on a new Mac:
 
 ```sh
-curl https://raw.githubusercontent.com/jnovack/dotfiles/master/install_buildtools.sh -o- | sh
-curl https://raw.githubusercontent.com/jnovack/dotfiles/master/install_ag.sh -o- | sh
-curl https://raw.githubusercontent.com/jnovack/dotfiles/master/install_tmux.sh -o- | sh
-curl https://raw.githubusercontent.com/jnovack/dotfiles/master/install_grc.sh -o- | sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/jnovack/dotfiles/HEAD/install.sh)"
 ```
 
-## Selected Installs
+The installer will:
 
-    curl -O -L https://raw.github.com/jnovack/dotfiles/master/bash/colorize.sh
+- ensure Xcode Command Line Tools and Homebrew are available
+- clone or refresh the repo in `~/Source/dotfiles`
+- prompt for a machine role
+- install baseline apps and tools
+- install `oh-my-zsh` and `powerlevel10k`
+- sync canonical `.zshrc` and `.gitconfig`
 
+## Sync Model
+
+The repo owns the canonical shared files:
+
+- `.zshrc`
+- `.gitconfig`
+
+They are symlinked into `$HOME` by `sync.sh`.
+
+Machine-local additions live outside the repo:
+
+- `~/.zshrc.local`
+- `~/.gitconfig.local`
+
+The canonical files load those local companions natively, so there is no generated merged file to maintain.
+
+## Audit
+
+Use `./audit.sh` on existing machines before syncing. It will review:
+
+- package drift against the registry in `packages/`
+- `.zshrc` drift versus the canonical repo file
+- `.gitconfig` drift versus the canonical repo file
+- presence of local companion files
+- shell tooling like `oh-my-zsh`, `powerlevel10k`, and the current login shell
+
+## Package Maintenance
+
+The package registry is intentionally simple:
+
+- shared formulas: `packages/formulas.txt`
+- shared casks: `packages/casks.txt`
+- role-based additions: `packages/roles/*.txt`
+- custom installers: `hooks/*.sh`
+
+Routine changes should mostly mean editing those files, not rewriting the installer.

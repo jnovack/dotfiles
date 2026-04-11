@@ -1,0 +1,13 @@
+#!/bin/bash
+
+HOOK_DESC="example custom install"
+HOOK_ROLES="all"
+
+hook_detect() {
+  return 0
+}
+
+hook_install() {
+  # curl WEBSITE.sh | bash
+  return 0
+}
