@@ -71,9 +71,6 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
 
-# Brew
-eval "$(/opt/homebrew/bin/brew shellenv)"
-
 # Which plugins would you like to load?
 # Standard plugins can be found in ~/.oh-my-zsh/plugins/*
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
@@ -228,10 +225,6 @@ fi
 if command -v go >/dev/null 2>&1; then
   export PATH="$(go env GOPATH)/bin:$PATH"
 fi
-
-export PATH="$HOME/.local/bin:$PATH"
-
-export PATH="$(go env GOPATH)/bin:$PATH"
 
 export PATH="$HOME/.local/bin:$PATH"
 
