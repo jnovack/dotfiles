@@ -1,0 +1,4 @@
+iterm2
+visual-studio-code
+docker-desktop
+font-meslo-lg-nerd-font
