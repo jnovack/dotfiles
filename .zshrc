@@ -137,6 +137,12 @@ autoload -U compinit && compinit
 [[ -f ~/.iterm2_shell_integration.zsh ]] && source ~/.iterm2_shell_integration.zsh
 
 export GPG_TTY="$(tty)"
+if command -v gpgconf >/dev/null 2>&1; then
+  gpgconf --launch gpg-agent >/dev/null 2>&1 || true
+fi
+if command -v gpg-connect-agent >/dev/null 2>&1; then
+  gpg-connect-agent updatestartuptty /bye >/dev/null 2>&1 || true
+fi
 
 alias generate-password="cat /dev/urandom | LC_CTYPE=C tr -dc '[:alnum:]' | fold -w 32 | head -n 4"
 
