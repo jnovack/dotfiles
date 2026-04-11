@@ -4,6 +4,7 @@ jq
 ripgrep
 tmux
 gnupg
+pinentry-mac
 mosh
 watch
 coreutils
