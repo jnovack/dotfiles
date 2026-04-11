@@ -62,9 +62,17 @@
         minor=$(printf '%s' \"$ver\" | sed -E 's/^(v[0-9]+\\.[0-9]+)\\..*/\\1/'); \
         git rev-parse --verify HEAD >/dev/null; \
         git tag -a \"$ver\" -m \"$msg\"; \
-        git tag -f \"$minor\"; \
-        git tag -f \"$major\"; \
-        git push origin -f \"$minor\" \"$major\"; \
+        if [ \"${ver#*-}\" = \"$ver\" ]; then \
+            git tag -f \"$minor\"; \
+            git tag -f \"$major\"; \
+            if [ \"${ver%%+*}\" != \"$ver\" ]; then \
+                patch=\"${ver%%+*}\"; \
+                git tag -f \"$patch\"; \
+                git push origin -f \"$patch\" \"$minor\" \"$major\"; \
+            else \
+                git push origin -f \"$minor\" \"$major\"; \
+            fi; \
+        fi; \
         git push origin \"$ver\"; \
         }; f"
     squash = "!f(){ \
