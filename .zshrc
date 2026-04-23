@@ -226,6 +226,24 @@ if command -v go >/dev/null 2>&1; then
   export PATH="$(go env GOPATH)/bin:$PATH"
 fi
 
+# graperoot
+export PATH="$PATH:$HOME/.dual-graph"
+
+# Open VS Code: if a *.local.code-workspace file exists in the target directory,
+# open that instead of the folder so folderOpen tasks (e.g. dual-graph MCP) fire.
+function code() {
+  local target="${1:-.}"
+  if [[ $# -le 1 && -d "$target" ]]; then
+    local ws
+    ws=$(ls "$target"/*.local.code-workspace 2>/dev/null | head -1)
+    if [[ -n "$ws" ]]; then
+      command code "$ws" "${@:2}"
+      return
+    fi
+  fi
+  command code "$@"
+}
+
 export PATH="$HOME/.local/bin:$PATH"
 
 if [[ -f "$HOME/.zshrc.local" ]]; then
