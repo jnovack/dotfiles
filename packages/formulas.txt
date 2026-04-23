@@ -7,6 +7,7 @@ gnupg
 mosh
 watch
 coreutils
+glow
 gnu-sed
 bash-completion@2
 go
