@@ -246,6 +246,15 @@ function code() {
 
 export PATH="$HOME/.local/bin:$PATH"
 
+_load_ca_bundle() {
+    local cert_dir="${HOME}/.certs"
+    local bundle="${cert_dir}/.bundle.pem"
+    [[ -d "$cert_dir" ]] || return
+    cat "$cert_dir"/*.pem(N) > "$bundle" 2>/dev/null
+    [[ -s "$bundle" ]] && export CURL_CA_BUNDLE="$bundle" SSL_CERT_FILE="$bundle"
+}
+_load_ca_bundle
+
 if [[ -f "$HOME/.zshrc.local" ]]; then
   source "$HOME/.zshrc.local"
 fi
