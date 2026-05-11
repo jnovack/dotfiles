@@ -1,7 +1,7 @@
 Review the entire repository and produce a file named REVIEW.md in `.claude/.local/REVIEW.md`.
 
 Before writing, ensure `.claude/.local/` exists. If `.claude/.local/.gitignore` does not exist,
-create it with the following content so these output files are never committed:
+create it with the following content so `.claude/.local` and it's files are never committed:
 
 ```text
 *
@@ -23,11 +23,21 @@ Analyze all source files for:
 
 ## Ground Rules
 
-- Prefer the smallest correct change. Do not rewrite what works.
-- Preserve existing structure, naming, and patterns unless they are the direct cause of a defect.
-- Do not perform unrelated refactors, formatting passes, style normalization, or file moves.
-- Any suggested new behavior must be backward-compatible and default-off (feature flag, opt-in config, etc.).
-- Do not disagree for novelty's sake. Every finding must cite a specific, demonstrable problem.
+- Propose the smallest change that doesn't make the codebase worse. If the fix
+  requires violating a pattern already established elsewhere, or introduces a
+  second way of doing something that already has a way, STOP and flag it as a
+  design problem before writing any code.
+- If you identify an architectural issue, write a 2-3 sentence diagnosis,
+  propose two options (quick workaround vs. proper fix), state your
+  recommendation, and wait for confirmation before proceeding.
+- Preserve existing structure, naming, and patterns unless they are the direct
+  cause of a defect.
+- Do not perform unrelated refactors, formatting passes, style normalization,
+  or file moves.
+- Any suggested new behavior must be backward-compatible and default-off
+  (feature flag, opt-in config, etc.).
+- Do not disagree for novelty's sake. Every finding must cite a specific,
+  demonstrable problem.
 - If a file has no meaningful issues, omit it from the report entirely.
 
 ## Additional Instructions
