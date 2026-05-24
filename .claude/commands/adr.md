@@ -1,54 +1,87 @@
-# /adr — Record an Architecture Decision
+Create a new Architecture Decision Record in `docs/decisions/`.
 
-Run this only after a plan has been fully executed, not during planning.
 
-1. Review what was just built or changed in this session
-2. Determine if any decisions meet the ADR trigger criteria in CLAUDE.md
-   - If none qualify, say so explicitly and stop
-3. Check /docs/decisions/ for the next sequence number
-4. For each qualifying decision, write `docs/decisions/NNNN-<kebab-title>.md`:
 
----
-# NNNN. <Title>
+Perform the following tasks:
 
-**Date:** <today>
+- inspect `docs/decisions/`
+- pick the next sequential ADR number using four digits (`0001`, `0002`, etc.)
+- create a kebab-case filename from a short summary of the last executed adr or plan and any follow-up.
+- if more than one major topic was discussed or fixed, please create individual files or major topics
+- Write the ADR file directly in `docs/decisions/`.
+- After creating or updating an ADR, update `docs/decisions/README.md`.
+- Add a new row to the summary table with the format: `| <adr filename> | Title | Status | Date |`.
+- Add an "ADR" tag in the comments near all relevant functions or decision points within the code
+  with `adr/NNNN-<kebab-title>.md`.
 
-**Status:** Accepted
+Rules:
 
-Describe the context and problem statement using two to three sentences along
-with the decision.
+- Prefer repo-specific reasoning over generic architecture language.
+- If rejecting an option, explain why it is wrong for this repo, not just why it is imperfect.
+- If facts depend on investigation, include exact dates.
+- Keep sections short and concrete, provide only as much context as necessary to understand the decision.
+
+The ADR must follow this format exactly:
+
+```md
+# ADR {{number}}: {{title}}
+
+- Status: {{Accepted|Rejected|Superseded|Draft}}
+- Date: {{YYYY-MM-DD}}
 
 ## Context
 
-What situation or constraint forced this decision?
-What would have happened without it?
+{{Summarize the problem that necessitated this decision and the final
+state reached. Do NOT narrate the debugging journey, intermediate
+fixes, or superseded approaches. Write as if the reader only needs
+to understand why the decision exists, not how you got there.}}
+
+## Findings
+
+{{State only facts that directly support the final decision.
+Omit dead ends, failed attempts, and anything that was later reversed.}}
 
 ## Alternatives Considered
 
-The numbers of options may vary, utilize this format.
+{{List as many alternatives discussed.}}
 
-**Option Summary** - Why this option was rejected
+### Option 1: {{name}}
 
-**Option Summary** - Why this option was rejected
+{{Accepted or rejected? Why?}}
+
+### Option 2: {{name}}
+
+{{Accepted or rejected? Why?}}
+
+## Decision
+
+{{State the final decision directly.}}
 
 ## Consequences
 
-**Easier:** what this decision enables
+### Positive
 
-**Harder:** what this decision complicates or forecloses
+- {{Benefit}}
+- {{Benefit}}
+- {{Benefit}}
 
-**Constrains:** future decisions this limits
+### Tradeoffs
 
-## More Information
+- {{Cost or limitation}}
+- {{Cost or limitation}}
+- {{Cost or limitation}}
 
-Provide additional evidence/confidence for the decision outcome here and define
-the when/how of this decision.  Document when the decision should be realized,
-if/when it should be re-visited, and links to other decisions and resources.
+## What Replaces It
 
----
+{{If this ADR rejects or removes an approach, state what the repo will do instead.}}
 
-1. Update /docs/decisions/README.md index
-2. Add a reference comment to any module created or significantly affected:
-   `adr#NNNN-<kebab-title>.md` at the top of the file or function.
+## Revisit Criteria
 
-Do not editorialize. Do not retroactively justify. Record what actually happened.
+{{State when this ADR should be reconsidered, if ever.}}
+
+## References
+
+- [{{relevant file or doc}}]({{relative-link}})
+- [{{relevant file or doc}}]({{relative-link}})
+- [{{relevant file or doc}}]({{relative-link}})
+```
