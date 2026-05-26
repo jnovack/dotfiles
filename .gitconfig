@@ -1,24 +1,3 @@
-[color]
-    branch = auto
-    diff = always
-    status = auto
-    ui = true
-
-[color "branch"]
-    current = yellow reverse
-    local = yellow
-    remote = green
-
-[color "diff"]
-    meta = yellow bold
-    frag = cyan bold
-    old = red bold
-    new = green bold
-
-[color "status"]
-    added = green
-    changed = yellow
-    untracked = red
 
 [alias]
     summary = log --graph --decorate --pretty=oneline --abbrev-commit
@@ -30,10 +9,9 @@
     accept-theirs = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --theirs -- $files; git add -u $files; git rebase --continue; }; f"
     catchup = "!f() { git pull --recurse-submodules; git submodule update --init; git submodule update --recursive; }; f"
     branch-default = "!f() { git config branch.master.remote origin; git config branch.master.merge refs/heads/master; }; f"
-    pull-request = "!f() { git fetch origin pull/$1/head:$1; }; f"
+    pr = "!f() { git fetch origin pull/$1/head:$1; }; f"
     sync = "!f() { git fetch upstream; git merge upstream/`git branch --show-current`; git push origin; }; f"
     noop = "!f() { git commit --allow-empty -m "Trigger Build"; git push origin; }; f"
-    minirelease = "!f() { git commit --allow-empty -m \"$1\"; git tag -a \"$1\" -m \"Release $1\"; git push origin --follow-tags; }; f"
     release = "!f() { \
         set -e; \
         test -n \"$1\" || { echo 'usage: git release major|minor|patch [message]'; echo '       git release v1.1.1 [message]'; exit 1; }; \
@@ -86,9 +64,35 @@
         git reset --soft \"$base\" && git commit --edit -m \"${msg:-squash}\"; \
     }; f"
 
+[color]
+    branch = auto
+    diff = always
+    status = auto
+    ui = true
+
+[color "branch"]
+    current = yellow reverse
+    local = yellow
+    remote = green
+
+[color "diff"]
+    meta = yellow bold
+    frag = cyan bold
+    old = red bold
+    new = green bold
+
+[color "status"]
+    added = green
+    changed = yellow
+    untracked = red
+
+[commit]
+    template = /Users/jnovack/.stCommitMsg
+    gpgsign = true
+
 [core]
-	pager = less -r
-	excludesfile = /Users/jnovack/.gitignore
+    pager = less -r
+    excludesfile = /Users/jnovack/.gitignore_global
 
 [credential]
     helper = osxkeychain
@@ -97,16 +101,19 @@
 	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
 	path =
 
+[init]
+	defaultBranch = main
+
 [mergetool "sourcetree"]
 	cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
 	trustExitCode = true
 
-[commit]
-	template = /Users/jnovack/.stCommitMsg
-	gpgsign = true
+[difftool "sourcetree"]
+    cmd = opendiff \"$LOCAL\" \"$REMOTE\"
+    path =
 
-[init]
-	defaultBranch = main
+[push]
+    default = simple
 
 [include]
     path = ~/.gitconfig.local
