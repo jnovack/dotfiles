@@ -1,0 +1,7 @@
+.code-review-graph/
+.env
+.DS_Store
+.local/*
+node_modules/
+Thumbs.db
+*.swp
