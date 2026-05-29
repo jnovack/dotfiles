@@ -11,7 +11,8 @@
 
 - Check every error. Do not assign errors to `_` unless the function is documented as always-nil.
 - Wrap errors with context using `fmt.Errorf("operation: %w", err)` so callers can use `errors.Is`/`errors.As`.
-- Do not use `panic` in library or application code for recoverable errors. Reserve it for truly unrecoverable programmer errors (e.g. invalid state at init time).
+- Do not use `panic` in library or application code for recoverable errors. Reserve it for truly unrecoverable
+  programmer errors (e.g. invalid state at init time).
 - Do not use `log.Fatal` or `os.Exit` deep inside packages unless the user requires it — only at `main()` or top-level entrypoints.
 
 ### Idioms
@@ -30,7 +31,8 @@
 
 ### Project Structure
 
-Follow [https://github.com/golang-standards/project-layout/](https://github.com/golang-standards/project-layout/) as closely as possible.
+Follow [https://github.com/golang-standards/project-layout/](https://github.com/golang-standards/project-layout/) as
+closely as possible.
 
 ```text
 {repo}/
@@ -50,7 +52,7 @@ Follow [https://github.com/golang-standards/project-layout/](https://github.com/
 │   ├── variables.mk          # computed build variables (VERSION, REVISION, etc.)
 │   └── go.mk                 # Go-specific Makefile targets (build, test, vet, clean)
 ├── test/                     # integration, function, smoke, or e2e testing;
-├── testdata/                 # fixture files used by tests;
+│   └── fixtures/             # fixture files used by tests;
 ├── Makefile                  # includes scripts/go.mk; top-level targets only
 ├── go.mod                    # module github.com/jnovack/{repo}
 └── go.sum
@@ -103,7 +105,8 @@ When Windows binaries are needed, please apply the following rules:
 
 #### Flags
 
-Use [`github.com/jnovack/flag`](https://github.com/jnovack/flag) — drop-in replacement for `flag` with env-var and config-file support.
+Use [`github.com/jnovack/flag`](https://github.com/jnovack/flag) — drop-in replacement for `flag` with env-var and
+config-file support.
 
 ```go
 fs := flag.NewFlagSetWithEnvPrefix(os.Args[0], "", flag.ExitOnError)
@@ -117,7 +120,8 @@ _ = fs.Parse(os.Args[1:])
 
 #### Logging
 
-Use `log/slog` exclusively for services where log files will be parsed by a computer.  For applications designed to run by a user, please use `rs/zerolog`.
+Use `log/slog` exclusively for services where log files will be parsed by a computer.  For applications designed to run
+by a user, please use `rs/zerolog`.
 
 ```go
 slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: l})))
@@ -134,11 +138,13 @@ When the application calls for metrics, apply the following rules:
 - Register counters and histograms once (in the type that owns the state machine) — do not recreate them per scrape.
 - Implement `prometheus.Collector` (`Describe` + `Collect`) for gauges whose label values change at runtime.
 - Use `prometheus.NewRegistry()` (not the default registry) for testability.
-- Expose `{namespace}_info` as a gauge = 1 with constant labels for static identity (instance identifier, version, revision, OS).
+- Expose `{namespace}_info` as a gauge = 1 with constant labels for static identity (instance identifier, version,
+  revision, OS).
 - Use `orUnknown(s string) string` helper — never emit empty label values.
 - Histogram buckets for duration metrics: `1, 5, 60, 300, 600, 1800, 3600` seconds.
 - Metric label cardinality: ensure label sets are bounded (no unbounded dynamic values like timestamps or UUIDs as labels).
-- Use `github.com/prometheus/client_golang/prometheus/testutil` (`CollectAndCompare`, `ToFloat64`) for Prometheus metric assertions.
+- Use `github.com/prometheus/client_golang/prometheus/testutil` (`CollectAndCompare`, `ToFloat64`) for Prometheus metric
+  assertions.
 
 ### Testing
 
@@ -215,8 +221,8 @@ Do not write functional, smoke, or e2e tests unless explicitly asked.
 - Table-driven throughout: `[]struct{ name, input, want }`
 - Group related cases under a single `t.Run` loop
 - Use `t.TempDir()` for filesystem tests — never hardcode `/tmp/`
-- Fixture files under `testdata/` — read with
-  `os.ReadFile(filepath.Join("..", "..", "testdata", "..."))`
+- Fixture files under `test/fixtures/` — read with
+  `os.ReadFile(filepath.Join("..", "..", "test/fixtures", "..."))`
   relative to the test package
 - Always test Windows line endings (CRLF) for any log/file parsing code
 - Coverage targets: 85%+ on core logic; error paths and OS-conditional
@@ -269,7 +275,7 @@ Do not write functional, smoke, or e2e tests unless explicitly asked.
 - Never mock types you don't own — wrap them behind an interface first
 - Never fetch live external services to generate mocks without explicit approval.
 - When approved, record the full response — headers, metadata, and body — to
-  `testdata/fixtures/<service>/`. Recorded responses are the source of truth
+  `test/fixtures/<service>/`. Recorded responses are the source of truth
   for all future mocks; do not hit the live service again if a fixture exists.
 
 #### Shared Test Helpers
