@@ -1,6 +1,6 @@
+# ADR.md
+
 Create a new Architecture Decision Record in `docs/decisions/`.
-
-
 
 Perform the following tasks:
 

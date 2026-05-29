@@ -1,7 +1,7 @@
-Review the entire repository and produce a file named REVIEW.md in `.claude/.local/REVIEW.md`.
+Review the entire repository and produce a file named REVIEW.md in `.local/REVIEW.md`.
 
-Before writing, ensure `.claude/.local/` exists. If `.claude/.local/.gitignore` does not exist,
-create it with the following content so `.claude/.local` and it's files are never committed:
+Before writing, ensure `.local/` exists. If `.local/.gitignore` does not exist,
+create it with the following content so these output files are never committed:
 
 ```text
 *

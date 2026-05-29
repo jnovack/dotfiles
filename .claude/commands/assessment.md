@@ -1,8 +1,8 @@
 # Assessment
 
-Review the entire repository and produce a file named ASSESSMENT.md in `.claude/.local/ASSESSMENT.md`.
+Review the entire repository and produce a file named ASSESSMENT.md in `.local/ASSESSMENT.md`.
 
-Before writing, ensure `.claude/.local/` exists. If `.claude/.local/.gitignore` does not exist,
+Before writing, ensure `.local/` exists. If `.local/.gitignore` does not exist,
 create it with the following content so these output files are never committed:
 
 ```text
