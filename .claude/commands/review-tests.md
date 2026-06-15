@@ -20,6 +20,23 @@ Analyze all test files (`*_test.go`, `test/`, `spec/`, etc.) for:
 - Do not disagree for novelty's sake. Every finding must cite a specific, demonstrable problem.
 - If a file has no meaningful issues, omit it from the report entirely.
 
+## Additional Instructions
+
+- Read every test file before writing REVIEW.TESTS.md. Do not emit partial results.
+- For each finding, read the corresponding production code to confirm the behavior the test should be asserting actually exists and is reachable by the test's setup.
+- Line numbers must be exact. Verify them against the actual file content before writing.
+- Code blocks in Fix sections must be complete, runnable replacements — not pseudocode.
+- If a suggested fix requires changes in more than one location, list all locations.
+- Do not add encouraging commentary, filler phrases, or meta-notes inside REVIEW.TESTS.md. Keep it dense and actionable.
+- Each finding must include a unique identifier using the format `#<MODULE>-<TYPE>-<N>`:
+  - **MODULE**: 2–5 char uppercase abbreviation of the test file or test suite (e.g., INT, UNIT, E2E, SOCKS, CACHE)
+  - **TYPE**: 2–5 char uppercase abbreviation of the issue class (e.g., MSG, PATH, MISS, TAUTO, GAP, SEC, MOCK)
+  - **NN**: 2-digit, 1-based integer scoped per file, resetting each module-type combination
+  - Format heading as: `#### 🟠 High — #INT-MSG-01 — <short title>`
+- Populate the Finding Index table at the top of REVIEW.TESTS.md with every finding ID before writing per-file sections.
+- When identifying missing tests (`GAP` findings), verify the production code path exists and is reachable before flagging it as missing. Do not flag coverage gaps for code that does not exist.
+- Distinguish between "not tested at all" (a gap) and "tested incorrectly" (a mirror test or wrong assertion). Use the correct TYPE abbreviation for each.
+
 ## REVIEW.TESTS.md Format
 
 Produce REVIEW.TESTS.md with the following structure:
@@ -44,8 +61,8 @@ A master table of all findings, emitted before the per-file sections:
 
 | ID | Severity | File | Title |
 | --- | --- | --- | --- |
-| #INT-MSG-1 | 🟠 High | `test/proxy_integration_test.go` | Inverted assertion message on no-store file check |
-| #UNIT-TAUTO-1 | 🟡 Medium | `internal/foo/foo_test.go` | Asserts mocked value equals mocked value |
+| #INT-MSG-01 | 🟠 High | `test/proxy_integration_test.go` | Inverted assertion message on no-store file check |
+| #UNIT-TAUTO-01 | 🟡 Medium | `internal/foo/foo_test.go` | Asserts mocked value equals mocked value |
 
 ---
 
@@ -55,7 +72,7 @@ Repeat the following block for each file that has findings, ordered by the highe
 
 ### `path/to/file_test.go`
 
-#### 🟠 High — #INT-MSG-1 — <short title>
+#### 🟠 High — #INT-MSG-01 — <short title>
 
 **Line(s):** 42
 
@@ -85,26 +102,3 @@ Repeat the following block for each file that has findings, ordered by the highe
 ## Quick Wins
 
 A bulleted list of the 3–5 highest-leverage changes — things that add the most coverage or remove the most false confidence for the least effort.
-
----
-
-*End of REVIEW.TESTS.md*
-
----
-
-## Additional Instructions
-
-- Read every test file before writing REVIEW.TESTS.md. Do not emit partial results.
-- For each finding, read the corresponding production code to confirm the behavior the test should be asserting actually exists and is reachable by the test's setup.
-- Line numbers must be exact. Verify them against the actual file content before writing.
-- Code blocks in Fix sections must be complete, runnable replacements — not pseudocode.
-- If a suggested fix requires changes in more than one location, list all locations.
-- Do not add encouraging commentary, filler phrases, or meta-notes inside REVIEW.TESTS.md. Keep it dense and actionable.
-- Each finding must include a unique identifier using the format `#<MODULE>-<TYPE>-<N>`:
-  - **MODULE**: 2–5 char uppercase abbreviation of the test file or test suite (e.g., INT, UNIT, E2E, SOCKS, CACHE)
-  - **TYPE**: 2–5 char uppercase abbreviation of the issue class (e.g., MSG, PATH, MISS, TAUTO, GAP, SEC, MOCK)
-  - **N**: 1-based integer scoped per file, resetting for each new file
-  - Format heading as: `#### 🟠 High — #INT-MSG-1 — <short title>`
-- Populate the Finding Index table at the top of REVIEW.TESTS.md with every finding ID before writing per-file sections.
-- When identifying missing tests (`GAP` findings), verify the production code path exists and is reachable before flagging it as missing. Do not flag coverage gaps for code that does not exist.
-- Distinguish between "not tested at all" (a gap) and "tested incorrectly" (a mirror test or wrong assertion). Use the correct TYPE abbreviation for each.

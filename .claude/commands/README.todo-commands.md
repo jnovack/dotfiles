@@ -1,10 +1,13 @@
 # TODO Skill System
 
-A set of seven Claude Code slash commands for lifecycle-managed TODO tracking. Works in any repo. Every item moves from a raw captured thought through spec, plan, execution, and validation — the same level of rigor as a formal refactor step.
+A set of seven Claude Code slash commands for lifecycle-managed TODO tracking. Works in any repo. Every item moves
+from a raw captured thought through spec, plan, execution, and validation — the same level of rigor as a formal
+refactor step.
 
 ## Why this exists
 
-Raw TODOs stall. There is no forcing function to clarify what "done" looks like, no plan specific enough to hand to a subagent, and no checkpoint to confirm the work actually landed cleanly. This system provides all three.
+Raw TODOs stall. There is no forcing function to clarify what "done" looks like, no plan specific enough to hand to a
+subagent, and no checkpoint to confirm the work actually landed cleanly. This system provides all three.
 
 ## Lifecycle
 
@@ -51,13 +54,15 @@ raw → spec'd → planned → ready → done
 | TEST-SMOKE-01 | raw | Add smoke tests for get-* binaries |
 ```
 
-The table is maintained by the skills. Do not edit status values by hand — use `/todo-ready` and let `/todo-next` and `/todo-checkpoint` handle `done`.
+The table is maintained by the skills. Do not edit status values by hand — use `/todo-ready` and let `/todo-next` and
+`/todo-checkpoint` handle `done`.
 
 ## ID format
 
 `CATEGORY-DESCRIPTOR-##` — for example `TEST-SMOKE-03`, `FEAT-REGISTRY-01`, `CI-DOCKER-02`.
 
-`/todo-add` generates the ID automatically by scanning existing IDs for the highest numeral in the same category-descriptor group.
+`/todo-add` generates the ID automatically by scanning existing IDs for the highest numeral in the same
+category-descriptor group.
 
 Common categories: `TEST` `REFACTOR` `CI` `LOG` `FIX` `FEAT` `DOCS` `API` `DB` `WEB` `TASK`
 
@@ -75,13 +80,15 @@ Capture a raw want. Generates an ID, creates `TODO.md` if it does not exist, app
 
 ### `/todo-spec <id>`
 
-Asks clarifying questions in developer terms — what breaks, what does done look like, dependencies, constraints. Writes `<id>.spec.md`. Bumps status to `spec'd`.
+Asks clarifying questions in developer terms — what breaks, what does done look like, dependencies, constraints.
+Writes `<id>.spec.md`. Bumps status to `spec'd`.
 
 Skips questions if the TODO.md row already contains enough detail (e.g. items migrated from a narrative TODO list).
 
 ### `/todo-plan <id>`
 
-Reads the spec. Writes `<id>.plan.md` with a numbered implementation plan, a model recommendation, and a DoD checklist. Bumps status to `planned`.
+Reads the spec. Writes `<id>.plan.md` with a numbered implementation plan, a model recommendation, and a DoD
+checklist. Bumps status to `planned`.
 
 The model recommendation follows this guide:
 
@@ -95,15 +102,18 @@ The user can edit the `model:` field to any value, including non-Claude models.
 
 ### `/todo-ready <id>`
 
-Confirms the plan file exists and bumps status from `planned` to `ready`. This is the human review gate — run it after you have read the plan and are satisfied with it.
+Confirms the plan file exists and bumps status from `planned` to `ready`. This is the human review gate — run it
+after you have read the plan and are satisfied with it.
 
 ### `/todo-next`
 
 Picks the first `ready` item and executes it.
 
-**Claude models (haiku/sonnet/opus):** Constructs a prompt from the spec and plan, spawns a subagent at the specified model, reports a synopsis, and reminds you to run `/todo-checkpoint`.
+**Claude models (haiku/sonnet/opus):** Constructs a prompt from the spec and plan, spawns a subagent at the specified
+model, reports a synopsis, and reminds you to run `/todo-checkpoint`.
 
-**Non-Claude models:** Writes the raw prompt to `.claude/todos/<id>.PROMPT.md` and stops. Copy that file into your external model session. When it finishes, run `/todo-checkpoint <id>`.
+**Non-Claude models:** Writes the raw prompt to `.claude/todos/<id>.PROMPT.md` and stops. Copy that file into your
+external model session. When it finishes, run `/todo-checkpoint <id>`.
 
 ### `/todo-checkpoint [id]`
 
@@ -131,10 +141,14 @@ Prints a condensed reference of this entire system in the terminal.
 
 ## Definition of Done
 
-The DoD has two tiers. The core tier is always required. The optional tier is declared per-item during planning — only items explicitly included in the plan's checklist are checked at checkpoint time.
+The DoD has two tiers. The core tier is always required. The optional tier is declared per-item during planning — only
+items explicitly included in the plan's checklist are checked at checkpoint time.
 
-The spec and plan process is where optional items get surfaced. If the work warrants an ADR or a COVERAGE.md entry, `/todo-plan` includes it. If it does not, it does not appear on the checklist and is not checked.
+The spec and plan process is where optional items get surfaced. If the work warrants an ADR or a COVERAGE.md entry,
+`/todo-plan` includes it. If it does not, it does not appear on the checklist and is not checked.
 
 ## Migrating an existing TODO list
 
-If your repo already has a narrative TODO list, convert it to the index table format and run `/todo-spec <id>` on each item. The skill will detect that the existing description is detailed enough and seed the spec file from it rather than asking redundant questions.
+If your repo already has a narrative TODO list, convert it to the index table format and run `/todo-spec <id>` on each
+item. The skill will detect that the existing description is detailed enough and seed the spec file from it rather than
+asking redundant questions.

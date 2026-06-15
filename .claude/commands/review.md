@@ -36,7 +36,7 @@ Analyze all source files for:
 - Each finding must include a unique identifier using the format `#<MODULE>-<TYPE>-<N>`:
   - **MODULE**: 2–4 char uppercase abbreviation of the filename or module (e.g., AUTH, DB, API, UI, CFG)
   - **TYPE**: 2–4 char uppercase abbreviation of the issue class (e.g., NULL, INJ, RACE, LEAK, VAL, SEC, ERR)
-  - **N**: 1-based integer scoped per file, resetting for each new file
+  - **NN**: 2-digit 1-based integer scoped per file, 0-prepended if necessary, resetting module-type combination.
   - Format heading as: `#### 🔴 Critical — #AUTH-NULL-1 — <short title>`
 - Populate the Finding Index table at the top of REVIEW.md with every finding ID before writing per-file sections.
 - For any finding involving legacy, deprecated, compatibility, or parallel-path code: before recommending a comment fix, grep production callers. Categorize results as: (a) production callers, (b) test-only callers, (c) zero callers. If (b) or (c), recommend deletion over documentation. If (a), document why the legacy path exists and what replaces it.
@@ -65,8 +65,8 @@ A master table of all findings, emitted before the per-file sections:
 
 | ID | Severity | File | Title |
 | --- | --- | --- | --- |
-| #AUTH-NULL-1 | 🔴 Critical | `auth/login.js` | Null dereference on missing user |
-| #DB-INJ-1 | 🟠 High | `db/query.js` | Unsanitized input in raw query |
+| #AUTH-NULL-01 | 🔴 Critical | `auth/login.js` | Null dereference on missing user |
+| #DB-INJ-01 | 🟠 High | `db/query.js` | Unsanitized input in raw query |
 
 ---
 
@@ -88,7 +88,7 @@ Repeat the following block for each file that has findings, ordered by the highe
 
 ---
 
-#### 🟠 High — #DB-INJ-1 — <short title>
+#### 🟠 High — #DB-INJ-01 — <short title>
 
 **Line(s):** 87–91
 **Issue:** ...
@@ -97,7 +97,7 @@ Repeat the following block for each file that has findings, ordered by the highe
 
 ---
 
-#### 🟡 Medium — #API-VAL-1 — <short title>
+#### 🟡 Medium — #API-VAL-01 — <short title>
 **Line(s):** 120
 **Issue:** ...
 **Fix:** ...
@@ -105,7 +105,7 @@ Repeat the following block for each file that has findings, ordered by the highe
 
 ---
 
-#### 🔵 Low — #UI-ERR-1 — <short title>
+#### 🔵 Low — #UI-ERR-01 — <short title>
 **Line(s):** 205
 **Issue:** ...
 **Fix:** ...
