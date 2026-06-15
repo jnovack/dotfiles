@@ -1,27 +1,26 @@
 # Review Skill System
 
-A set of three Claude Code slash commands for structured code and test review. The review commands produce a dense,
-actionable report with severity-scored findings; the fix command closes findings one at a time, each validated against
-build, vet, lint, and tests before it is accepted.
+A set of slash commands for structured code, test, and dependency review, plus an action-update executor. Review commands produce dense, actionable reports with severity-scored findings. The fix command closes findings one at a time, each validated against build, vet, lint, and tests before acceptance.
 
 ## Why this exists
 
-Code review feedback without a forcing function never lands. Findings stall in a document, fixes get applied
-inconsistently, and the report drifts out of sync with the actual code. This system ties review output to a structured
-fix workflow: every finding has an ID, every fix has a verify gate, and the report shrinks only when a change has
-passed that gate.
+Code review feedback without a forcing function never lands. Findings stall in a document, fixes get applied inconsistently, and the report drifts out of sync with the actual code. This system ties review output to a structured fix workflow: every finding has an ID, every fix has a verify gate, and the report shrinks only when a change has passed that gate.
 
 ## Lifecycle
 
 ```text
-source code → /review or /review-tests → REVIEW.md → /review-fix → clean tree
+source code → /review [path]                 → .local/REVIEW.md       → /review-fix
+              /review-comprehensive [path]   → .local/REVIEW.md       → /review-fix
+test files  → /review-tests [path]           → .local/REVIEW.TESTS.md
+dep files   → /review-deps [path]            → .local/REVIEW.DEPS.md
+workflows   → /update-actions               → .local/REVIEW.ACTIONS.md + modified files
 ```
 
 | Stage | Meaning |
 | --- | --- |
 | REVIEW.md | Open findings; shrinks as fixes are accepted |
 | Finding ID | Unique identifier scoped per file and issue class |
-| Verify gate | Build + vet + lint (new issues only) + tests — must all pass before a finding is accepted |
+| Verify gate | Build + vet + lint (new issues only) + tests — all must pass before a finding is accepted |
 | Removed | Finding deleted from REVIEW.md; fix is in the tree, uncommitted |
 
 ## File layout
@@ -29,30 +28,34 @@ source code → /review or /review-tests → REVIEW.md → /review-fix → clean
 ```text
 ~/.claude/commands/          <- these skill files (global, works in any repo)
   review.md
+  review-comprehensive.md
   review-tests.md
+  review-deps.md
   review-fix.md
+  update-actions.md
 
 <repo>/
   .local/
-    REVIEW.md                <- findings from /review
-    REVIEW.TESTS.md          <- findings from /review-tests
     .gitignore               <- auto-created; excludes .local/ from commits
+    REVIEW.md                <- findings from /review or /review-comprehensive
+    REVIEW.TESTS.md          <- findings from /review-tests
+    REVIEW.DEPS.md           <- findings from /review-deps
+    REVIEW.ACTIONS.md        <- report from /update-actions
 ```
 
 ## Finding IDs
 
 ```text
-#<MODULE>-<TYPE>-<N>
+#<MODULE>-<TYPE>-<NN>
 ```
 
-- **MODULE** — 2–4 char uppercase abbreviation of the filename or module (e.g., `AUTH`, `DB`, `API`, `UI`)
-- **TYPE** — 2–4 char uppercase abbreviation of the issue class (e.g., `NULL`, `INJ`, `RACE`, `LEAK`, `SEC`)
-- **N** — 1-based integer scoped per file, resetting per module/type combination
+- **MODULE** — 2–5 char uppercase abbreviation of the filename or module (e.g. `AUTH`, `DB`, `API`, `MW`)
+- **TYPE** — 2–5 char uppercase abbreviation of the issue class (e.g. `NULL`, `INJ`, `RACE`, `LEAK`, `SEC`, `ERR`)
+- **NN** — 2-digit 1-based integer, reset per module-type pair
 
-Examples: `#AUTH-NULL-1`, `#DB-INJ-1`, `#API-VAL-2`
+For test reviews, MODULE reflects the test suite (`INT`, `UNIT`, `E2E`) and TYPE reflects the failure mode (`GAP`, `TAUTO`, `MOCK`, `FRAG`, `DEAD`, `RELY`, `LAYER`).
 
-For test reviews, MODULE reflects the test suite (`INT`, `UNIT`, `E2E`) and TYPE reflects the test failure mode
-(`MSG`, `TAUTO`, `GAP`, `MOCK`).
+For dependency reviews, MODULE reflects the ecosystem (`GOMOD`, `NPM`, `PY`, `CARGO`) and TYPE reflects the concern (`UNPIN`, `STALE`, `BREAK`, `AUTO`).
 
 ## Severity levels
 
@@ -61,74 +64,139 @@ For test reviews, MODULE reflects the test suite (`INT`, `UNIT`, `E2E`) and TYPE
 | 🔴 Critical | Exploitable vulnerability, data loss risk, or crash in normal usage |
 | 🟠 High | Likely bug or significant security weakness; fix before shipping |
 | 🟡 Medium | Inconsistency or practice violation that will cause problems at scale |
-| 🔵 Low | Minor refinement; fix when you're already touching the file |
+| 🔵 Low | Minor refinement; fix when already touching the file |
 
 For test reviews:
 
 | Level | Meaning |
 | --- | --- |
-| 🔴 Critical | Test actively masks an exploitable bug or data-loss scenario already in production |
+| 🔴 Critical | Test actively masks an exploitable bug or data-loss scenario in production |
 | 🟠 High | Test passes when the feature it covers is broken (false confidence) |
-| 🟡 Medium | Missing coverage for a significant branch, or assertion tests implementation detail instead of requirement |
-| 🔵 Low | Minor message inaccuracy or dead infrastructure |
+| 🟡 Medium | Significant coverage gap, or assertion tests implementation detail instead of requirement |
+| 🔵 Low | Minor message inaccuracy, dead infrastructure, or reliability smell |
+
+For dependency reviews:
+
+| Level | Meaning |
+| --- | --- |
+| 🔴 Critical | Known CVE in a dependency used in a security-sensitive path |
+| 🟠 High | Major version gap with likely breaking changes |
+| 🟡 Medium | Moderately stale minor version, missing automation coverage, or floating pin |
+| 🔵 Low | Minor version drift on a non-security-sensitive dev dependency |
 
 ## Commands
 
-### `/review`
+### `/review [path]`
 
-Reviews the entire repository and writes `.local/REVIEW.md`. Reads every source file before writing — no partial results.
+Reviews source files and writes `.local/REVIEW.md`. Scope to a path with `/review src/` or `/review cmd/app1`; omit for the full repository.
 
-Scope:
+Before writing any finding, works through a mandatory 9-item checklist for every file in scope:
 
-- **Bugs** — logic errors, off-by-one, null dereferences, incorrect error handling, race conditions, resource leaks
-- **Security** — injection risks, insecure defaults, hardcoded secrets, improper input validation, exposed sensitive data
-- **Inconsistencies** — deviations from conventions already established in this codebase
-- **Best-practice violations** — only issues rooted in well-established patterns for the language and framework in use
+1. Absent-value safety (null, nil, typed null, zero-value-invalid)
+2. Error/exception propagation (checked, context preserved, not swallowed)
+3. Resource lifecycle (handles, connections, goroutines, timers — guaranteed release)
+4. Concurrency (synchronized or immutable; async lifetime bounded)
+5. Trust boundary validation (user input, env vars, external APIs, HTTP headers)
+6. Credential/secret exposure (variables, error messages, logs, traces, metrics)
+7. Injection surfaces (queries, shell, templates, paths, regex, archive paths)
+8. Test completeness — spot-check only; use `/review-tests` for the full audit
+9. Convention consistency with the existing codebase
+
+Only records findings supported by concrete code evidence. Does not flag speculative issues or risks already handled elsewhere.
 
 ```text
 /review
-→ Reads every source file
+→ Reads every source file; works through 9-item checklist per file
 → Writes .local/REVIEW.md with Finding Index + per-file sections
 → Next: /review-fix to apply fixes
 ```
 
-REVIEW.md structure:
+### `/review-comprehensive [path]`
+
+Multi-agent parallel review. Same scope as `/review` but fans out 6 agents simultaneously, each hunting one dimension. Token cost is approximately 5× a standard `/review` run; use when coverage matters more than speed.
 
 ```text
-# Code Review
-
-## Summary              <- 3–5 sentence executive summary
-## Finding Index        <- master table: ID, severity, file, title
-## Findings by File     <- per-file blocks ordered by highest severity
-## Severity Reference
-## Quick Wins           <- 3–5 highest-leverage changes across the repo
+/review-comprehensive
+→ Discover agent: lists all source files
+→ 6 parallel agents: null+errors, resources, concurrency,
+  security, test completeness, convention consistency
+→ Synthesis agent: deduplicates and writes .local/REVIEW.md
+→ Next: /review-fix to apply fixes
 ```
 
-### `/review-tests`
+### `/review-tests [path]`
 
-Reviews all test files and writes `REVIEW.TESTS.md` at the project root.
+Comprehensive test audit. Reads every test file and its corresponding production code. Scope to a path with `/review-tests test/`; for languages with co-located test files (e.g. Go), also scans the source in that path.
 
 Scope:
 
-- **Mirror tests** — assertions that pass regardless of whether the feature works (tautological, testing internal state)
-- **Mislabeled tests** — test name describes one path, setup exercises a different path
+- **Absent test coverage** — exported/public functions, methods, or behaviors with no test at all
+- **Layer coverage gaps** — critical paths missing coverage at the appropriate layer (unit/integration/smoke)
+- **Mirror tests** — assertions that pass regardless of whether the feature works
+- **Mislabeled tests** — test name describes one path, setup exercises another
 - **Missing business constraints** — error recovery, auth branches, input combinations not covered
-- **Happy path bias** — tests that only verify no crash, without asserting correct outcome
-- **Fragile mocking** — mocks that both provide and assert the same value
-- **Dead test infrastructure** — fixtures, helpers, or mock types defined but never referenced
+- **Happy path bias** — only verifies no crash, not correct outcome
+- **Fragile mocking** — fakes that both provide and assert the same value
+- **Dead test infrastructure** — fixtures or helpers defined but never referenced
+- **Test reliability** — timing, ordering, global state, or network dependencies
 
 ```text
 /review-tests
 → Reads every test file and corresponding production code
-→ Writes REVIEW.TESTS.md with Finding Index + per-file sections
-→ Next: /review-fix to apply fixes (reads from .local/REVIEW.md;
-         review-fix does not currently target REVIEW.TESTS.md)
+→ Writes .local/REVIEW.TESTS.md with Finding Index + per-file sections
+→ Note: /review-fix does not currently target REVIEW.TESTS.md
+```
+
+### `/review-deps [path]`
+
+Dependency hygiene audit. Reads all package manager manifests and lockfiles. Scope to a path with `/review-deps`; omit for the full repository.
+
+Scope:
+
+- **Version pinning** — floating pins (`latest`, `*`, `^`, `~`) that allow silent breaking updates
+- **Dependabot / Renovate coverage** — automated update tooling configured per ecosystem
+- **Stale major versions** — major version gaps evidenced by the manifest or lockfile
+- **Known-vulnerable patterns** — version ranges known to contain CVEs (does not fabricate CVE IDs)
+
+For each High finding, greps the codebase for direct usages and assesses breaking-change risk.
+
+```text
+/review-deps
+→ Reads all package manifests and lockfiles
+→ Writes .local/REVIEW.DEPS.md with Finding Index + per-file sections
+→ Note: /review-fix does not target REVIEW.DEPS.md — dependency upgrades require manual validation
+```
+
+### `/update-actions`
+
+Upgrades all GitHub Actions `uses:` pins to their latest major release version. Modifies workflow files directly — this is an executor, not a read-only review.
+
+Respects `# wontfix` comments: any `uses:` line annotated with `# wontfix` (case-insensitive) is skipped and noted in the report.
+
+Preserves pin style (replace like for like):
+
+| Current pin style | Updated to |
+| --- | --- |
+| SHA | SHA of latest release + `# vX.Y.Z` comment |
+| `@vX.Y.Z` | `@vX.Y.Z` of latest release |
+| `@vX` | `@vX` of latest major |
+| Branch (`@main`) | SHA of latest release + `# vX.Y.Z` comment |
+
+For each major-version upgrade, fetches release notes to reconcile interface changes (renamed inputs, removed keys, new required fields) and applies them to the workflow files.
+
+```text
+/update-actions
+→ Reads all .github/workflows/ files
+→ Looks up latest major release for each action via WebFetch/WebSearch
+→ Updates uses: pins (preserving pin style; branch pins → SHA)
+→ Reconciles interface changes; leaves # TODO comments where manual resolution needed
+→ Writes .local/REVIEW.ACTIONS.md with change table per file + wontfix log
+→ Working tree is dirty — review diff before committing
 ```
 
 ### `/review-fix [filter]`
 
-Fixes findings from `.local/REVIEW.md` one at a time in severity order (Critical → High → Medium → Low). Each finding
-must pass the full verify gate before it is accepted and removed from the report.
+Fixes findings from `.local/REVIEW.md` one at a time in severity order (Critical → High → Medium → Low). Each finding must pass the full verify gate before it is accepted and removed from the report.
 
 **Filters:**
 
@@ -137,61 +205,70 @@ must pass the full verify gate before it is accepted and removed from the report
 | `/review-fix` | every open finding |
 | `/review-fix high` | all High findings |
 | `/review-fix medium and low` | all Medium + Low findings |
-| `/review-fix #AUTH-NULL-1` | only `#AUTH-NULL-1` |
-| `/review-fix all except #VAL-LOGIC-1` | everything except `#VAL-LOGIC-1` |
+| `/review-fix #AUTH-NULL-01` | only that finding |
+| `/review-fix all except #VAL-LOGIC-01` | everything except that finding |
 
 **Per-finding procedure:**
 
 1. Load the finding from REVIEW.md
-2. Re-validate against current source (finding may already be fixed; line numbers may have drifted)
+2. Re-validate against current source (may already be fixed; line numbers may have drifted)
 3. Check impact radius via `code-review-graph` tools before touching anything
 4. Apply the smallest correct edit
 5. Add or update a test that fails on pre-fix behavior and passes after
-6. Sync documentation (GoDoc, README, ADRs, OpenAPI spec, env examples)
+6. Sync documentation (docstrings, README, ADRs, OpenAPI spec, env examples)
 7. Run the verify gate — all must pass or the command hard-stops:
-   - `go build ./...`
-   - `go vet ./...`
-   - `golangci-lint run --new-from-rev=$(git merge-base HEAD main)` (new issues only)
-   - `make test`
+   - Build (`go build ./...` or equivalent for the project's language)
+   - Vet/lint (`go vet ./...`, `golangci-lint run --new-from-rev=$(git merge-base HEAD main)`, or equivalent)
+   - Tests (`make test` or equivalent)
 8. Remove the finding from REVIEW.md and the Finding Index table
 
 **Fix-accuracy tier rule** — when the report's proposed fix is wrong:
 
 | Severity | Behavior |
 | --- | --- |
-| Low | Auto-correct: apply the smallest correct fix, note the deviation in the final report |
+| Low | Auto-correct: apply the smallest correct fix, note the deviation |
 | Medium / High / Critical | Stop and ask: explain what is wrong, propose a corrected solution, apply nothing until accepted |
 
-**Hard stops** — the command stops immediately (does not revert, leaves the tree dirty) on:
+**Hard stops** — the command stops immediately on:
 
 - Any verify gate failure
 - Impact radius too large to cover safely in this pass
-- Medium+ fix accuracy rejection (pending operator decision)
+- Medium+ fix accuracy rejection pending operator decision
 
 ```text
 /review-fix critical
 → Processes all Critical findings in severity order
-→ For each: validates, applies fix, runs tests, removes from REVIEW.md
+→ For each: re-validates, applies fix, runs verify gate, removes from REVIEW.md
 → Stops at first gate failure or oversized blast radius
-→ Final report: fixed / auto-corrected / skipped / stopped-at / remaining
 → Working tree is dirty and uncommitted — review diffs before committing
 ```
 
 ## Typical session
 
 ```text
-/review                       <- generate REVIEW.md
-/review-fix critical high     <- fix the high-priority items first
-                              <- review the diffs, commit when satisfied
-/review-fix medium low        <- address the remaining items
-                              <- review the diffs, commit when satisfied
-/review-tests                  <- generate REVIEW.TESTS.md separately
+/review                        <- generate REVIEW.md (full repo)
+/review src/payments           <- generate REVIEW.md (scoped to one package)
+/review-fix critical high      <- fix the high-priority items first
+                               <- review diffs, commit when satisfied
+/review-fix medium low         <- address remaining items
+                               <- review diffs, commit when satisfied
+/review-tests                  <- comprehensive test audit → REVIEW.TESTS.md
+/review-deps                   <- dependency hygiene → REVIEW.DEPS.md
+/update-actions                <- upgrade GitHub Actions → REVIEW.ACTIONS.md + modified files
+```
+
+When token budget is available:
+
+```text
+/review-comprehensive          <- multi-agent parallel review → REVIEW.md
+/review-fix                    <- work through all findings
 ```
 
 ## Notes
 
-- Neither `/review` nor `/review-tests` modifies source files — they only produce report files.
-- `/review-fix` never branches, stages, or commits. The working tree is always left dirty for operator review.
+- `/review`, `/review-comprehensive`, `/review-tests`, and `/review-deps` do not modify source files.
+- `/update-actions` modifies `.github/workflows/` files directly. The working tree is left dirty for operator review; nothing is staged or committed.
+- `/review-fix` never branches, stages, or commits.
 - If REVIEW.md is missing or the filter matches zero findings, `/review-fix` reports that and stops without changing anything.
-- The verify gate uses `--new-from-rev` lint to measure only what the fix introduced — a pre-existing lint baseline
-  cannot mask a new warning or falsely block a finding.
+- The verify gate commands shown are Go examples. For other languages, substitute the equivalent build, lint, and test commands for the project.
+- `/review-fix` does not target REVIEW.TESTS.md, REVIEW.DEPS.md, or REVIEW.ACTIONS.md — those reports require manual or purpose-built remediation workflows.
