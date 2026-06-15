@@ -17,4 +17,4 @@ documentation throughout. For each package:
 4. Do NOT change any behaviour. Documentation only — no refactoring, no renaming,
    no new code.
 
-After all edits: `go vet ./...` must pass with zero errors.
+After all edits: go vet ./... must pass with zero errors.

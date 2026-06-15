@@ -36,6 +36,18 @@ Analyze all source files for:
 - **Every finding must cite a specific, demonstrable problem.** "Could be clearer" is not a finding. "Caller has no way to know this mutates the input" is.
 - **If a file has no meaningful issues, omit it from the report entirely.**
 
+## Additional Instructions
+
+- Read every file before writing ASSESSMENT.md. Do not emit partial results. Where a code graph or symbol index is available, use it to identify call sites, analogous functions, and module boundaries before doing full file reads — this reduces redundant token use without sacrificing coverage.
+- Line numbers must be exact. Verify them against the actual file content.
+- Fix blocks must be complete and runnable — no pseudocode, no "add a comment here," no ellipsis standing in for real code.
+- If a fix requires changes in more than one location, list all locations with their respective fix blocks.
+- Do not add encouraging commentary, filler phrases, or meta-notes. Keep it dense and actionable.
+- Do not re-explain the finding inside the fix block. The fix should speak for itself.
+- For any finding involving legacy, deprecated, compatibility, or parallel-path code: before recommending a comment fix, grep production callers. Categorize results as: (a) production callers, (b) test-only callers, (c) zero callers. If (b) or (c), recommend deletion over documentation. If (a), document why the legacy path exists and what replaces it.
+
+---
+
 ## Output Format
 
 ### Finding Index
@@ -93,14 +105,3 @@ Group findings by file. Within each file, order by line number.
 - **NN**: 2-digit left-zero-padded integer, incrementing globally across the entire report (never resets per file); e.g., `01`, `02`, … `10`, `11`
 
 Example heading: `#### 🟡 Warning — #DB-GAP-07 — Connection error handler missing in \`queryBatch\``
-
----
-
-## Additional Instructions
-
-- Read every file before writing ASSESSMENT.md. Do not emit partial results. Where a code graph or symbol index is available, use it to identify call sites, analogous functions, and module boundaries before doing full file reads — this reduces redundant token use without sacrificing coverage.
-- Line numbers must be exact. Verify them against the actual file content.
-- Fix blocks must be complete and runnable — no pseudocode, no "add a comment here," no ellipsis standing in for real code.
-- If a fix requires changes in more than one location, list all locations with their respective fix blocks.
-- Do not add encouraging commentary, filler phrases, or meta-notes. Keep it dense and actionable.
-- Do not re-explain the finding inside the fix block. The fix should speak for itself.

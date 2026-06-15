@@ -29,6 +29,11 @@
 - Prefer channels for communication, mutexes for protecting shared state — do not mix casually.
 - Run the race detector on tests: `go test -race ./...`. A race condition is a bug, not a warning.
 
+### Building
+
+- Always build with `make build` or `go build -o bin/<binary>` — never bare `go build ./...` from the project root.
+- To verify a change compiles, use `go build ./...` (no output produced) rather than a bare `go build ./cmd/...`.
+
 ### Project Structure
 
 Follow [https://github.com/golang-standards/project-layout/](https://github.com/golang-standards/project-layout/) as
