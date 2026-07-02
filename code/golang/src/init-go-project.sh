@@ -47,7 +47,6 @@ mkdir -p \
     "test/functional" \
     "test/smoke" \
     "test/e2e" \
-    "testdata" \
     ".github/workflows"
 
 # ── scripts/variables.mk ──────────────────────────────────────────────────────

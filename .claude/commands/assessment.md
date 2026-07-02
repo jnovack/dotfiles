@@ -25,6 +25,14 @@ Analyze all source files for:
 - **Naming that lies or misleads** — names that contradict behavior, overpromise scope, or require reading the implementation to decode; names that differ across call sites for the same concept
 - **Dead or vestigial code** — commented-out blocks left in, imports never used, flags never checked, code paths that cannot be reached; flag only what a reader would waste time trying to understand
 - **Implicit contracts** — assumptions about input shape, call order, shared state, or external conditions that are nowhere stated and not obvious; anything a caller must know that isn't captured in the interface
+- **Overengineering** - Review diffs for unnecessary complexity. Stop at the first rung that holds. The ladder is a reflex, not a research project. Two rungs work → take the higher one and move on. The first lazy solution that works is the right one.
+
+  1. Does this need to exist at all? Speculative need = skip it, say so in one line. (YAGNI)
+  2. Stdlib does it? Use it.
+  3. Native platform feature covers it? `<input type="date">` over a picker lib, CSS over JS, DB constraint over app code.
+  4. Already-installed dependency solves it? Use it. Never add a new one for what a few lines can do.
+  5. Can it be one line? One line.
+  6. Only then: the minimum code that works.
 
 ## Ground Rules
 

@@ -81,10 +81,20 @@ that and stop without changing anything.
 Run these steps in order for one finding. Any **STOP** condition ends the whole
 command (stop on first failure).
 
-### 1. Load the finding
+### 1. Load the finding — read it completely before proceeding
 
-Read the finding's full block from `.local/REVIEW.md`: ID, severity, file,
-`Line(s)`, Issue, Fix, Rationale.
+**This step must finish before any other tool is called.** Do not open a source
+file, run a shell command, or call any graph tool until this step is done.
+
+Read the finding's **entire block** from `.local/REVIEW.md`: ID, severity, file,
+`Line(s)`, Issue, Fix, Rationale, Test — **and every line that follows**, including
+any Codex Evaluation, Codex Suggested Fix, alternative fix analysis, reviewer
+annotations, or other appended content. The finding block ends where the next
+finding's `####` heading begins (or at end of file).
+
+Context below the standard fields often contains a preferred or corrected fix that
+supersedes the Fix field. Ignoring it is a correctness error. Read everything,
+form a complete picture of the recommended approach, then proceed to step 2.
 
 ### 2. Re-validate accuracy against current source
 
