@@ -2,7 +2,9 @@
 
 Fix findings recorded in `.local/REVIEW.md` — one finding at a time, each fully
 validated, regression-guarded, tested, and documented before it is accepted and
-removed from the report.
+removed from the report. Each fix is performed by a dedicated subagent launched
+at the model/effort the finding calls for; the orchestrator (you) independently
+re-validates the subagent's work before accepting it.
 
 Arguments: `$ARGUMENTS` (a filter selecting which findings to fix; see **Target
 selection**). When empty, every open finding is targeted.
@@ -14,25 +16,39 @@ selection**). When empty, every open finding is targeted.
 - **Source of truth.** `.local/REVIEW.md` lists the open findings. `AGENTS.md`
   governs validation, Definition of Done, and documentation sync; obey it.
 - **Smallest correct change.** Apply the fix in the finding (or a corrected
-  version of it — see step 2), nothing more. No drive-by refactors, no
+  version of it — see step 3), nothing more. No drive-by refactors, no
   formatting passes, no file moves.
-- **No git.** Never branch, stage, or commit. Leave the working tree dirty for
-  the operator to review and commit. The REVIEW.md diff plus the code diff are
-  the audit trail.
+- **The report is a lead, not a mandate.** Treat every `Fix` block — and any
+  `Codex Evaluation`/`Codex Suggested Fix` content appended to it — as an
+  unverified proposal. Fix subagents must independently check it against the
+  nearest ADR under `docs/decisions/` and the touched function/type's doc
+  comment before applying, because a report can be stale, wrong, or written by
+  an agent that skipped that check. A fix that is small but contradicts
+  governing intent is not minimal — it is wrong, and is handled by the
+  fix-accuracy tier rule below like any other wrong fix.
+- **No git, no worktree isolation.** Never branch, stage, or commit — this
+  applies to subagents too. Do not launch fix subagents with `isolation:
+  "worktree"`; they must edit the real, shared working tree so the operator sees
+  one dirty tree at the end, not a stray branch. Leave the working tree dirty
+  for the operator to review and commit. The REVIEW.md diff plus the code diff
+  are the audit trail.
 - **Stop on first failure.** Process targets in severity order (Critical → High
-  → Medium → Low). On any **verify-gate** failure (build, vet, lint, tests) or an
-  impact radius too large to cover safely, **stop**: report what failed with
-  output, leave all work in place (do not revert), and do not touch the remaining
-  findings. Fix-*accuracy* problems follow the **tier rule** (step 2), not this
-  hard stop.
+  → Medium → Low). On any **verify-gate** failure (build, vet, lint, tests) —
+  whether caught by the fix subagent or by the orchestrator's independent
+  re-validation in step 5 — or an impact radius too large to cover safely,
+  **stop**: report what failed with output, leave all work in place (do not
+  revert), and do not touch the remaining findings. Fix-*accuracy* problems
+  follow the **tier rule** (step 3), not this hard stop.
 - **Fix-accuracy tier rule.** When the report's proposed fix is wrong, unsafe, or
-  incomplete: **Low** findings are auto-corrected (apply your own smallest correct
-  fix and note the deviation); **Medium / High / Critical** findings stop and ask,
-  and an accepted alternative restarts validation from a clean slate. Full
-  mechanics in step 2.
-- **Graph first.** Use the `code-review-graph` MCP tools (`semantic_search_nodes`,
-  `query_graph`, `get_impact_radius`, `get_affected_flows`) before Grep/Read,
-  per `CLAUDE.md`.
+  incomplete: **Low** findings are auto-corrected by the fix subagent itself
+  (apply the smallest correct fix and note the deviation); **Medium / High /
+  Critical** findings make the fix subagent stop without applying anything and
+  report the problem plus a proposed correction back to you, so you can ask the
+  operator. An accepted alternative gets a **brand-new fix subagent** — see
+  **Clean-slate restart** in step 4. Full mechanics in step 3.
+- **Graph first.** Fix subagents must use the `code-review-graph` MCP tools
+  (`semantic_search_nodes`, `query_graph`, `get_impact_radius`,
+  `get_affected_flows`) before Grep/Read, per `CLAUDE.md`.
 - **Pre-release repo conventions** (from project memory — apply without asking):
   - Remove things outright; no deprecation aliases, shims, or transition periods.
   - A change to any one `cmd/` binary or shared package must be applied
@@ -76,115 +92,157 @@ that and stop without changing anything.
 
 ---
 
+## Model/effort resolution
+
+Each finding block may carry a line of the form:
+
+```text
+**Suggested Model/Effort:** <Model> / <Effort> — <reasoning>
+```
+
+Parse `<Model>` and `<Effort>` from this line before dispatching the fix
+subagent (step 3).
+
+**Model → Agent tool `model` param:**
+
+| Suggested Model | `model` value | Notes |
+| --- | --- | --- |
+| Haiku | `haiku` | |
+| Sonnet | `sonnet` | |
+| Opus | `opus` | |
+| Codex | `opus` | Codex is not launchable via the Agent tool (different vendor); substitute `opus` as the closest locally available reasoning-oriented model and note the substitution in the final report. |
+| *(line absent)* | `sonnet` | Default when a finding predates this field. Note in the final report that a default was applied. |
+
+**Effort → prompt instruction** (the Agent tool has no effort parameter; effort
+is conveyed as explicit prose in the subagent's prompt):
+
+| Effort | Instruction embedded in the subagent prompt |
+| --- | --- |
+| Low | "Apply the described fix directly once you've confirmed it's correct. Keep the regression-guard graph check brief — the directly impacted symbol is enough." |
+| Medium | "Verify assumptions with the graph tools before applying the fix; re-derive it if gaps appear. Check at least one layer of callers/dependents via `get_impact_radius`." |
+| High | "Thoroughly investigate the impact radius and affected flows before applying anything. Reason carefully through concurrency/design implications and edge cases, and make sure the regression test actually exercises them." |
+
+---
+
 ## Per-finding procedure
 
 Run these steps in order for one finding. Any **STOP** condition ends the whole
 command (stop on first failure).
 
-### 1. Load the finding — read it completely before proceeding
+### 1. Load the finding
 
-**This step must finish before any other tool is called.** Do not open a source
-file, run a shell command, or call any graph tool until this step is done.
+Read the finding's full block from `.local/REVIEW.md`: ID, severity, file,
+`Line(s)`, Issue, Fix, Rationale, and any `Codex Evaluation` / `Codex Suggested
+Fix` content present. Parse the `Suggested Model/Effort` line per **Model/effort
+resolution** above.
 
-Read the finding's **entire block** from `.local/REVIEW.md`: ID, severity, file,
-`Line(s)`, Issue, Fix, Rationale, Test — **and every line that follows**, including
-any Codex Evaluation, Codex Suggested Fix, alternative fix analysis, reviewer
-annotations, or other appended content. The finding block ends where the next
-finding's `####` heading begins (or at end of file).
+### 2. Quick staleness check (orchestrator, no subagent)
 
-Context below the standard fields often contains a preferred or corrected fix that
-supersedes the Fix field. Ignoring it is a correctness error. Read everything,
-form a complete picture of the recommended approach, then proceed to step 2.
+Before spending a subagent call, do a cheap check yourself: open the cited file
+and confirm the described defect still plausibly exists (a grep/read is
+enough — full re-validation of fix *correctness* is the subagent's job in step
+3, not yours here).
 
-### 2. Re-validate accuracy against current source
+- If the defect is **clearly already resolved** → remove the finding from
+  REVIEW.md (step 6 cleanup) with a note "already fixed", and continue to the
+  next target. No subagent is dispatched for this finding.
+- Otherwise, proceed to step 3.
 
-REVIEW.md may be stale relative to the working tree. Open the cited file and
-confirm the defect still exists. Line numbers drift — locate the real symbol via
-`semantic_search_nodes` / `query_graph` rather than trusting the line range.
+### 3. Dispatch the fix subagent
 
-- If the defect is **already resolved** in the tree → remove the finding from
-  REVIEW.md (step 8 cleanup) with a note "already fixed", and continue to the
-  next target (this is success, not a failure).
-- If the finding's proposed **Fix is wrong, unsafe, or incomplete**, or you cannot
-  confidently locate the code, apply the **fix-accuracy tier rule** by severity:
-  - **Low → auto-correct.** Derive the smallest correct fix yourself and proceed
-    through steps 3–8 with it. Record the deviation in the final report (what the
-    report proposed vs. what you applied, and why). The verify gate (step 7) still
-    governs — a gate failure on the corrected fix is still a hard STOP.
-    **Exception:** if the corrected fix is non-trivial (e.g. a new package, a
-    behavioral split across callers, or a change that touches more than ~5 files),
-    stop and present the approach before applying — treat it like a Medium finding
-    for that step only, then continue autonomously once accepted.
-  - **Medium / High / Critical → stop and ask.** **STOP**. Explain precisely what
-    is wrong with the proposed fix and propose a corrected solution (concrete code
-    or approach). Apply nothing. If the operator accepts the proposal, **restart
-    this finding from step 1 on a clean slate** (see below).
+Launch one `Agent` call with:
 
-**Clean-slate restart.** When an operator accepts a proposed alternative for a
-Medium+ finding, treat that proposal as a *new candidate fix to validate*, not as
-pre-approved truth. Re-run this finding's procedure from step 1: re-read the
-source fresh, re-run the graph impact check, and re-apply every gate. Humans and
-agents both err — the restart makes the accepted solution earn the same full
-validation as any other, with no reliance on the prior (rejected) analysis.
+- `subagent_type: "general-purpose"` (needs Bash/Read/Edit/Write plus the
+  `code-review-graph` MCP tools).
+- `model`: the value resolved in **Model/effort resolution**.
+- No `isolation` parameter (must edit the real working tree — see Operating
+  rules).
+- `run_in_background`: unset (run in the foreground) — the next finding must
+  not start until this one's outcome is known, per "stop on first failure".
 
-### 3. Regression guard via the graph
+The prompt must be fully self-contained (the subagent starts cold with no
+memory of this conversation) and must include:
 
-Run `get_impact_radius` on the symbol(s) you will change and `get_affected_flows`
-for the touched files. Read the callers/dependents the fix could break. If the
-change ripples to sibling call sites or other `cmd/` binaries, you must update
-them all in this pass (consistency rule). If the blast radius is larger than the
-fix can safely cover here → **STOP** and report.
+- The finding's full content from step 1 (ID, severity, file, line(s), issue,
+  fix, rationale, and any Codex evaluation/suggested fix).
+- The effort instruction resolved above.
+- The relevant Operating rules verbatim: smallest correct change, no git/no
+  branching/no committing, graph-first tool usage, the pre-release repo
+  conventions, and the **fix-accuracy tier rule** (verbatim, including the Low
+  auto-correct/non-trivial-exception and the Medium+ stop-without-applying
+  behavior).
+- Instructions to perform, in order, what were originally steps 2–6 of this
+  procedure:
+  1. Re-validate the defect and the proposed fix against current source (line
+     numbers may have drifted; locate the real symbol via the graph tools).
+     Re-deriving correctness includes checking the fix — and any appended
+     `Codex Evaluation`/`Codex Suggested Fix` — against the nearest ADR under
+     `docs/decisions/` and the touched function/type's doc comment; a fix that
+     is small but contradicts either counts as "wrong" for step 3 below, not
+     as pre-approved because it's written down.
+  2. Regression guard: run `get_impact_radius` and `get_affected_flows` on the
+     symbol(s)/file(s) to change; if the blast radius is larger than the fix can
+     safely cover, stop and report instead of applying.
+  3. Apply the smallest correct fix (or the tier-rule-corrected fix for Low
+     findings; for Medium/High/Critical findings with a wrong/unsafe/incomplete
+     proposed fix — including one that violates governing intent per step 1 —
+     **stop without applying anything** and report the problem plus a
+     proposed correction).
+  4. Add or update a regression test that fails on the pre-fix behavior and
+     passes after; update any mirrored mock/stub types in the same pass.
+  5. Sync documentation: GoDoc for any changed contract, external markdown
+     (`README.md`, `AGENTS.md`, relevant ADRs, `docs/openapi.yaml`) if behavior
+     or an API contract changed, and `.env.example`/`README.md` together for any
+     flag/env change. Keep markdown lint-clean per `CLAUDE.md`.
+  6. Run the **verify gate** itself before reporting back: `go build ./...`,
+     `go vet ./...`, the scoped `golangci-lint run --new-from-rev=...` command,
+     `make test`, and confirm the new/updated test is included and passing.
+- Instructions to report back precisely: what was changed (files + a diff
+  summary), the regression test added/updated and its name, docs touched, the
+  exact verify-gate commands run and their pass/fail output, and — if it
+  stopped — exactly why (oversized impact radius, tier-rule Medium+ rejection
+  with proposed correction, or a gate failure) with no changes left applied in
+  the stop case.
 
-### 4. Apply the fix
+### 4. Handle the subagent's outcome
 
-Make the smallest correct edit, matching surrounding style and naming. Add an
-inline comment only if the **WHY is genuinely non-obvious** — a hidden
-constraint, a subtle invariant, a workaround for a specific bug. Do not comment
-what the code does; do not write step-reference or changelog prose. Most fixes
-need no comment at all.
+- **Success reported** → proceed to step 5 (independent validation). Do not
+  yet touch REVIEW.md.
+- **Stopped: oversized impact radius, or a verify-gate failure** → this is a
+  hard stop for the whole `/review-fix` run. Report the finding ID, what the
+  subagent found, and the failing output. Leave all work as the subagent left
+  it (do not revert). Do not process remaining targets.
+- **Stopped: Medium/High/Critical tier-rule rejection** → present the
+  subagent's explanation and proposed correction to the operator and ask
+  whether to accept it, reject it (hard stop, same as above), or supply a
+  different fix.
+  - **Clean-slate restart:** if the operator accepts a proposal (the
+    subagent's or their own), do **not** resume the same subagent or reuse its
+    context. Dispatch a **brand-new** fix subagent (fresh `Agent` call, same
+    model/effort resolution) for this finding, re-entering this procedure at
+    step 3 with the accepted fix substituted for the report's original `Fix`.
+    A fresh subagent naturally enforces "clean slate" — it re-derives
+    everything from source with no reliance on the prior (rejected) analysis.
 
-### 5. Lock the fix with a test
+### 5. Independent post-subagent validation (orchestrator-owned)
 
-Add or update a test that **fails on the pre-fix behavior and passes after**.
-Prefer table extension in the existing `_test.go` for that package. State in the
-test name/comment which finding it locks (e.g. the defect, not the finding ID, so
-the test reads naturally). Update any mock/stub types in test files in the same
-pass. If a regression test is genuinely infeasible, say so explicitly in the
-final report and explain why.
+Do not accept a finding on the subagent's self-report alone. After a subagent
+reports success:
 
-### 6. Sync documentation
+1. Re-run, yourself, the specific new/updated test(s) it named.
+2. Re-run `make test` in full.
+3. If the touched files could plausibly affect build/vet/lint scope beyond the
+   named test (i.e. almost always), also re-run `go build ./...`, `go vet
+   ./...`, and the scoped lint gate:
+   `go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --new-from-rev=$(git merge-base HEAD main)`.
 
-- **GoDoc:** update the doc comment of any function/type whose contract or
-  behavior changed so it matches reality.
-- **External markdown:** update anything that documents the changed behavior —
-  `README.md`, `AGENTS.md`, relevant ADRs under `docs/decisions/`, and
-  `docs/openapi.yaml` if an API contract changed. Keep markdown lint-clean per
-  `CLAUDE.md` (MD022/MD032/MD040/MD060; blank lines around fences/lists/headings).
-- **Flags/env:** if a flag or environment variable changed, update
-  `.env.example` and `README.md` together.
+Any failure or discrepancy from what the subagent reported is treated exactly
+like a verify-gate failure under Operating rules: **STOP**, report the command
+and its output, leave work in place, do not touch the remaining findings.
 
-### 7. Verify gate — ALL must pass
+### 6. Accept and remove from the report
 
-Run each; any failure → **STOP**, report the command and its output, leave work
-in place:
-
-1. `go build ./...`
-2. `go vet ./...`
-3. **Lint (new issues only):**
-   `go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --new-from-rev=$(git merge-base HEAD main)`
-   — flags only lint issues the change introduces relative to the merge-base with
-   the default branch. Block on **any** output. Using `--new-from-rev` instead of
-   plain `make lint` means a red baseline can neither mask a real new warning nor
-   falsely block the finding; the gate measures exactly what this change added.
-   (If `main` is unavailable, substitute the actual default branch ref.)
-4. `make test` (full unit/mock suite) — block on any failure.
-5. The new/updated test from step 5 is included in `make test` and passes.
-6. Touched `.md` files are lint-clean (rely on IDE diagnostics; `markdownlint`
-   is not installed here).
-
-### 8. Accept and remove from the report
-
-Only after every gate passes:
+Only after independent validation (step 5) passes:
 
 - Delete the finding's entire per-file section from `.local/REVIEW.md`.
 - Delete its row from the **Finding Index** table.
@@ -199,13 +257,17 @@ Do **not** commit. Move to the next target.
 
 After the run (whether it completed or stopped early), print a concise summary:
 
-- **Fixed:** for each accepted finding — ID, files touched, test added, docs updated.
-- **Auto-corrected (Low):** any Low finding where you applied a fix that differed
-  from the report — note the report's proposal vs. what you applied and why.
+- **Fixed:** for each accepted finding — ID, model/effort used (and any
+  Codex→Opus or missing-field→Sonnet/Medium substitution applied), files
+  touched, test added, docs updated.
+- **Auto-corrected (Low):** any Low finding where the fix subagent applied a
+  fix that differed from the report — note the report's proposal vs. what was
+  applied and why.
 - **Skipped (already fixed):** any findings step 2 found already resolved.
-- **Stopped at:** if halted — the finding ID, the gate/step that failed (verify
-  gate, oversized impact, or a Medium+ proposed-fix rejection), the failing output
-  or your corrected proposal, and the recommended next action.
+- **Stopped at:** if halted — the finding ID, the gate/step that failed (fix
+  subagent's verify gate, orchestrator's independent re-validation, oversized
+  impact, or a Medium+ proposed-fix rejection), the failing output or the
+  corrected proposal, and the recommended next action.
 - **Remaining:** open findings still in `.local/REVIEW.md`.
 - Remind the operator: the working tree is **dirty and uncommitted** — review the
   `.local/REVIEW.md` diff and the code diff, then commit when satisfied.

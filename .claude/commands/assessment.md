@@ -39,6 +39,7 @@ Analyze all source files for:
 - **Do not conflate this with a bug review.** If a finding is purely a correctness issue, omit it. This command is about comprehensibility.
 - **Omit self-evident code.** `i++` does not need a comment. Flag absence of documentation only where a reader would genuinely pause.
 - **Prefer the smallest correct change.** A one-line comment often fixes a finding. Don't suggest a refactor when a comment will do.
+- **A comment is not a fix for code that violates a governing ADR or documented contract.** If the confusing code exists *because* it papers over or contradicts a decision record, say so in the finding instead of only recommending a comment — otherwise the fix documents duct tape rather than flagging it.
 - **Preserve existing structure.** Do not recommend restructuring that isn't directly necessary to make code understandable.
 - **Flag inconsistency at the gap, not just the origin.** If function A has a guard that B and C lack, the finding is on B and C.
 - **Every finding must cite a specific, demonstrable problem.** "Could be clearer" is not a finding. "Caller has no way to know this mutates the input" is.

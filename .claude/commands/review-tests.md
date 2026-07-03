@@ -38,6 +38,9 @@ Read every test file in scope and its corresponding production code. Analyze for
 ## Ground Rules
 
 - Prefer the smallest correct change. Do not rewrite what works.
+- A minimal test fix that contradicts a governing ADR or documented testing
+  strategy is not minimal — it is wrong. If the smallest patch conflicts with
+  either, report the correct fix instead and say why.
 - Preserve existing structure, naming, and patterns unless they are the direct cause of a defect.
 - Do not perform unrelated refactors, formatting passes, or file moves.
 - Every finding must cite a specific, demonstrable problem.

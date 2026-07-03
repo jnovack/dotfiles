@@ -77,6 +77,15 @@ risk cannot be ruled out from static analysis alone.
 ## Ground Rules
 
 - Prefer the smallest correct change. Do not rewrite what works.
+- A minimal fix that contradicts a governing ADR or documented contract is not
+  minimal — it is wrong. Before sizing a fix, check `docs/decisions/` (or the
+  project's equivalent decision record) and the touched function/type's doc
+  comment. If the smallest patch conflicts with either, report the
+  architecturally-correct fix instead — even if it's larger — and say so
+  explicitly (see `**Scope:**` in the finding format below).
+- Cite what governing intent was checked for each finding, when one exists. A
+  finding with no governing ADR should say "no governing ADR found" rather
+  than imply the check was done and passed.
 - Preserve existing structure, naming, and patterns unless they are the direct cause
   of a defect.
 - Do not perform unrelated refactors, formatting passes, style normalization, or file
@@ -99,6 +108,9 @@ risk cannot be ruled out from static analysis alone.
 - For legacy/deprecated/compatibility code: grep callers before recommending a fix.
   Categorize as (a) production callers, (b) test-only, or (c) zero callers.
   Recommend deletion if (b) or (c).
+- Within each finding, add a line with the suggested model and effort
+  (Haiku/Sonnet/Opus/Codex; Low/Medium/High) to correctly reason about the issue
+  and the impact of the suggested fix.
 
 ---
 
@@ -140,6 +152,15 @@ Within each file, findings are ordered Critical → High → Medium → Low.
 **Line(s):** 42
 
 **Issue:** Precise description of what is wrong and why it is dangerous or incorrect.
+
+**Scope:** Only present when the correct fix is larger than the smallest patch that
+would silence the symptom. One or two sentences: which ADR or documented contract
+the minimal patch would violate, and why the larger fix is the actual smallest
+*correct* change. Omit this line entirely when the minimal patch and the correct
+patch are the same.
+
+**Suggested Model/Effort:** Model and effort required to properly confirm the fix and
+impact.  One or two sentences noting impact radius, gotchas or pitfalls to be aware of.
 
 **Fix:**
 

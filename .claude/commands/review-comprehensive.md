@@ -80,6 +80,7 @@ const FINDING_SCHEMA = {
           severity:     { type: 'string', enum: ['critical','high','medium','low'] },
           title:        { type: 'string' },
           issue:        { type: 'string' },
+          scope:        { type: 'string' },
           fix:          { type: 'string' },
           fix_language: { type: 'string' },
           rationale:    { type: 'string' },
@@ -97,6 +98,13 @@ const BASE =
   'bug, security risk, reliability issue, or meaningful maintainability problem. ' +
   'Do not speculate. Do not flag risks already handled elsewhere in the codebase. ' +
   'Verify exact line numbers before reporting.\n\n' +
+  'Before writing a fix, check it against governing intent: the nearest ADR ' +
+  '(docs/decisions/ or equivalent) and the touched function/type\'s doc comment. ' +
+  'A minimal fix that contradicts either is not minimal — it is wrong. If the ' +
+  'smallest patch conflicts with documented intent, propose the ' +
+  'architecturally-correct fix instead (even if larger) and set the `scope` ' +
+  'field explaining why. Leave `scope` empty when the minimal and correct fix ' +
+  'are the same.\n\n' +
   'Repository: ' + SUMMARY + '\n\n' +
   'Files to read:\n' + FILE_LIST
 
@@ -211,6 +219,9 @@ await agent(
   '- ## Finding Index (table: ID | Severity emoji+label | File | Title)\n' +
   '- ## Findings by File (per-file blocks ordered by highest severity in that ' +
      'file; each finding block: severity emoji heading with ID, Line(s), Issue, ' +
+     'Scope (only when the finding\'s scope field is non-empty — one or two ' +
+     'sentences on which ADR/contract the minimal patch would violate and why ' +
+     'the reported fix is larger than minimal), ' +
      'Fix as a complete runnable fenced code block with language tag, ' +
      'Rationale, Test)\n' +
   '- ## Severity Reference (4-level table with emoji labels)\n' +
