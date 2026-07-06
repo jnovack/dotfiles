@@ -1,7 +1,9 @@
 .code-review-graph/
 .env
 .DS_Store
-.local/*
+.local/
 node_modules/
 Thumbs.db
 *.swp
+
+**/.claude/settings.local.json
