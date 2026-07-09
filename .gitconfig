@@ -8,6 +8,7 @@
     accept-ours = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --ours -- $files; git add -u $files; git rebase --continue; }; f"
     accept-theirs = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --theirs -- $files; git add -u $files; git rebase --continue; }; f"
     catchup = "!f() { git pull --recurse-submodules; git submodule update --init; git submodule update --recursive; }; f"
+    autocommit = "!f() { git add -A && git commit -F .local/COMMIT-MSG.txt && rm .local/COMMIT-MSG.txt && git push; }; f"
     branch-default = "!f() { git config branch.master.remote origin; git config branch.master.merge refs/heads/master; }; f"
     pr = "!f() { git fetch origin pull/$1/head:$1; }; f"
     sync = "!f() { git fetch upstream; git merge upstream/`git branch --show-current`; git push origin; }; f"
