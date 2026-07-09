@@ -84,9 +84,10 @@ const FINDING_SCHEMA = {
           fix:          { type: 'string' },
           fix_language: { type: 'string' },
           rationale:    { type: 'string' },
-          test:         { type: 'string' }
+          test:         { type: 'string' },
+          model_effort: { type: 'string' }
         },
-        required: ['file','lines','severity','title','issue','fix','rationale']
+        required: ['file','lines','severity','title','issue','fix','rationale','model_effort']
       }
     }
   },
@@ -105,6 +106,21 @@ const BASE =
   'architecturally-correct fix instead (even if larger) and set the `scope` ' +
   'field explaining why. Leave `scope` empty when the minimal and correct fix ' +
   'are the same.\n\n' +
+  'For every finding, set `model_effort` to the model and effort a fix agent ' +
+  'would need to correctly apply and verify the fix, formatted as ' +
+  '"<Model> / <Effort> — <one sentence: blast radius or ambiguity>" using ' +
+  'Model in {Haiku, Sonnet, Opus, Codex} and Effort in {Low, Medium, High}. ' +
+  'Size by blast radius and ambiguity, not by severity: a Critical finding ' +
+  'with an unambiguous one-line fix in a single file is still Haiku/Low. A ' +
+  'Medium finding whose correct fix needs a real concurrency-safety argument, ' +
+  'not a restated assumption, is Opus/Medium if the agent can resolve it ' +
+  'correctly on its own; a finding whose fix contradicts a governing ADR or ' +
+  'requires a product decision the report cannot make unilaterally is ' +
+  'Opus/High regardless of diff size. Reserve Codex/Medium for mechanical, ' +
+  'low-judgment edits repeated across many locations or files. This is ' +
+  'illustrative, not exhaustive — pick Model by how much reasoning ' +
+  'correctness requires and Effort by how much verification trusting it ' +
+  'requires, independently of each other.\n\n' +
   'Repository: ' + SUMMARY + '\n\n' +
   'Files to read:\n' + FILE_LIST
 
@@ -205,7 +221,9 @@ await agent(
   'Repository: ' + SUMMARY + '\n\n' +
   'Instructions:\n' +
   '1. Deduplicate: same file+lines reported by multiple agents — keep the most ' +
-     'specific description.\n' +
+     'specific description; if their model_effort values differ, keep the ' +
+     'higher-effort one (a finding two dimensions independently flagged is at ' +
+     'least as risky as either alone).\n' +
   '2. Assign severity consistently: Critical (crash/data-loss/exploitable), ' +
      'High (likely bug or significant security weakness), Medium (will cause ' +
      'problems at scale), Low (minor refinement).\n' +
@@ -222,6 +240,7 @@ await agent(
      'Scope (only when the finding\'s scope field is non-empty — one or two ' +
      'sentences on which ADR/contract the minimal patch would violate and why ' +
      'the reported fix is larger than minimal), ' +
+     'Suggested Model/Effort (copy the finding\'s model_effort field verbatim), ' +
      'Fix as a complete runnable fenced code block with language tag, ' +
      'Rationale, Test)\n' +
   '- ## Severity Reference (4-level table with emoji labels)\n' +

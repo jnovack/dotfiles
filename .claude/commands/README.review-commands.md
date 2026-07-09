@@ -1,16 +1,38 @@
 # Review Skill System
 
-A set of slash commands for structured code, test, and dependency review, plus an action-update executor. Review commands produce dense, actionable reports with severity-scored findings. The fix command closes findings one at a time, each validated against build, vet, lint, and tests before acceptance.
+A set of slash commands for structured code review, comprehensibility
+assessment, test review, and dependency review, plus an action-update
+executor. Review/assessment commands produce dense, actionable reports with
+severity-scored findings. An optional triage pass groups those findings into
+batches. The fix commands close findings — one at a time, or batch by batch
+— each validated before acceptance.
 
 ## Why this exists
 
-Code review feedback without a forcing function never lands. Findings stall in a document, fixes get applied inconsistently, and the report drifts out of sync with the actual code. This system ties review output to a structured fix workflow: every finding has an ID, every fix has a verify gate, and the report shrinks only when a change has passed that gate.
+Review feedback without a forcing function never lands. Findings stall in a
+document, fixes get applied inconsistently, and the report drifts out of
+sync with the actual code. This system ties review output to a structured
+fix workflow: every finding has an ID and a model/effort assignment, every
+fix has a verify gate, and the report shrinks only when a change has passed
+that gate. Triage exists because "one finding at a time" is the right
+granularity for bug fixes (each needs its own regression test) but wasteful
+for a report full of low-ambiguity, same-shape findings — batching those
+turns N verification passes into a handful.
 
 ## Lifecycle
 
 ```text
-source code → /review [path]                 → .local/REVIEW.md       → /review-fix
-              /review-comprehensive [path]   → .local/REVIEW.md       → /review-fix
+source code → /review [path]                 → .local/REVIEW.md      ─┐
+              /review-comprehensive [path]    → .local/REVIEW.md      ─┤
+comprehens.  → /assessment [path]             → .local/ASSESSMENT.md  ─┘
+                                                                        │
+                                               /review-triage [report] ←┘
+                                                        │
+                                    .local/REVIEW.TRIAGE.md or
+                                    .local/ASSESSMENT.TRIAGE.md
+                                                        │
+                              /review-fix [filter]  or  /assessment-fix [filter]
+
 test files  → /review-tests [path]           → .local/REVIEW.TESTS.md
 dep files   → /review-deps [path]            → .local/REVIEW.DEPS.md
 workflows   → /update-actions               → .local/REVIEW.ACTIONS.md + modified files
@@ -18,10 +40,12 @@ workflows   → /update-actions               → .local/REVIEW.ACTIONS.md + mod
 
 | Stage | Meaning |
 | --- | --- |
-| REVIEW.md | Open findings; shrinks as fixes are accepted |
+| REVIEW.md / ASSESSMENT.md | Open findings; shrinks as fixes are accepted |
 | Finding ID | Unique identifier scoped per file and issue class |
-| Verify gate | Build + vet + lint (new issues only) + tests — all must pass before a finding is accepted |
-| Removed | Finding deleted from REVIEW.md; fix is in the tree, uncommitted |
+| Suggested Model/Effort | Per-finding execution sizing; added at generation time or backfilled by `/review-triage` — required before a `-fix` command will process a finding |
+| `*.TRIAGE.md` | Optional grouping/ordering index over an open report; planning only, never modifies source or the report itself (besides backfilling the field above) |
+| Verify gate | Build + vet + lint (new issues only) + tests — all must pass before a finding is accepted. `/assessment-fix` relaxes this to build+vet for pure comment/doc fixes; a fix that turns out to be a real bug gets the full gate |
+| Removed | Finding deleted from its report; fix is in the tree, uncommitted |
 
 ## File layout
 
@@ -29,15 +53,21 @@ workflows   → /update-actions               → .local/REVIEW.ACTIONS.md + mod
 ~/.claude/commands/          <- these skill files (global, works in any repo)
   review.md
   review-comprehensive.md
+  assessment.md
+  review-triage.md
   review-tests.md
   review-deps.md
   review-fix.md
+  assessment-fix.md
   update-actions.md
 
 <repo>/
   .local/
     .gitignore               <- auto-created; excludes .local/ from commits
     REVIEW.md                <- findings from /review or /review-comprehensive
+    ASSESSMENT.md             <- findings from /assessment
+    REVIEW.TRIAGE.md         <- batch plan for REVIEW.md, from /review-triage
+    ASSESSMENT.TRIAGE.md      <- batch plan for ASSESSMENT.md, from /review-triage
     REVIEW.TESTS.md          <- findings from /review-tests
     REVIEW.DEPS.md           <- findings from /review-deps
     REVIEW.ACTIONS.md        <- report from /update-actions
@@ -57,6 +87,8 @@ For test reviews, MODULE reflects the test suite (`INT`, `UNIT`, `E2E`) and TYPE
 
 For dependency reviews, MODULE reflects the ecosystem (`GOMOD`, `NPM`, `PY`, `CARGO`) and TYPE reflects the concern (`UNPIN`, `STALE`, `BREAK`, `AUTO`).
 
+For comprehensibility assessments (`/assessment`), MODULE reflects the file/module and TYPE reflects the comprehensibility failure: `DOC` (missing/misleading documentation), `WHY` (missing inline rationale), `GAP` (pattern applied inconsistently), `NAME` (misleading name), `DEAD` (vestigial code), `CNTR` (unstated implicit contract), `STRCT` (structural confusion). `NN` increments globally across the report rather than resetting per module-type pair.
+
 ## Severity levels
 
 | Level | Meaning |
@@ -65,6 +97,14 @@ For dependency reviews, MODULE reflects the ecosystem (`GOMOD`, `NPM`, `PY`, `CA
 | 🟠 High | Likely bug or significant security weakness; fix before shipping |
 | 🟡 Medium | Inconsistency or practice violation that will cause problems at scale |
 | 🔵 Low | Minor refinement; fix when already touching the file |
+
+For comprehensibility assessments:
+
+| Level | Meaning |
+| --- | --- |
+| 🔴 Critical | A reader will almost certainly misunderstand this and introduce a defect or wrong assumption during maintenance |
+| 🟡 Warning | A reader will need to slow down, cross-reference, or guess; ongoing maintenance risk |
+| 🔵 Note | Minor gap; low immediate risk but degrades the codebase over time |
 
 For test reviews:
 
@@ -122,6 +162,50 @@ Multi-agent parallel review. Same scope as `/review` but fans out 6 agents simul
   security, test completeness, convention consistency
 → Synthesis agent: deduplicates and writes .local/REVIEW.md
 → Next: /review-fix to apply fixes
+```
+
+### `/assessment [path]`
+
+Human-comprehensibility review — not correctness, not performance, not
+security. Reads every file in scope and reports where a human engineer would
+have to reverse-engineer intent: missing/misleading docs, unstated
+rationale, inconsistently-applied patterns, structural confusion, misleading
+names, dead code, and implicit contracts. Every finding carries a Suggested
+Model/Effort line sized by blast radius and ambiguity — not by severity —
+plus a rule to re-derive (not transcribe) any rationale a fix asserts for a
+magic number or formula, since that can surface a real bug hiding behind an
+"undocumented constant" framing.
+
+```text
+/assessment
+→ Reads every source file for comprehensibility only (see /review for bugs)
+→ Writes .local/ASSESSMENT.md with Finding Index + per-file sections,
+  each finding carrying a Suggested Model/Effort line
+→ Next: /review-triage .local/ASSESSMENT.md, then /assessment-fix
+```
+
+### `/review-triage [report]`
+
+Groups and orders a report's open findings into batches a `-fix` command can
+execute efficiently, and writes a companion `*.TRIAGE.md`. Changes no source
+code — purely a planning pass. Works on either `.local/REVIEW.md` or
+`.local/ASSESSMENT.md` (defaults to whichever exists, preferring REVIEW.md).
+
+Backfills a missing `Suggested Model/Effort` line directly into the source
+report for any finding that predates it — a `-fix` command will not process
+a finding without one. Groups same-tier, non-dependent findings that touch a
+manageable number of files into one batch (never mixing tiers, never
+bundling a judgment call — those always get their own batch and a mandatory
+checkpoint). Orders batches cheapest/safest first.
+
+```text
+/review-triage .local/ASSESSMENT.md
+→ Ensures every finding has a Suggested Model/Effort (backfills into
+  ASSESSMENT.md if missing)
+→ Groups same-tier findings into batches; isolates checkpoint-required
+  findings into their own batch each
+→ Writes .local/ASSESSMENT.TRIAGE.md, ordered cheapest-first
+→ Next: /assessment-fix (processes batches in this order automatically)
 ```
 
 ### `/review-tests [path]`
@@ -196,7 +280,20 @@ For each major-version upgrade, fetches release notes to reconcile interface cha
 
 ### `/review-fix [filter]`
 
-Fixes findings from `.local/REVIEW.md` one at a time in severity order (Critical → High → Medium → Low). Each finding must pass the full verify gate before it is accepted and removed from the report.
+Fixes findings from `.local/REVIEW.md`. If `.local/REVIEW.TRIAGE.md` exists
+and the resolved filter matches whole batches from it, processes **batch by
+batch** — one dispatch and one verify gate per batch — in the triage file's
+risk-ordered sequence. Otherwise falls back to one finding at a time in
+severity order (Critical → High → Medium → Low). Either way, each finding
+must pass the full verify gate before it is accepted and removed from the
+report.
+
+A batch assigned the `Codex` model is not run through the `Agent` tool at
+all — Codex is a separate vendor's CLI. Instead `/review-fix` writes a
+self-contained `.local/CODEX-PROMPT.md` for that batch and stops; the
+operator hands it to Codex externally and reports back, and the next
+`/review-fix` invocation detects the resulting diff and resumes from
+validation automatically.
 
 **Filters:**
 
@@ -243,6 +340,33 @@ Fixes findings from `.local/REVIEW.md` one at a time in severity order (Critical
 → Working tree is dirty and uncommitted — review diffs before committing
 ```
 
+### `/assessment-fix [filter]`
+
+Fixes findings from `.local/ASSESSMENT.md`. Same filter syntax and
+triage/batch/Codex-handoff mechanics as `/review-fix`, but a lighter verify
+gate: build + vet is sufficient for a fix that only touches comments or doc
+strings — no test is invented for code that didn't change behavior.
+
+The one non-negotiable step, run independently by the orchestrator even when
+a subagent or Codex claims to have done it: before accepting any fix that
+explains a magic number, formula, or derived value, re-derive that value
+from the code it describes. If it doesn't hold up, the finding just
+escalated from a doc gap to a real bug — it gets re-sized, a real code fix,
+a regression test, and the full verify gate, same as `/review-fix` would
+demand. Findings that require editing a file under `docs/decisions/` (not
+just citing one) always require an explicit operator checkpoint, regardless
+of what the triage file says.
+
+```text
+/assessment-fix warning
+→ Processes all Warning findings, batch-by-batch if .local/ASSESSMENT.TRIAGE.md
+  matches the filter, else one at a time
+→ For each: re-validates, re-derives any asserted constant/formula, applies
+  the fix, runs build+vet (or the full gate if it turned out to be a bug)
+→ Removes accepted findings from ASSESSMENT.md and ASSESSMENT.TRIAGE.md
+→ Working tree is dirty and uncommitted — review diffs before committing
+```
+
 ## Typical session
 
 ```text
@@ -264,11 +388,32 @@ When token budget is available:
 /review-fix                    <- work through all findings
 ```
 
+Comprehensibility pass, with triage batching for a large report:
+
+```text
+/assessment                            <- generate ASSESSMENT.md (full repo)
+/review-triage .local/ASSESSMENT.md    <- backfill Model/Effort, group into
+                                           batches → ASSESSMENT.TRIAGE.md
+/assessment-fix                        <- works through batches cheapest-first;
+                                           stops and writes CODEX-PROMPT.md at
+                                           any Codex-tier batch
+                                       <- hand CODEX-PROMPT.md to Codex, tell
+                                           the operator when it's done
+/assessment-fix                        <- re-invoke; detects the Codex diff,
+                                           validates it, resumes remaining batches
+                                       <- review diffs, commit when satisfied
+```
+
 ## Notes
 
-- `/review`, `/review-comprehensive`, `/review-tests`, and `/review-deps` do not modify source files.
+- `/review`, `/review-comprehensive`, `/assessment`, `/review-triage`,
+  `/review-tests`, and `/review-deps` do not modify source files.
+  `/review-triage` may modify its source report (backfilling a missing
+  `Suggested Model/Effort` line) but never touches code.
 - `/update-actions` modifies `.github/workflows/` files directly. The working tree is left dirty for operator review; nothing is staged or committed.
-- `/review-fix` never branches, stages, or commits.
-- If REVIEW.md is missing or the filter matches zero findings, `/review-fix` reports that and stops without changing anything.
+- `/review-fix` and `/assessment-fix` never branch, stage, or commit.
+- If the target report is missing or the filter matches zero findings, `/review-fix`/`/assessment-fix` reports that and stops without changing anything.
+- A `-fix` command requires every targeted finding to already carry a `Suggested Model/Effort` line; run `/review-triage` first if the report predates that field (older reports, or ones generated before this system existed).
+- A batch assigned the `Codex` model always stops the current `-fix` invocation after writing `.local/CODEX-PROMPT.md` — that handoff is inherently a human-in-the-loop step, not something a single command run can complete. The next invocation resumes automatically once it detects the resulting diff.
 - The verify gate commands shown are Go examples. For other languages, substitute the equivalent build, lint, and test commands for the project.
-- `/review-fix` does not target REVIEW.TESTS.md, REVIEW.DEPS.md, or REVIEW.ACTIONS.md — those reports require manual or purpose-built remediation workflows.
+- `/review-fix` does not target REVIEW.TESTS.md, REVIEW.DEPS.md, or REVIEW.ACTIONS.md — those reports require manual or purpose-built remediation workflows. `/assessment-fix` targets only ASSESSMENT.md.

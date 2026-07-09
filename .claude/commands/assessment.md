@@ -54,6 +54,34 @@ Analyze all source files for:
 - Do not add encouraging commentary, filler phrases, or meta-notes. Keep it dense and actionable.
 - Do not re-explain the finding inside the fix block. The fix should speak for itself.
 - For any finding involving legacy, deprecated, compatibility, or parallel-path code: before recommending a comment fix, grep production callers. Categorize results as: (a) production callers, (b) test-only callers, (c) zero callers. If (b) or (c), recommend deletion over documentation. If (a), document why the legacy path exists and what replaces it.
+- Within each finding, add a line with the suggested model and effort (Haiku/Sonnet/Opus/Codex; Low/Medium/High) needed to correctly apply the fix. Size by blast radius and ambiguity, not by the finding's severity label — a Critical finding that's a one-line, unambiguous comment in a single file is still Haiku/Low; a Warning whose fix requires amending a governing ADR or a product decision the report cannot make unilaterally is Opus/High regardless of how small the resulting diff looks. See the sizing table below.
+
+### Model/Effort sizing table
+
+| Tier | Criteria |
+| --- | --- |
+| Haiku / Low | Pure comment/doc fix, one file, one location, zero behavior change, zero ambiguity in the fix's correctness. |
+| Sonnet / Low | No behavior change, but the fix needs cross-file consistency, or correctness on a widely-used interface/type/contract, to get right. |
+| Sonnet / Medium | Small structural cleanup (dedupe, hoist, delete dead code, extract a helper) contained to one package; needs a caller check and/or a test touch-up. |
+| Sonnet / High | The correct fix is a real behavior change, not just wording — needs verification of an assumption and a test before landing. |
+| Opus / Medium | Needs Opus-level reasoning to get right (e.g. an actual concurrency-safety argument, not a restated assumption) but does not need a human product decision — the agent can resolve it correctly on its own once it reasons carefully, it just can't be trusted to a lighter model. |
+| Opus / High | Architecture/ADR-governance conflict, or a product decision the report cannot make unilaterally. Flag that a human checkpoint is needed before any code is written — do not let a fix pass silently pick a default. |
+| Codex / Medium | Mechanical, low-judgment edit repeated across many locations or files, where diff precision matters more than reasoning — a strong batching candidate. |
+
+This table is illustrative, not exhaustive — pick the model by how much
+reasoning correctness requires and the effort by how much verification
+trusting it requires, independently of each other, rather than forcing a
+finding into the nearest listed combination.
+
+Before assigning Opus/High to a finding whose fix is "just a comment": check
+whether writing that comment requires asserting a rationale for a magic
+number, formula, or derived value. If so, re-derive the value from the code
+it describes rather than trusting the pattern of a nearby, already-explained
+constant — two constants that look like siblings (e.g. a header width and
+the rule that underlines it) can silently drift out of sync, and the
+"undocumented magic number" you were asked to explain may actually be wrong,
+not just unexplained. Say so in the Problem text if you find this; it changes
+the finding from a doc gap to a real bug and should be sized accordingly.
 
 ---
 
@@ -80,6 +108,7 @@ Group findings by file. Within each file, order by line number.
 
 **Lines:** <exact line number(s)>
 **Problem:** <what a reader will misunderstand, miss, or have to reverse-engineer>
+**Suggested Model/Effort:** <Model> / <Effort> — <one sentence: blast radius, ambiguity, or why this tier>
 **Fix:**
 
     ```<language>
