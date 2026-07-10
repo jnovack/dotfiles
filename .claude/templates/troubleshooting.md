@@ -1,4 +1,5 @@
-<!-- TROUBLESHOOTING.md -->
+
+<!-- troubleshooting.md -->
 ## Troubleshooting Documentation
 
 Troubleshooting docs live at two levels:
