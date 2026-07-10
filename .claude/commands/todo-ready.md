@@ -1,3 +1,8 @@
+---
+description: Mark a planned TODO item as ready for execution (the human review gate)
+argument-hint: <id>
+---
+
 # /todo-ready
 
 Mark a planned TODO item as ready for execution after the user has reviewed the plan.

@@ -1,3 +1,8 @@
+---
+description: Validate a completed TODO item against its Definition of Done (runs tests)
+argument-hint: [id]
+---
+
 # /todo-checkpoint
 
 Validate that a completed TODO item satisfies its Definition of Done.
@@ -8,7 +13,12 @@ Validate that a completed TODO item satisfies its Definition of Done.
 
 If an ID argument was provided, use it.
 
-Otherwise, scan `TODO.md` for the most recently completed item — the last row with status `done`.
+Otherwise, determine which `done` item was completed most recently. Table order
+is insertion order, so the last `done` row is **not** necessarily the most
+recent completion. Check `git diff HEAD -- TODO.md` (and `git log -1 -p --
+TODO.md` if the working tree is clean) for the row whose status most recently
+changed to `done`. If exactly one row is `done`, use it. If it is still
+ambiguous, list the `done` items and ask the user which to validate.
 
 - If no item is identified: report "No completed items found. Provide an ID or complete an item first." and stop.
 
@@ -18,10 +28,11 @@ Read `.claude/todos/<id>.plan.md` to get the DoD checklist (core and any optiona
 
 ### 2 — Detect and run tests
 
-Detect the project test command in this order:
+Detect the project test command in this order (a Makefile `test` target is the
+project's canonical gate and may run more than the bare tool would):
 
-1. `go.mod` present → `go test ./...`
-2. `Makefile` present with a `test` target → `make test`
+1. `Makefile` present with a `test` target → `make test`
+2. `go.mod` present → `go test ./...`
 3. `package.json` present with a `"test"` script → `npm test`
 4. `pytest.ini`, `pyproject.toml`, or `setup.py` present → `pytest`
 

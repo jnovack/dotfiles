@@ -1,3 +1,12 @@
+---
+description: Fix comprehensibility findings from .local/ASSESSMENT.md; re-derives asserted constants, lighter gate for doc-only fixes
+argument-hint: [filter]
+---
+
+<!-- Keep the shared mechanics (Target selection, Model/effort resolution,
+Execution mode, Codex handoff/resume, Commit message) in sync with
+review-fix.md — the two files are deliberately parallel. -->
+
 # /assessment-fix
 
 Fix findings recorded in `.local/ASSESSMENT.md`, each independently
@@ -88,22 +97,16 @@ entirely would be careless. The rule this command uses instead:
   proposed correction back to you, so you can ask the operator. An accepted
   alternative gets a **brand-new fix subagent** — see **Clean-slate
   restart** in the per-finding procedure.
-- **Graph first.** Fix subagents must use the `code-review-graph` MCP tools
-  (`semantic_search_nodes`, `query_graph`, `get_impact_radius`,
-  `get_affected_flows`) before Grep/Read, per `CLAUDE.md`.
-- **Pre-release repo conventions** (from project memory — apply without
-  asking):
-  - Remove things outright; no deprecation aliases, shims, or transition
-    periods.
-  - A change to any one `cmd/` binary or shared package must be applied
-    uniformly to every sibling that shares the pattern.
-  - Update mock/stub types in `_test.go` files in the **same pass** as the
-    production type they mirror.
-  - Any flag/env change updates `.env.example` **and** `README.md` in the
-    same pass.
-  - Inline comments explain **why** (the invariant/root cause). Never write
-    step-reference comments like `// Step N.x:` — they are stripped each
-    phase.
+- **Graph first.** When the project has a `code-review-graph` knowledge graph,
+  fix subagents must use its MCP tools (`semantic_search_nodes`, `query_graph`,
+  `get_impact_radius`, `get_affected_flows`) before Grep/Read, per `CLAUDE.md`.
+  If the graph tools are unavailable, trace callers/dependents manually
+  instead.
+- **Project conventions.** Read the repo's `AGENTS.md`/`CLAUDE.md` for
+  repo-specific conventions (uniformity rules across sibling binaries or
+  packages, doc/env-file pairing, mock/stub sync rules, comment style,
+  deprecation policy) and include the relevant ones verbatim in every fix
+  subagent prompt. Repo-specific rules live in the repo, not in this command.
 
 ---
 
@@ -169,6 +172,27 @@ command has no way to know is actually a hidden bug).
 
 ---
 
+## Verify gate
+
+Resolve the project's build + vet/lint + test commands once at the start of the
+run and use them everywhere this file names a gate command:
+
+1. If `AGENTS.md`/`CLAUDE.md` or the Makefile defines build/lint/test commands,
+   use those.
+2. Otherwise, for Go projects default to: **build+vet** = `go build ./...` +
+   `go vet ./...`; **scoped lint** = `golangci-lint run
+   --new-from-rev=$(git merge-base HEAD main)`; **full tests** = `make test`
+   (or `go test ./...` if no Makefile).
+3. For other languages, substitute the equivalent compile/lint check and full
+   test command (e.g. `npm run build` / `npm run lint` / `npm test`).
+
+Comment/doc-only fixes need only build+vet (this command's lighter gate); any
+real code change needs the scoped lint and full tests as well. State the
+resolved commands in the final report and include them verbatim in every fix
+subagent prompt.
+
+---
+
 ## Execution mode
 
 Determine mode once, before processing any targets, after Target selection
@@ -230,8 +254,9 @@ covering the entire batch. The prompt must be fully self-contained and
 include, for every finding: its full content from B1, the effort
 instruction for the batch's tier, the relevant Operating rules verbatim
 (smallest correct change, no git/branching/committing, graph-first tool
-usage, pre-release repo conventions, the ADR-amendment rule, the fix-accuracy
-tier rule), and instructions to, per finding:
+usage, the project conventions gathered from `AGENTS.md`/`CLAUDE.md`, the
+ADR-amendment rule, the fix-accuracy tier rule), and instructions to, per
+finding:
 
 1. Re-validate against current source (line numbers may have drifted; locate
    the real symbol via the graph tools).
@@ -249,10 +274,10 @@ tier rule), and instructions to, per finding:
    changed a documented contract, `.env.example`/`README.md` together for
    any flag/env change.
 
-Then, **once for the whole batch**: run `go build ./...` and `go vet ./...`
+Then, **once for the whole batch**: run the verify gate's build+vet check
 (the compile/lint check every finding needs). Additionally run the scoped
-lint gate and `make test` only if any finding in the batch required a real
-code change per step 4. Report back per-finding outcomes plus the gate
+lint gate and the full test command only if any finding in the batch required
+a real code change per step 4. Report back per-finding outcomes plus the gate
 result(s).
 
 **If the batch's model is Codex:** do not dispatch an Agent. Instead:
@@ -292,10 +317,10 @@ an external Codex diff, alone.
    as a fix-accuracy tier-rule failure: report the discrepancy as a likely
    real bug, do not remove the finding from `ASSESSMENT.md`, and propose
    re-sizing it (Sonnet/High or higher, code fix + test) for a follow-up run.
-3. `go build ./...` and `go vet ./...`, once for the batch.
+3. The verify gate's build+vet check, once for the batch.
 4. If any finding in the batch required a real code change (per B3 step 4),
-   also re-run the scoped lint gate and `make test` once for the batch, and
-   confirm the new/updated test is present and passing.
+   also re-run the scoped lint gate and the full test command once for the
+   batch, and confirm the new/updated test is present and passing.
 
 Any gate failure or unresolved discrepancy from step 1 or 2 stops processing
 further targets; report the batch, the specific finding(s), and the output;
@@ -352,8 +377,9 @@ The prompt must be fully self-contained and include:
 - The finding's full content from step 1.
 - The effort instruction resolved above.
 - The relevant Operating rules verbatim: smallest correct change, no
-  git/branching/committing, graph-first tool usage, pre-release repo
-  conventions, the ADR-amendment rule, and the fix-accuracy tier rule.
+  git/branching/committing, graph-first tool usage, the project conventions
+  gathered from `AGENTS.md`/`CLAUDE.md`, the ADR-amendment rule, and the
+  fix-accuracy tier rule.
 - Instructions to, in order:
   1. Re-validate the gap and the proposed fix against current source (line
      numbers may have drifted).
@@ -367,11 +393,11 @@ The prompt must be fully self-contained and include:
      behavior change, add or update a regression test that fails on the
      pre-fix behavior and passes after; if it's a pure comment/doc change,
      no test is needed.
-  5. Sync documentation as needed (GoDoc, README, ADRs, OpenAPI,
+  5. Sync documentation as needed (doc comments, README, ADRs, OpenAPI,
      `.env.example`).
-  6. Run the verify gate: `go build ./...` and `go vet ./...` always; the
-     scoped lint gate and `make test` only if step 4 required a real code
-     change.
+  6. Run the verify gate (the resolved commands, included verbatim in this
+     prompt): build+vet always; the scoped lint gate and the full test
+     command only if step 4 required a real code change.
 - Instructions to report back precisely: what was changed, the regression
   test added/updated (or "none — comment-only fix" if applicable), docs
   touched, the exact gate commands run and their pass/fail output, and — if
@@ -401,9 +427,9 @@ Do not accept a finding on the subagent's self-report alone.
 1. Independently re-derive any numeric/formula rationale the fix asserts —
    yourself, again, even though the subagent claims to have done this in
    step 3.2. This is the primary check for this command.
-2. If a regression test was added, re-run it yourself; re-run `make test` in
-   full if any code change was made.
-3. Re-run `go build ./...` and `go vet ./...`; add the scoped lint gate if
+2. If a regression test was added, re-run it yourself; re-run the verify
+   gate's full test command if any code change was made.
+3. Re-run the verify gate's build+vet check; add the scoped lint gate if
    step 3.4 made a real code change.
 
 Any failure or discrepancy is treated like a verify-gate failure under

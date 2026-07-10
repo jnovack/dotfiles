@@ -1,3 +1,9 @@
+---
+description: Group open report findings into risk-ordered batches for a -fix command; backfills missing Model/Effort lines
+argument-hint: [report-path]
+model: sonnet
+---
+
 # /review-triage
 
 Group and order the open findings in a report into batches a `-fix` command
@@ -148,7 +154,7 @@ Write `.local/<REPORT-NAME>.TRIAGE.md` (e.g. `.local/REVIEW.TRIAGE.md` for a
 # <Report Name> Triage
 
 > Source: `.local/<REPORT-NAME>.md` (<N> findings, <M> batches)
-> Generated: <datetime in localtime>
+> Generated: <datetime in localtime — run `date`, do not guess>
 > <K> findings had their Suggested Model/Effort backfilled into the source
 > report by this run.
 

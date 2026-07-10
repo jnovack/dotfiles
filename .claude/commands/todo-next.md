@@ -1,3 +1,7 @@
+---
+description: Execute the next ready TODO item via a subagent (Claude models) or a prompt file (external models)
+---
+
 # /todo-next
 
 Execute the next ready TODO item by spawning a subagent or writing a prompt file for external models.
@@ -21,7 +25,7 @@ Read `.claude/todos/<id>.spec.md` and `.claude/todos/<id>.plan.md`.
 Read the `model:` field from the plan file.
 
 - **Claude models** (`haiku`, `sonnet`, `opus`): see Claude branch below.
-- **Anything else** (e.g. `codex`, `gpt-4o`, `gemini`): see Non-Claude branch below.
+- **Anything else** (e.g. `codex`, `gemini`): see Non-Claude branch below.
 
 ---
 

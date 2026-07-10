@@ -1,3 +1,8 @@
+---
+description: Capture a raw TODO item with a generated ID and append it to TODO.md
+argument-hint: <description>
+---
+
 # /todo-add
 
 Capture a raw TODO item with a generated ID and append it to the repo's `TODO.md` index.
@@ -54,7 +59,7 @@ If `TODO.md` does not exist in the repo root, create it:
 
 Add a new row to the table:
 
-```
+```text
 | <ID> | raw | <description, truncated to ~80 chars> |
 ```
 

@@ -1,7 +1,13 @@
+---
+description: Show the current state of the active refactor plan (read-only)
+model: haiku
+allowed-tools: Read
+---
+
 # /refactor-status
 
 Report the current state of the active refactor plan. Read-only — nothing is run or
-changed. Haiku is sufficient for this command.
+changed. Runs on Haiku via the `model` frontmatter.
 
 ---
 

@@ -1,3 +1,8 @@
+---
+description: Turn a spec'd TODO item into an implementation plan with a model tag and DoD checklist
+argument-hint: <id>
+---
+
 # /todo-plan
 
 Turn a spec'd TODO item into an implementation plan with a model tag and DoD checklist.
@@ -26,7 +31,7 @@ Choose based on the complexity described in the spec:
 | Standard implementation — new features, refactors, multi-file changes | sonnet |
 | High complexity — cross-cutting architectural changes, ambiguous requirements, deep analysis | opus |
 
-Record this as the `model:` field. The user can edit the plan file to override, including setting a non-Claude model (e.g. `codex`, `gpt-4o`).
+Record this as the `model:` field. The user can edit the plan file to override, including setting a non-Claude model (e.g. `codex`, `gemini`).
 
 ### 3 — Write the plan file
 
@@ -57,7 +62,6 @@ type signatures, method names, or file paths.>
 - [ ] No untracked technical debt — no new `// TODO` or `// FIXME` without a corresponding TODO.md entry
 
 ### Optional (delete any that do not apply to this item)
-- [ ] COVERAGE.md entry added with test command, paths, result, and date
 - [ ] ADR created in docs/decisions/
 - [ ] Migration notes written
 - [ ] API changelog updated

@@ -23,6 +23,30 @@
 - Use `defer` for cleanup, but be aware that deferred calls in loops execute at function return, not loop iteration.
 - Short variable names (`i`, `v`, `err`) are fine in short scopes. Use descriptive names across function boundaries.
 
+### Documentation (GoDoc)
+
+Every package has a package comment, but only some deserve a full doc.go. Two tiers:
+
+- **Contract packages** get a full doc.go: the package is imported by two or more other
+  packages AND defines a contract the source alone does not show — lifecycle ordering,
+  concurrency guarantees, wire/data formats, ldflags injection points, or an extension
+  point other packages implement against. Document the purpose, the contract, and any
+  non-obvious design decisions. Nothing else.
+- **Everything else** gets a brief package comment, ten lines or fewer: what the package
+  provides and who consumes it. It may live atop the primary source file instead of a
+  separate doc.go.
+
+Rules that apply to both tiers:
+
+- Never include file-layout listings, "why this is a separate package" rationale, or
+  prose that restates code structure. All of it is derivable from the code and goes
+  stale silently the moment the code moves.
+- When several packages implement one shared pattern (e.g. pipeline stages), document
+  the pattern once in the contract package they implement against; each implementation
+  documents only its deltas — data source, outputs, quirks.
+- Right-sizing cuts both ways: an oversized doc.go that violates its tier should be
+  shrunk, not preserved.
+
 ### Concurrency
 
 - Every goroutine must have a defined owner responsible for its lifetime.
@@ -32,8 +56,10 @@
 
 ### Building
 
-- Always build with `make build` or `go build -o bin/<binary>` — never bare `go build ./...` from the project root.
-- To verify a change compiles, use `go build ./...` (no output produced) rather than a bare `go build ./cmd/...`.
+- To produce a binary, use `make build` or `go build -o bin/<binary>` — never let `go build` drop a binary
+  in the project root.
+- To verify a change compiles (no artifact wanted), use `go build ./...` — it discards output and covers
+  every package, unlike `go build ./cmd/...`.
 
 ### Project Structure
 
@@ -162,7 +188,7 @@ When the application calls for metrics, apply the following rules:
 - Prefer the smallest test level that can prove correctness; do not jump to e2e
   when a unit or integration test would cover the behavior adequately.
 - When fixing a bug, add the narrowest regression test that would have failed
-- before the fix.
+  before the fix.
 - Do not add brittle tests that depend on timing guesses, pixel layout,
   incidental text formatting, or internal implementation details unless the
   requirement explicitly depends on them.

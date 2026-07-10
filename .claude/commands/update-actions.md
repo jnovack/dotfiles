@@ -1,3 +1,7 @@
+---
+description: Upgrade all GitHub Actions uses pins to the latest major release; writes .local/REVIEW.ACTIONS.md (modifies workflow files)
+---
+
 Update all GitHub Actions workflow files to their latest major release version and produce `.local/REVIEW.ACTIONS.md`.
 
 Scans every file under `.github/workflows/`, upgrades each `uses:` reference to the latest major release, reconciles any interface changes (renamed inputs, dropped outputs, new required fields), and writes a report. This command modifies workflow files — review the diff before committing.
@@ -41,11 +45,16 @@ Classify each pin format — this determines the output format when updating:
 
 ## Step 2 — Look up latest major releases
 
-For each unique action, use WebFetch or WebSearch to find the latest stable major release:
+For each unique action, use the `gh` CLI — structured output, no HTML scraping, and it handles auth/rate limits. Fall back to WebFetch on the releases page only if `gh` is unavailable or a lookup fails:
 
-- Check the action's GitHub releases page: `https://github.com/[owner]/[repo]/releases`
+```bash
+gh api repos/OWNER/REPO/releases/latest --jq '.tag_name'          # latest stable release
+gh api repos/OWNER/REPO/tags --jq '.[].name'                      # fallback when the repo doesn't use releases
+gh api repos/OWNER/REPO/git/ref/tags/vX.Y.Z --jq '.object | "\(.type) \(.sha)"'  # SHA a tag points to
+```
+
 - Identify the highest stable major version and its latest full semver (e.g. major `v4`, latest release `v4.2.2`)
-- For `sha`-class pins, also find the commit SHA that the latest release tag points to
+- For `sha`-class pins, resolve the commit SHA the latest release tag points to. If the ref above returns type `tag` (an annotated tag object) rather than `commit`, dereference it: `gh api repos/OWNER/REPO/git/tags/SHA --jq '.object.sha'`
 
 Do not upgrade to pre-release or release-candidate tags unless the action has no stable release at all.
 
@@ -53,7 +62,7 @@ Do not upgrade to pre-release or release-candidate tags unless the action has no
 
 ## Step 3 — Check interface changes
 
-For each action being upgraded across a major version boundary (e.g. `v3` → `v4`), fetch the action's release notes or CHANGELOG to identify renamed inputs, removed inputs, new required inputs, changed defaults, and renamed or removed outputs. Cross-reference these against the actual `with:` blocks and downstream `${{ steps.[id].outputs.* }}` expressions in every workflow file that uses the action.
+For each action being upgraded across a major version boundary (e.g. `v3` → `v4`), fetch the action's release notes (`gh api repos/OWNER/REPO/releases --jq '.[] | .tag_name + ": " + .body'`, or WebFetch the release page for long-form notes) or CHANGELOG to identify renamed inputs, removed inputs, new required inputs, changed defaults, and renamed or removed outputs. Cross-reference these against the actual `with:` blocks and downstream `${{ steps.[id].outputs.* }}` expressions in every workflow file that uses the action.
 
 ---
 
@@ -81,7 +90,7 @@ Do not modify workflow logic, job conditions, secrets references, or anything un
 ```markdown
 # Actions Update Report
 
-> Generated: [datetime in localtime]
+> Generated: [datetime in localtime — run `date`, do not guess]
 > Reviewer: Claude Code
 > Scope: .github/workflows/
 

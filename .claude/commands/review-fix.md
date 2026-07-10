@@ -1,3 +1,12 @@
+---
+description: Fix open findings from .local/REVIEW.md via sized subagents, each verified before removal from the report
+argument-hint: [filter]
+---
+
+<!-- Keep the shared mechanics (Target selection, Model/effort resolution,
+Execution mode, Codex handoff/resume, Commit message) in sync with
+assessment-fix.md — the two files are deliberately parallel. -->
+
 # /review-fix
 
 Fix findings recorded in `.local/REVIEW.md`, each fully validated,
@@ -53,18 +62,16 @@ selection**). When empty, every open finding is targeted.
   report the problem plus a proposed correction back to you, so you can ask the
   operator. An accepted alternative gets a **brand-new fix subagent** — see
   **Clean-slate restart** in step 4. Full mechanics in step 3.
-- **Graph first.** Fix subagents must use the `code-review-graph` MCP tools
-  (`semantic_search_nodes`, `query_graph`, `get_impact_radius`,
-  `get_affected_flows`) before Grep/Read, per `CLAUDE.md`.
-- **Pre-release repo conventions** (from project memory — apply without asking):
-  - Remove things outright; no deprecation aliases, shims, or transition periods.
-  - A change to any one `cmd/` binary or shared package must be applied
-    uniformly to every sibling that shares the pattern.
-  - Update mock/stub types in `_test.go` files in the **same pass** as the
-    production type they mirror.
-  - Any flag/env change updates `.env.example` **and** `README.md` in the same pass.
-  - Inline comments explain **why** (the invariant/root cause). Never write
-    step-reference comments like `// Step N.x:` — they are stripped each phase.
+- **Graph first.** When the project has a `code-review-graph` knowledge graph,
+  fix subagents must use its MCP tools (`semantic_search_nodes`, `query_graph`,
+  `get_impact_radius`, `get_affected_flows`) before Grep/Read, per `CLAUDE.md`.
+  If the graph tools are unavailable, trace callers/dependents manually instead —
+  the regression-guard step still applies.
+- **Project conventions.** Read the repo's `AGENTS.md`/`CLAUDE.md` for
+  repo-specific conventions (uniformity rules across sibling binaries or
+  packages, doc/env-file pairing, mock/stub sync rules, comment style,
+  deprecation policy) and include the relevant ones verbatim in every fix
+  subagent prompt. Repo-specific rules live in the repo, not in this command.
 
 ---
 
@@ -128,6 +135,24 @@ is conveyed as explicit prose in the subagent's prompt):
 | Low | "Apply the described fix directly once you've confirmed it's correct. Keep the regression-guard graph check brief — the directly impacted symbol is enough." |
 | Medium | "Verify assumptions with the graph tools before applying the fix; re-derive it if gaps appear. Check at least one layer of callers/dependents via `get_impact_radius`." |
 | High | "Thoroughly investigate the impact radius and affected flows before applying anything. Reason carefully through concurrency/design implications and edge cases, and make sure the regression test actually exercises them." |
+
+---
+
+## Verify gate
+
+The verify gate is the project's build + vet/lint + test commands, resolved once
+at the start of the run and used everywhere this file says "verify gate":
+
+1. If `AGENTS.md`/`CLAUDE.md` or the Makefile defines build/lint/test commands,
+   use those.
+2. Otherwise, for Go projects default to: `go build ./...`, `go vet ./...`,
+   `golangci-lint run --new-from-rev=$(git merge-base HEAD main)` (scoped lint —
+   new issues only), and `make test` (or `go test ./...` if no Makefile).
+3. For other languages, substitute the equivalent build, lint, and full-test
+   commands (e.g. `npm run build` / `npm run lint` / `npm test`).
+
+State the resolved commands in the final report. Include them verbatim in every
+fix subagent prompt.
 
 ---
 
@@ -207,14 +232,15 @@ fully self-contained and include, for every finding in the batch: its full
 content from B1, the effort instruction for the batch's tier (see
 **Model/effort resolution**), the relevant Operating rules verbatim (smallest
 correct change per finding, no git/branching/committing, graph-first tool
-usage, pre-release repo conventions, fix-accuracy tier rule), and instructions
+usage, the project conventions gathered from `AGENTS.md`/`CLAUDE.md`,
+fix-accuracy tier rule), and instructions
 to, per finding: re-validate against current source (checking the fix and any
 appended Codex content against the nearest ADR and the touched doc comment,
 per the fix-accuracy tier rule), check impact radius, apply the fix (or the
 tier-rule correction), add/update a regression test, and sync documentation.
-Then, **once for the whole batch**: run the verify gate (build, vet, scoped
-lint, `make test`) and report back per-finding outcomes plus the single
-verify-gate result.
+Then, **once for the whole batch**: run the verify gate (see **Verify gate**;
+include the resolved commands verbatim in the prompt) and report back
+per-finding outcomes plus the single verify-gate result.
 
 **If the batch's model is Codex:** do not dispatch an Agent. Instead:
 
@@ -258,8 +284,8 @@ diff from an external Codex run, alone.
    finding and report the discrepancy as a real bug, not a doc gap — it may
    need re-sizing and a code fix with a test, not a comment).
 3. Re-run, yourself, every new/updated test named across the batch.
-4. Re-run `make test` in full, once, for the batch.
-5. Re-run `go build ./...`, `go vet ./...`, and the scoped lint gate once for
+4. Re-run the verify gate's full test command once for the batch.
+5. Re-run the verify gate's build, vet, and scoped lint commands once for
    the batch, unless every finding in it is a pure comment/doc change with no
    compiled-code impact (then build/vet alone is sufficient).
 
@@ -322,10 +348,10 @@ memory of this conversation) and must include:
   fix, rationale, and any Codex evaluation/suggested fix).
 - The effort instruction resolved above.
 - The relevant Operating rules verbatim: smallest correct change, no git/no
-  branching/no committing, graph-first tool usage, the pre-release repo
-  conventions, and the **fix-accuracy tier rule** (verbatim, including the Low
-  auto-correct/non-trivial-exception and the Medium+ stop-without-applying
-  behavior).
+  branching/no committing, graph-first tool usage, the project conventions
+  gathered from `AGENTS.md`/`CLAUDE.md`, and the **fix-accuracy tier rule**
+  (verbatim, including the Low auto-correct/non-trivial-exception and the
+  Medium+ stop-without-applying behavior).
 - Instructions to perform, in order, what were originally steps 2–6 of this
   procedure:
   1. Re-validate the defect and the proposed fix against current source (line
@@ -345,13 +371,13 @@ memory of this conversation) and must include:
      proposed correction).
   4. Add or update a regression test that fails on the pre-fix behavior and
      passes after; update any mirrored mock/stub types in the same pass.
-  5. Sync documentation: GoDoc for any changed contract, external markdown
-     (`README.md`, `AGENTS.md`, relevant ADRs, `docs/openapi.yaml`) if behavior
-     or an API contract changed, and `.env.example`/`README.md` together for any
-     flag/env change. Keep markdown lint-clean per `CLAUDE.md`.
-  6. Run the **verify gate** itself before reporting back: `go build ./...`,
-     `go vet ./...`, the scoped `golangci-lint run --new-from-rev=...` command,
-     `make test`, and confirm the new/updated test is included and passing.
+  5. Sync documentation: doc comments for any changed contract, external
+     markdown (`README.md`, `AGENTS.md`, relevant ADRs, `docs/openapi.yaml`) if
+     behavior or an API contract changed, and `.env.example`/`README.md`
+     together for any flag/env change. Keep markdown lint-clean per `CLAUDE.md`.
+  6. Run the **verify gate** itself before reporting back (the resolved
+     commands, included verbatim in this prompt), and confirm the new/updated
+     test is included and passing.
 - Instructions to report back precisely: what was changed (files + a diff
   summary), the regression test added/updated and its name, docs touched, the
   exact verify-gate commands run and their pass/fail output, and — if it
@@ -391,11 +417,10 @@ reports success:
    the "doc gap" may actually be a real bug that needs re-sizing and a code
    fix with a test, not a comment.
 2. Re-run, yourself, the specific new/updated test(s) it named.
-3. Re-run `make test` in full.
+3. Re-run the verify gate's full test command.
 4. If the touched files could plausibly affect build/vet/lint scope beyond the
-   named test (i.e. almost always), also re-run `go build ./...`, `go vet
-   ./...`, and the scoped lint gate:
-   `go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --new-from-rev=$(git merge-base HEAD main)`.
+   named test (i.e. almost always), also re-run the verify gate's build, vet,
+   and scoped lint commands.
 
 Any failure or discrepancy from what the subagent reported is treated exactly
 like a verify-gate failure under Operating rules: **STOP**, report the command

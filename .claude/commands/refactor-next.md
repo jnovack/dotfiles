@@ -1,3 +1,7 @@
+---
+description: Execute the next eligible phase from .local/REFACTOR.md via a subagent at the phase's assigned model
+---
+
 # /refactor-next
 
 Run the next incomplete phase in the refactor plan. One phase per invocation — do not chain.
@@ -44,12 +48,11 @@ Append exactly as written:
 >
 > 1. Run the test command from `.local/REFACTOR.md` §Test Command.
 >    Do not mark the phase complete if tests fail — report the failure and stop.
-> 2. Update `COVERAGE.md` with the exact test command, paths covered, result, and today's date.
-> 3. Mark the phase `Complete` in `## Phase Map` in `.local/REFACTOR.md`.
-> 4. Append one row to `## Session Log`:
+> 2. Mark the phase `Complete` in `## Phase Map` in `.local/REFACTOR.md`.
+> 3. Append one row to `## Session Log`:
 >    `| YYYY-MM-DD | Phase N — [name] | [model] | Complete | [one-line note] |`
 >    Use `Partial` if any step was left incomplete, and explain why in the note.
-> 5. Return a brief synopsis: what was done, any blockers or open questions, and
+> 4. Return a brief synopsis: what was done, any blockers or open questions, and
 >    the name + model of the next phase.
 
 ---
@@ -81,7 +84,7 @@ project root for the user to paste into their Codex session. Then output:
 Prompt written to PROMPT.md. Paste it into your Codex session.
 
 When Codex finishes:
-- Confirm tests pass and COVERAGE.md is updated.
+- Confirm tests pass.
 - Confirm Step Index and Phase Map are updated in .local/REFACTOR.md.
 - Run /refactor-checkpoint to validate the Definition of Done.
 ═══════════════════════════════════════

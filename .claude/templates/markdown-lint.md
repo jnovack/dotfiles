@@ -7,20 +7,23 @@ pre-existing ones.
 
 ### Commonly missed rules
 
-**MD013/table-column-style** — Table pipe spacing must be `| --- | --- |`, not `|---|---|`.
+**MD060/table-column-style** — Table pipe spacing must be `| --- | --- |`, not `|---|---|`.
 
 **MD022/blanks-around-headings** — Blank line required before and after every heading.
 
 **MD031/blanks-around-fences** — Blank line required before and after every fenced
 code block.
 
-**MD040/fenced-code-language** — Every fenced code block must declare a language:
+**MD032/blanks-around-lists** — Blank line required before and after every list.
 
-```markdown
-` ``` `mermaid
-` ``` `bash
-` ``` `text
-```
+**MD040/fenced-code-language** — Every fenced code block must declare a language
+(use `text` if unknown):
+
+````markdown
+```mermaid
+```bash
+```text
+````
 
 Some language names contain characters that break renderers — use the safe identifier:
 

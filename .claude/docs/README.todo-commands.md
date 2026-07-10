@@ -127,7 +127,6 @@ Validates the most recently completed item (or a specific ID) against the DoD:
 
 **Optional (only items declared in the plan):**
 
-- COVERAGE.md entry
 - ADR created
 - Migration notes
 - API changelog
@@ -144,7 +143,7 @@ Prints a condensed reference of this entire system in the terminal.
 The DoD has two tiers. The core tier is always required. The optional tier is declared per-item during planning — only
 items explicitly included in the plan's checklist are checked at checkpoint time.
 
-The spec and plan process is where optional items get surfaced. If the work warrants an ADR or a COVERAGE.md entry,
+The spec and plan process is where optional items get surfaced. If the work warrants an ADR,
 `/todo-plan` includes it. If it does not, it does not appear on the checklist and is not checked.
 
 ## Migrating an existing TODO list

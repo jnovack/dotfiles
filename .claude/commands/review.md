@@ -1,3 +1,8 @@
+---
+description: Review source files for bugs, security, and reliability issues; write findings to .local/REVIEW.md
+argument-hint: [path]
+---
+
 Review the repository and produce `.local/REVIEW.md`.
 
 If a path argument is provided (e.g. `/review src/` or `/review cmd/app1`), restrict
@@ -15,6 +20,13 @@ create it with:
 
 ## Pre-Analysis Phase
 
+If the `code-review-graph` MCP tools are available, use them first
+(`get_architecture_overview`, `semantic_search_nodes`, `query_graph`) to map call
+sites, analogous functions, and module boundaries before full file reads — this
+reduces redundant token use without sacrificing coverage. For large repositories,
+prefer scoping with a path argument, or use `/review-comprehensive`, whose parallel
+agents each get a fresh context.
+
 Read every source file in scope. Then, before writing any finding, work through the
 checklist below for EACH file in order. Do not skip files or checklist items. Keep
 private notes as needed, but do not write `REVIEW.md` until the checklist has been
@@ -28,6 +40,9 @@ elsewhere in the codebase.
 For each finding, identify: file and line number; severity (Critical, High, Medium,
 or Low); the specific failure mode; why the current code permits it; a minimal
 suggested fix; and any test that should be added or changed.
+
+<!-- Keep this checklist in sync with the DIMENSIONS prompts in
+review-comprehensive.md and the summary in ../docs/README.review-commands.md -->
 
 **Checklist for each file:**
 
@@ -98,19 +113,32 @@ risk cannot be ruled out from static analysis alone.
 ## Output Instructions
 
 - Line numbers must be exact — verify against the file before writing.
+- For the `Generated:` timestamp, run `date` — do not guess the datetime.
 - Fix code blocks must be complete, runnable replacements — not pseudocode.
 - If a fix spans multiple locations, list all locations with separate fix blocks.
 - No encouraging commentary or meta-notes. Keep findings dense and actionable.
 - Each finding ID format: `#MODULE-TYPE-NN`
   - MODULE: 2–4 char uppercase file abbreviation (e.g. `AUTH`, `DB`, `MW`)
   - TYPE: 2–4 char uppercase issue class (e.g. `NULL`, `INJ`, `RACE`, `LEAK`, `SEC`)
-  - NN: 2-digit 1-based integer, reset per module-type pair
+  - NN: 2-digit 1-based integer, incrementing globally across the entire report
+    (never resets per module-type pair)
 - For legacy/deprecated/compatibility code: grep callers before recommending a fix.
   Categorize as (a) production callers, (b) test-only, or (c) zero callers.
   Recommend deletion if (b) or (c).
-- Within each finding, add a line with the suggested model and effort
-  (Haiku/Sonnet/Opus/Codex; Low/Medium/High) to correctly reason about the issue
-  and the impact of the suggested fix.
+- Within each finding, add a `**Suggested Model/Effort:**` line in exactly this
+  format — it is parsed by `/review-fix` and `/review-triage`:
+
+  ```text
+  **Suggested Model/Effort:** <Model> / <Effort> — <one sentence: blast radius or ambiguity>
+  ```
+
+  with Model in {Haiku, Sonnet, Opus, Codex} and Effort in {Low, Medium, High}.
+  Size by blast radius and ambiguity, not severity: a Critical finding with an
+  unambiguous one-line fix in a single file is still Haiku/Low; a finding whose
+  fix contradicts a governing ADR or requires a product decision the report
+  cannot make unilaterally is Opus/High regardless of diff size. Pick Model by
+  how much reasoning correctness requires and Effort by how much verification
+  trusting it requires, independently of each other.
 
 ---
 
@@ -159,8 +187,8 @@ the minimal patch would violate, and why the larger fix is the actual smallest
 *correct* change. Omit this line entirely when the minimal patch and the correct
 patch are the same.
 
-**Suggested Model/Effort:** Model and effort required to properly confirm the fix and
-impact.  One or two sentences noting impact radius, gotchas or pitfalls to be aware of.
+**Suggested Model/Effort:** `<Model> / <Effort> — <one sentence>` noting impact
+radius, gotchas, or pitfalls (exact format above — parsed by `/review-fix`).
 
 **Fix:**
 

@@ -1,3 +1,8 @@
+---
+description: Multi-agent parallel code review across 6 dimensions; writes findings to .local/REVIEW.md (~5x token cost of /review)
+argument-hint: [path]
+---
+
 Run a multi-agent parallel code review of the repository and produce `.local/REVIEW.md`.
 
 If a path argument is provided (e.g. `/review-comprehensive src/`), scope all file
@@ -124,6 +129,8 @@ const BASE =
   'Repository: ' + SUMMARY + '\n\n' +
   'Files to read:\n' + FILE_LIST
 
+// Keep these dimension prompts in sync with the per-file checklist in
+// review.md and the summary in ../docs/README.review-commands.md
 const DIMENSIONS = [
   {
     key: 'null-errors',
@@ -229,10 +236,12 @@ await agent(
      'problems at scale), Low (minor refinement).\n' +
   '3. Assign IDs: #MODULE-TYPE-NN where MODULE is a 2-4 char file abbreviation, ' +
      'TYPE is a 2-4 char issue class (NULL INJ RACE LEAK SEC ERR etc.), ' +
-     'NN is a 2-digit 1-based counter reset per module-type pair.\n' +
+     'NN is a 2-digit 1-based counter incrementing globally across the report ' +
+     '(never reset per module-type pair).\n' +
   '4. Write the complete .local/REVIEW.md file.\n\n' +
   'REVIEW.md format:\n' +
-  '- # Code Review header with generated datetime, reviewer, scope\n' +
+  '- # Code Review header with generated datetime (run `date` — do not guess), ' +
+     'reviewer, scope\n' +
   '- ## Summary (3-5 sentences: dominant patterns, highest-priority concerns)\n' +
   '- ## Finding Index (table: ID | Severity emoji+label | File | Title)\n' +
   '- ## Findings by File (per-file blocks ordered by highest severity in that ' +

@@ -1,3 +1,8 @@
+---
+description: Turn a raw TODO item into a spec with acceptance criteria (asks clarifying questions if needed)
+argument-hint: <id>
+---
+
 # /todo-spec
 
 Turn a raw TODO item into a written spec by asking clarifying questions and writing a spec file.

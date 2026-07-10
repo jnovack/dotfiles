@@ -1,3 +1,7 @@
+---
+description: Scaffold an architecture audit (REFACTOR.md + phase docs + /audit-next) from a guided discovery conversation
+---
+
 # /architecture-audit-init
 
 Initialize architecture refactor scaffolding for the current project through a
@@ -14,8 +18,9 @@ If `docs/discovery.md` exists, read it. Tell the user: "I found a prior discover
 file. I'll use that as my starting point and skip the discovery conversation — just
 confirm anything looks wrong before I generate the scaffolding."
 
-Jump directly to Round 4 (one question about planned additions), then Generation.
-Skip Rounds 1–3 entirely.
+Then ask only the Round 4 question (planned additions) from
+`~/.claude/commands/discover.md`, and proceed to Generation. Skip the rest of
+the conversation entirely.
 
 If `docs/discovery.md` does not exist, suggest running `/discover` first:
 "I'd recommend running `/discover` before this — it runs a short conversation to
@@ -35,6 +40,7 @@ list_communities()
 ```
 
 Also collect:
+
 - All entrypoints: `cmd/`, `bin/`, top-level executables, `main.py`, etc.
 - All internal packages: `internal/`, `src/`, `lib/`, `pkg/`, etc.
 - Primary language and test command.
@@ -45,99 +51,13 @@ Hold all of this. Do not mention it yet.
 
 ---
 
-## Round 1 — Plain-English Opening
+## Rounds 1–4 — Discovery conversation (inline fallback)
 
-Tell the user: "I found [N] packages and [N] entrypoints. Before I generate
-anything, I want to understand the project from your perspective. Three questions:"
-
-Ask these as plain text — not a form, not bullet points, not a checklist.
-One at a time if the user seems overwhelmed; all three at once if they seem comfortable:
-
-**Q1 — What it does:**
-> "What does this app actually do? Give me the one or two sentence version you'd
-> tell a new teammate on their first day."
-
-**Q2 — What's broken:**
-> "What part of the codebase makes you wince? Not 'what should be better
-> someday' — what actively gets in your way right now when you're trying to
-> make a change or debug something?"
-
-**Q3 — What can't break:**
-> "What has to keep working no matter what? What would cause an actual problem
-> — for you, a user, a downstream system — if you accidentally changed it?"
-
-Wait for answers before proceeding. Do not generate files yet.
-
----
-
-## Round 2 — Targeted Follow-Ups
-
-Read their answers carefully. Based on what they said, ask 1–3 targeted follow-up
-questions from the list below. Only ask what their answers made relevant.
-Do not ask all of them. Use judgment.
-
-**If they described a multi-step process or workflow:**
-> "You mentioned [the steps]. Does each of those need to run on its own sometimes,
-> or do they always run together? And what happens if one fails halfway through —
-> does everything stop, or does it limp forward?"
-
-**If they mentioned slowness, long-running tasks, or waiting:**
-> "How long does the slow part actually take? And while it's running, can anything
-> see what's happening — or does it just go silent until it's done?"
-
-**If they mentioned external services, APIs, or databases:**
-> "If that external call fails or is slow, what happens to everything else that
-> was in flight? Does it retry, bail out, or just silently produce bad output?"
-
-**If there are multiple entrypoints and the roles aren't obvious:**
-> "Looking at your [binary names] — are these meant to be used by the same
-> person, or do different types of users run different ones? For example, is
-> one for operators and one for end users?"
-
-**If they mentioned data, files, or caching:**
-> "When the app fetches data, does it save anything locally so it doesn't have
-> to fetch again? Or does it go back to the source every time? And if you
-> deleted the database and needed to reload from scratch — would that mean
-> re-fetching everything, or is there a local copy somewhere?"
-
-**If they mentioned tests being bad or absent:**
-> "What kind of tests exist right now? And is there anything you can run locally
-> to verify the whole flow end-to-end without needing a live environment?"
-
-**If they mentioned wanting to add something new:**
-> "What's next on your list that the current code isn't ready for? Not a full
-> roadmap — just the one thing that's blocked by how it's structured right now."
-
-After their answers, pause and synthesize. Do not jump to generation yet.
-
----
-
-## Round 3 — Confirm Understanding
-
-Write a short summary (5–8 lines) of what you now understand, in plain English.
-Frame it as "here's what I'm going to use to shape the audit" — not architecture
-jargon. Something like:
-
-> "OK, so here's what I'm working with: [app] is a [type of thing] that [does X].
-> The main pain point is [Y] — [brief reason]. The stuff that can't break is [Z].
-> I'm also noting that [any follow-up insight]. Does that sound right, or did I
-> miss something?"
-
-Wait for confirmation or correction. If they correct something, update your
-understanding and re-confirm. Do not proceed until they say it looks right.
-
----
-
-## Round 4 — One Final Scoping Check
-
-Ask this one question before generating anything:
-
-> "Last thing: is there anything that's planned but doesn't exist yet — a new
-> feature, a new entry point, a different way people will use this — that you'd
-> want the new architecture to be ready for? If nothing comes to mind, just say
-> none and we'll let the audit surface it."
-
-Then generate immediately after their answer. No more questions.
+Read `~/.claude/commands/discover.md` and run its Round 1–4 conversation
+exactly as written there — the plain-English opening questions, the targeted
+follow-ups, the confirmation summary, and the final planned-additions question
+— including writing `docs/discovery.md` at the end, so both paths leave the
+same artifact behind. Then proceed to **Generation** below.
 
 ---
 
@@ -156,13 +76,13 @@ Write sections in this order. Every section is required.
 
 Generic. Verbatim:
 
-> Steps are run one at a time by invoking `/refactor-next`. The orchestrator reads
+> Steps are run one at a time by invoking `/audit-next`. The orchestrator reads
 > this file and the current phase doc, finds the next incomplete step, and spawns
 > a subagent at the correct model tier. The subagent writes findings to disk, marks
 > the step complete, and returns a synopsis. The orchestrator relays the synopsis
-> and waits for the next `/refactor-next` invocation.
+> and waits for the next `/audit-next` invocation.
 >
-> **Invoke:** `/refactor-next`
+> **Invoke:** `/audit-next`
 >
 > One step per invocation. Codex steps cannot be auto-spawned — the orchestrator
 > outputs the prompt as a copyable block for manual Codex execution.
@@ -242,6 +162,7 @@ Use the project's actual test command and coverage file name.
 **## Success Criteria**
 
 Core items plus project-specific ones inferred from the conversation:
+
 - Thin entrypoints
 - Single orchestration model
 - Independently runnable units (if multi-step workflow was described)
@@ -328,8 +249,9 @@ task as questions, findings subsections that mirror the questions.
 
 ### docs/refactor/phase2-design.md
 
-Standard preamble: read conventions doc + REFACTOR.md + Phase 1 Step 1.9 synthesis
-+ this file. Use graph only to verify Phase 1 findings. Write decisions to disk.
+Standard preamble: read the conventions doc, REFACTOR.md, the Phase 1 Step 1.9
+synthesis, and this file. Use graph only to verify Phase 1 findings. Write
+decisions to disk.
 
 Step Index:
 
@@ -392,10 +314,12 @@ Notes: [anything the next agent needs to know]
 
 ---
 
-### .claude/commands/refactor-next.md
+### .claude/commands/audit-next.md
 
-Generate with the project name substituted for "moxfall" in the title and any
-project references. Logic is identical:
+Generate a project-local `/audit-next` command file. It is deliberately named
+`audit-next` — not `refactor-next` — so it never collides with the global
+`/refactor-next`, which operates on a different `.local/REFACTOR.md` layout.
+Title it with this project's name. Its logic:
 
 - Read REFACTOR.md Phase Map → find current phase.
 - Read phase doc Step Index → find next Not started step.
@@ -413,10 +337,11 @@ project references. Logic is identical:
 ## After generating
 
 Tell the user:
+
 - The five files that were created.
 - Call out anything left as a placeholder that they should review:
   specifically the Workflow and Domain Notes section and the What Must Not Break section.
 - If the workflow description is thin because the user said "defer to audit":
   "The audit will discover the structure, but a 10-minute conversation now about
   how the app's main workflow runs would make every audit question sharper. Up to you."
-- How to start: "`/refactor-next` — first step is Haiku, graph-only, takes a few minutes."
+- How to start: "`/audit-next` — first step is Haiku, graph-only, takes a few minutes."

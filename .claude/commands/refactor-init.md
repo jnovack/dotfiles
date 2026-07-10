@@ -1,3 +1,8 @@
+---
+description: Transform .local/PLAN.md into the machine-maintained .local/REFACTOR.md tracking file (asks clarifying questions first)
+model: opus
+---
+
 # /refactor-init
 
 Transform `.local/PLAN.md` into `.local/REFACTOR.md` — the single
@@ -35,7 +40,7 @@ Read `.local/PLAN.md`. Extract:
 For each phase, assign a model using these rules in priority order:
 
 1. **Haiku** — phase title contains "checkpoint" or "test checkpoint", or the phase
-   does nothing except run tests and update `COVERAGE.md`.
+   does nothing except run tests.
 2. **Codex** — ALL of the following are true:
    - Every step has complete, literal code provided (no open design decisions left to
      the implementor).
@@ -138,7 +143,7 @@ API contract items. Add generic constraints that always apply:]
 
 | Model  | Use for |
 | --- | --- |
-| Haiku  | Test-only phases, COVERAGE.md updates, mechanical lookups |
+| Haiku  | Test-only phases, mechanical lookups |
 | Sonnet | Implementation with any judgment, component architecture, test design |
 | Opus   | Central contracts that cascade into multiple later phases |
 | Codex  | Fully-specified mechanical phases: field additions, fixture updates, boilerplate |
@@ -154,7 +159,6 @@ A phase is complete only when all of the following are true:
 - All documentation that changed in behavior has been updated.
 - New or updated tests cover the changed logic.
 - `[Test Command]` passes.
-- `COVERAGE.md` is updated with today's date, exact command, and result.
 - Every item in the phase's `### Definition of Done` checklist is satisfied.
 - An ADR exists in `docs/decisions/` for any phase that changes a public contract
   (if flagged during /refactor-init review).

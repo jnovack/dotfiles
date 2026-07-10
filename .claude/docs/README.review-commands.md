@@ -81,13 +81,13 @@ workflows   → /update-actions               → .local/REVIEW.ACTIONS.md + mod
 
 - **MODULE** — 2–5 char uppercase abbreviation of the filename or module (e.g. `AUTH`, `DB`, `API`, `MW`)
 - **TYPE** — 2–5 char uppercase abbreviation of the issue class (e.g. `NULL`, `INJ`, `RACE`, `LEAK`, `SEC`, `ERR`)
-- **NN** — 2-digit 1-based integer, reset per module-type pair
+- **NN** — 2-digit 1-based integer, incrementing globally across the entire report (never resets per module-type pair)
 
 For test reviews, MODULE reflects the test suite (`INT`, `UNIT`, `E2E`) and TYPE reflects the failure mode (`GAP`, `TAUTO`, `MOCK`, `FRAG`, `DEAD`, `RELY`, `LAYER`).
 
 For dependency reviews, MODULE reflects the ecosystem (`GOMOD`, `NPM`, `PY`, `CARGO`) and TYPE reflects the concern (`UNPIN`, `STALE`, `BREAK`, `AUTO`).
 
-For comprehensibility assessments (`/assessment`), MODULE reflects the file/module and TYPE reflects the comprehensibility failure: `DOC` (missing/misleading documentation), `WHY` (missing inline rationale), `GAP` (pattern applied inconsistently), `NAME` (misleading name), `DEAD` (vestigial code), `CNTR` (unstated implicit contract), `STRCT` (structural confusion). `NN` increments globally across the report rather than resetting per module-type pair.
+For comprehensibility assessments (`/assessment`), MODULE reflects the file/module and TYPE reflects the comprehensibility failure: `DOC` (missing/misleading documentation), `WHY` (missing inline rationale), `GAP` (pattern applied inconsistently), `NAME` (misleading name), `DEAD` (vestigial code), `CNTR` (unstated implicit contract), `STRCT` (structural confusion).
 
 ## Severity levels
 
@@ -415,5 +415,5 @@ Comprehensibility pass, with triage batching for a large report:
 - If the target report is missing or the filter matches zero findings, `/review-fix`/`/assessment-fix` reports that and stops without changing anything.
 - A `-fix` command requires every targeted finding to already carry a `Suggested Model/Effort` line; run `/review-triage` first if the report predates that field (older reports, or ones generated before this system existed).
 - A batch assigned the `Codex` model always stops the current `-fix` invocation after writing `.local/CODEX-PROMPT.md` — that handoff is inherently a human-in-the-loop step, not something a single command run can complete. The next invocation resumes automatically once it detects the resulting diff.
-- The verify gate commands shown are Go examples. For other languages, substitute the equivalent build, lint, and test commands for the project.
+- The `-fix` commands resolve the verify gate from the project's `AGENTS.md`/`CLAUDE.md` or Makefile; the Go commands shown here are the fallback defaults for Go projects. Other languages get the equivalent build, lint, and test commands.
 - `/review-fix` does not target REVIEW.TESTS.md, REVIEW.DEPS.md, or REVIEW.ACTIONS.md — those reports require manual or purpose-built remediation workflows. `/assessment-fix` targets only ASSESSMENT.md.

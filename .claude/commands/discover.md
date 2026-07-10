@@ -1,3 +1,7 @@
+---
+description: Guided conversation to build docs/discovery.md — shared project context other skills can reuse
+---
+
 # /discover
 
 Build a shared understanding of the current project through a short guided conversation.
@@ -19,6 +23,7 @@ list_communities()
 ```
 
 Also collect:
+
 - Entrypoints: `cmd/`, `bin/`, `main.*`, top-level executables.
 - Internal packages: `internal/`, `src/`, `lib/`, `pkg/`, or equivalent.
 - Primary language and test command.
@@ -177,6 +182,7 @@ during audit."]
 ## After writing the file
 
 Tell the user:
+
 - "Written to `docs/discovery.md`."
 - What was captured vs. what is marked "not discussed" (those become Phase 1 audit
   questions automatically).

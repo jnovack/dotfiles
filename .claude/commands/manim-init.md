@@ -1,3 +1,8 @@
+---
+description: Scaffold a new Manim animation project using the AnimationMixin architecture
+argument-hint: [directory]
+---
+
 # /manim-init
 
 Scaffold a new Manim animation project using the AnimationMixin architecture.
@@ -29,7 +34,7 @@ Follow `~/.claude/MANIM.md` exactly for structure and ordering.
 
 The file must contain, in this order:
 
-```
+```python
 from manim import *
 
 # ── Timing constants ──────────────────────────────────────────────────────────
@@ -51,8 +56,9 @@ C_FAIL   = "#ff3333"   # error / blocked / broken
 
 # ── Typography ────────────────────────────────────────────────────────────────
 # Only define font constants you actually use. Name by role, not by font property.
-C_LABEL = "Verdana"    # example — replace with whatever suits the subject
-# C_DATA  = "Menlo"    # add only if the project shows code, IPs, or tabular data
+# F_ prefix (font) — never C_, which is reserved for colors above.
+F_LABEL = "Verdana"    # example — replace with whatever suits the subject
+# F_DATA  = "Menlo"    # add only if the project shows code, IPs, or tabular data
 
 # ── Dev mode ──────────────────────────────────────────────────────────────────
 DEV_MODE = False

@@ -1,3 +1,7 @@
+---
+description: Create a new Architecture Decision Record in docs/decisions/ and update the index
+---
+
 # ADR.md
 
 Create a new Architecture Decision Record in `docs/decisions/`.

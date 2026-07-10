@@ -1,3 +1,8 @@
+---
+description: Audit dependency hygiene (floating pins, stale versions, Dependabot/Renovate coverage); writes .local/REVIEW.DEPS.md
+argument-hint: [path]
+---
+
 Review all package dependency declarations and produce `.local/REVIEW.DEPS.md`.
 
 If a path argument is provided, scope discovery to that path. Otherwise scan the full repository.
@@ -65,8 +70,10 @@ For each High finding, grep the codebase for direct usages of the affected packa
 - Finding ID format: `#ECOSYSTEM-TYPE-NN`
   - ECOSYSTEM: 2–5 char uppercase abbreviation of the package ecosystem (e.g. `GOMOD`, `NPM`, `PY`, `CARGO`, `GEM`, `NUGET`)
   - TYPE: 2–5 char uppercase abbreviation of the issue class: `UNPIN` (floating version), `STALE` (behind current), `BREAK` (major version gap), `AUTO` (missing automation coverage)
-  - NN: 2-digit 1-based integer, reset per ecosystem-type pair
+  - NN: 2-digit 1-based integer, incrementing globally across the entire report
+    (never resets per ecosystem-type pair)
   - Example IDs: `#GOMOD-STALE-01`, `#NPM-UNPIN-02`, `#PY-AUTO-01`
+- For the `Generated:` timestamp, run `date` — do not guess the datetime.
 - No encouraging commentary or meta-notes. Keep findings dense and actionable.
 
 ---

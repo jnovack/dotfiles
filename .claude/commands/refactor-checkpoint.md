@@ -1,3 +1,7 @@
+---
+description: Validate the most recently completed refactor phase against its Definition of Done (runs tests)
+---
+
 # /refactor-checkpoint
 
 Validate that the most recently completed phase satisfies its Definition of Done before
@@ -50,9 +54,6 @@ affected packages, `docs/openapi.yaml` (API behavior). FAIL if a relevant doc wa
 and no tests were touched, report WARN (not FAIL — existing coverage may be sufficient,
 but flag it).
 
-**COVERAGE.md** — Read `COVERAGE.md`. Does it have an entry dated today with the exact
-test command, paths, and result? FAIL if not.
-
 **ADRs** — If any phase DoD item explicitly requires an ADR, verify the file exists in
 `docs/decisions/`. FAIL if required and missing. N/A if not required.
 
@@ -69,7 +70,6 @@ Print the checkpoint report:
  Technical debt   PASS / FAIL — [note]
  Documentation    PASS / FAIL — [list]
  Test coverage    PASS / WARN — [note]
- COVERAGE.md      PASS / FAIL
  ADRs             PASS / FAIL / N/A
  DoD checklist    PASS / FAIL — [N of M items met]
 ───────────────────────────────────────

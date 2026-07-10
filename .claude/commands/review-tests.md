@@ -1,3 +1,8 @@
+---
+description: Audit test quality and coverage (gaps, mirror tests, fragile mocks, flakiness); writes .local/REVIEW.TESTS.md
+argument-hint: [path]
+---
+
 Review test files and produce `.local/REVIEW.TESTS.md`.
 
 If a path argument is provided (e.g. `/review-tests test/` or `/review-tests src/`), scope discovery to that path. For languages where test files live beside source files (e.g. Go `*_test.go`), also scan the corresponding source files in that path. Otherwise review the full repository.
@@ -53,13 +58,15 @@ Read every test file in scope and its corresponding production code. Analyze for
 - Read every test file before writing REVIEW.TESTS.md. Do not emit partial results.
 - For each finding, read the corresponding production code to confirm the behavior the test should be asserting actually exists and is reachable by the test's setup.
 - Line numbers must be exact. Verify them against the actual file content before writing.
+- For the `Generated:` timestamp, run `date` — do not guess the datetime.
 - Fix code blocks must be complete, runnable replacements — not pseudocode.
 - If a fix requires changes in more than one location, list all locations.
 - No encouraging commentary or meta-notes. Keep findings dense and actionable.
 - Each finding ID format: `#MODULE-TYPE-NN`
   - MODULE: 2–5 char uppercase abbreviation of the test file or suite (e.g. `INT`, `UNIT`, `E2E`, `AUTH`, `CACHE`)
   - TYPE: 2–5 char uppercase abbreviation of the issue class (e.g. `GAP`, `MISS`, `TAUTO`, `MSG`, `MOCK`, `FRAG`, `DEAD`, `RELY`, `LAYER`)
-  - NN: 2-digit 1-based integer, reset per module-type pair
+  - NN: 2-digit 1-based integer, incrementing globally across the entire report
+    (never resets per module-type pair)
 - Distinguish "not tested at all" (`GAP`) from "tested incorrectly" (`TAUTO`, `MOCK`, etc.).
 
 ---

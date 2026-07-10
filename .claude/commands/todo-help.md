@@ -1,3 +1,8 @@
+---
+description: Print the reference guide for the todo skill system
+model: haiku
+---
+
 # /todo-help
 
 Display the reference guide for the todo skill system.
@@ -85,7 +90,6 @@ DEFINITION OF DONE
     • No untracked technical debt (new // TODO without a TODO.md entry)
 
   Optional (declared per-item during planning):
-    • COVERAGE.md entry
     • ADR created
     • Migration notes
     • API changelog

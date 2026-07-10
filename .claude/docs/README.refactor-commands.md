@@ -71,7 +71,7 @@ The Phase Map and Step Index are maintained by the skills. Do not edit status va
 
 | Model | Work type |
 | --- | --- |
-| Haiku | Test-only phases, COVERAGE.md updates, mechanical lookups |
+| Haiku | Test-only phases, mechanical lookups |
 | Sonnet | Implementation with any judgment, component architecture, test design |
 | Opus | Central contracts that cascade into multiple later phases (use sparingly) |
 | Codex | Fully-specified mechanical phases with no design decisions left to the agent |
@@ -155,7 +155,6 @@ Checks:
 - **Technical debt** — flags any `// TODO` or `// FIXME` not tracked in the session log
 - **Documentation** — checks README, AGENTS.md, doc.go, OpenAPI spec if behavior changed
 - **Test coverage** — warns if changed logic has no new or updated tests
-- **COVERAGE.md** — must have an entry dated today with the exact test command and result
 - **ADRs** — verifies required ADR files exist in `docs/decisions/`
 
 ```text
@@ -167,7 +166,6 @@ Checks:
  Technical debt   PASS
  Documentation    PASS
  Test coverage    WARN — no new tests for changed logic
- COVERAGE.md      PASS
  ADRs             N/A
  DoD checklist    PASS — 4 of 4 items met
 ───────────────────────────────────────
@@ -199,6 +197,6 @@ On **PASS**: confirms Step Index and Phase Map are marked `Complete`, then tells
 For phases assigned Codex, `/refactor-next` writes the full prompt to `PROMPT.md`. Paste it into your Codex session.
 When Codex finishes:
 
-1. Confirm tests pass and `COVERAGE.md` is updated.
+1. Confirm tests pass.
 2. Confirm the Step Index and Phase Map rows in `.local/REFACTOR.md` are marked `Complete`.
 3. Run `/refactor-checkpoint` to validate the Definition of Done.

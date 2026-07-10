@@ -11,7 +11,8 @@
 
 - Use whichever package manager the repo already uses (npm, yarn, pnpm). Do not switch.
 - Do not add a dependency without calling it out explicitly. Prefer packages already in `package.json`.
-- Audit any new package: check weekly downloads, last publish date, and known CVEs before adding.
+- Audit any new package before adding: `npm view <pkg>` for last publish date and maintenance signals,
+  `npm audit` for known CVEs after installing.
 
 ### Async and error handling
 
