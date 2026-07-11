@@ -7,6 +7,9 @@
 - One page object file per page or major section: `pages/HomePage.js`, `pages/ContactPage.js`.
 - One spec file per page or user journey: `tests/home.spec.js`, `tests/contact.spec.js`.
 - All selectors live in the page object. Tests contain zero raw CSS/XPath strings.
+- Prefer user-facing locators (`getByRole`, `getByLabel`, `getByText`, `getByTestId`)
+  over raw CSS/XPath — even inside page objects. Reserve CSS selectors for markup
+  with no accessible identity, and treat that as a signal to add one.
 - Each `test()` must be able to run in isolation. Do not share state between tests
   via module-level variables.
 - Failing tests must fail loudly — no `try/catch` blocks that swallow assertion
@@ -21,8 +24,9 @@
   side-effects alone.
 - **Modals / interactive elements**: `expect(locator).toBeVisible()` after trigger;
   `expect(locator).toBeHidden()` after dismiss.
-- **Dynamic content**: use `waitForSelector` or
-  `expect(locator).toBeVisible({ timeout })` never `page.waitForTimeout()`.
+- **Dynamic content**: rely on web-first assertions (`expect(locator).toBeVisible()`
+  and friends) — they auto-wait and retry. Never `page.waitForTimeout()`, and do not
+  use the legacy `page.waitForSelector()` in new tests.
 
 ### Minimum coverage
 

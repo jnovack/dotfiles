@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-<!-- command-hygene.md -->
+<!-- command-hygiene.md -->
 ## Command hygiene (for a stable permission allowlist)
 
 "Always allow" captures the full command string, so only commands with a

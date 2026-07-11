@@ -23,7 +23,8 @@ anything already covered by an existing record.
 
 Read reactively, not eagerly:
 
-- When entering a module that references one in its header (e.g. `adr#NNNN-<kebab-title>.md`)
+- When entering a module whose header comment references one
+  (e.g. `See docs/decisions/NNNN-<kebab-title>.md`)
 - Before making a decision that meets the trigger criteria above
 - Never pre-load the full ADR corpus — check the index, pull only what's relevant
 

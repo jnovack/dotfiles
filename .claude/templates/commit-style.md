@@ -12,6 +12,8 @@ All commits must follow Conventional Commits format:
 
 ### Rules
 
+- Scope is optional — `type: subject` is valid; add one only when it clarifies
+  the affected area.
 - Summary line: imperative mood, no period, ≤72 characters.
 - Body (optional): explain the *why*, not the *what*. Wrap at 72 characters.
 - Breaking changes: add `!` after type/scope and a `BREAKING CHANGE:` footer.

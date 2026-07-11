@@ -70,7 +70,7 @@ closely as possible.
 {repo}/
 ├── build/
 │   └── package/
-│       └── Dockerfile         # multi-stage: golang:1.25-alpine → scratch
+│       └── Dockerfile         # multi-stage: golang:<current-stable>-alpine → scratch
 ├── cmd/
 │   └── {application}/
 │       └── main.go           # entry point only — flag parsing, wiring, shutdown
@@ -134,6 +134,9 @@ When Windows binaries are needed, please apply the following rules:
 - Do not add a module without calling it out explicitly. Run `go mod tidy` after any dependency change.
 - Prefer the standard library. The stdlib covers most needs.  Notable exceptions below:
 - Pin indirect dependencies by running `go mod tidy` and committing both `go.mod` and `go.sum`.
+- Pin build tools (`mockery`, `golangci-lint`, etc.) with the `tool` directive
+  in `go.mod` (`go get -tool <module>`, Go 1.24+) and invoke via `go tool <name>` —
+  no untracked global installs.
 
 #### Flags
 
@@ -161,7 +164,9 @@ slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Lev
 
 - Set level from `--log-level` flag at startup.
 - Use structured key-value pairs, not format strings.
-- Log level order: `debug`, `info`, `warn`, `error`, `fatal`.
+- Log level order: `debug`, `info`, `warn`, `error`. slog has no `fatal` level —
+  log at `error` and exit explicitly at the entrypoint; zerolog's `Fatal()` is
+  acceptable in user-facing applications.
 
 #### Prometheus Exporters
 
@@ -253,9 +258,13 @@ Do not write functional, smoke, or e2e tests unless explicitly asked.
 - Table-driven throughout: `[]struct{ name, input, want }`
 - Group related cases under a single `t.Run` loop
 - Use `t.TempDir()` for filesystem tests — never hardcode `/tmp/`
+- Use `t.Context()` (Go 1.24+) when a test needs a context — it is
+  canceled automatically when the test ends; do not use `context.Background()`
+  in tests on modern toolchains
 - Fixture files under `test/fixtures/` — read with
-  `os.ReadFile(filepath.Join("..", "..", "test/fixtures", "..."))`
-  relative to the test package
+  `os.ReadFile(filepath.Join("..", "..", "test", "fixtures", "..."))`
+  relative to the test package (every path segment its own argument —
+  no embedded `/`, per the Windows rules above)
 - Always test Windows line endings (CRLF) for any log/file parsing code
 - Coverage targets: 85%+ on core logic; error paths and OS-conditional
   branches are acceptable gaps

@@ -5,6 +5,8 @@
 ### Task rules
 
 - Prefer idempotent tasks. Prefer built-in Ansible modules over `shell` or `command`.
+- Use fully-qualified collection names (`ansible.builtin.copy`, not `copy`) —
+  ansible-lint enforces this and short names are ambiguous across collections.
 - When `command` or `shell` is required, set `changed_when` and `failed_when` appropriately.
 - Use handlers for service reload/restart — do not restart services inline in tasks.
 - Prefer explicit `name:` on every task.
@@ -31,7 +33,7 @@
 
 ```bash
 ansible-lint
-ansible-playbook --syntax-check site.yml
+ansible-playbook --syntax-check site.yml   # substitute the repo's entry playbook
 ansible-playbook --check --diff site.yml   # dry run with diff
 ```
 

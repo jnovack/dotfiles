@@ -9,7 +9,8 @@ correct change — it is a workaround wearing a small diff.
 
 ### Check intent before sizing
 
-Read the function/type's doc comment, the nearest ADR (see `adr.md`), and the
+Read the function/type's doc comment, the nearest ADR (see the Architecture
+Decision Records rules, if this project keeps them), and the
 purpose of the flow the change sits in. A fix must fit that intent, not just
 compile and pass tests.
 

@@ -59,7 +59,7 @@ Rules:
 - Keep each section short enough to read in under 30 seconds. All depth belongs in the deep-dive.
 - HR (`---`) between every section.
 
-### docs/troubleshooting/<SLUG>.md format
+### `docs/troubleshooting/<SLUG>.md` format
 
 ```markdown
 # Title (noun phrase describing the problem, not the fix)
