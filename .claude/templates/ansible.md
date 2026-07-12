@@ -1,5 +1,9 @@
+---
+id: ansible
+scope: project
+order: 54
+---
 
-<!-- ansible.md -->
 ## Ansible
 
 ### Task rules

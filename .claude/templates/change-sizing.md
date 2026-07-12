@@ -1,5 +1,9 @@
+---
+id: change-sizing
+scope: global
+order: 20
+---
 
-<!-- change-sizing.md -->
 ## Change Sizing: Correct, Not Just Small
 
 "Smallest correct change" describes the *diff*, not the *decision*. A

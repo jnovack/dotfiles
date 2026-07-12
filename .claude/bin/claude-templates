@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""claude-templates — assemble shared CLAUDE.md / AGENTS.md prose from templates.
+
+Templates live in ../templates relative to this script. Each is a Markdown
+fragment with YAML-ish front-matter (id, scope, requires, order). A consuming
+file declares a recipe:
+
+    <!-- templates: core-rules, lang-golang -->        (project file)
+    <!-- templates: @global -->                        (~/.claude/CLAUDE.md)
+
+The injector resolves `requires`, deduplicates, orders by `order`, and writes
+the result between markers, stamping a content hash:
+
+    <!-- BEGIN TEMPLATES v:1 hash:<12hex> -->
+    ...assembled prose...
+    <!-- END TEMPLATES -->
+
+Scope layering: `global` templates belong only in ~/.claude/CLAUDE.md and are
+inherited by every repo. When assembling a project file, the global closure is
+subtracted, so a project template's `requires` on a global one is treated as
+already satisfied by the global layer.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import os
+import re
+import sys
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+TEMPLATES_DIR = SCRIPT_DIR.parent / "templates"
+GLOBAL_FILE = Path("~/.claude/CLAUDE.md").expanduser()
+SYNC_ROOTS = [Path("~/.claude").expanduser(), Path("~/Source").expanduser(),
+              Path("~/go/src").expanduser()]
+
+RECIPE_RE = re.compile(r"<!--\s*templates:(.*?)-->", re.DOTALL)
+BEGIN_RE = re.compile(r"<!--\s*BEGIN TEMPLATES[^>]*-->")
+END_RE = re.compile(r"<!--\s*END TEMPLATES\s*-->")
+BLOCK_RE = re.compile(r"<!--\s*BEGIN TEMPLATES[^>]*-->.*?<!--\s*END TEMPLATES\s*-->",
+                      re.DOTALL)
+
+
+class Template:
+    def __init__(self, id, scope, requires, order, body):
+        self.id = id
+        self.scope = scope
+        self.requires = requires
+        self.order = order
+        self.body = body
+
+
+def parse_template(path: Path) -> Template:
+    text = path.read_text().lstrip("\n")
+    if not text.startswith("---"):
+        die(f"{path.name}: missing front-matter (must start with '---')")
+    _, fm, body = text.split("---", 2)
+    meta = {"scope": "project", "requires": [], "order": 999}
+    for line in fm.strip().splitlines():
+        if ":" not in line:
+            continue
+        key, val = line.split(":", 1)
+        key, val = key.strip(), val.strip()
+        if key == "requires":
+            val = val.strip("[]")
+            meta[key] = [x.strip() for x in val.split(",") if x.strip()]
+        elif key == "order":
+            meta[key] = int(val)
+        else:
+            meta[key] = val
+    if "id" not in meta:
+        die(f"{path.name}: front-matter missing 'id'")
+    if meta["scope"] not in ("global", "project"):
+        die(f"{path.name}: scope must be 'global' or 'project'")
+    return Template(meta["id"], meta["scope"], meta["requires"], meta["order"],
+                    body.strip())
+
+
+def load_templates() -> dict:
+    templates = {}
+    for path in sorted(TEMPLATES_DIR.glob("*.md")):
+        t = parse_template(path)
+        if t.id in templates:
+            die(f"duplicate template id '{t.id}'")
+        templates[t.id] = t
+    for t in templates.values():
+        for req in t.requires:
+            if req not in templates:
+                die(f"template '{t.id}' requires unknown template '{req}'")
+    return templates
+
+
+def closure(ids, templates, seen=None, stack=None) -> set:
+    """Transitive closure over `requires`, with cycle detection."""
+    seen = set() if seen is None else seen
+    stack = [] if stack is None else stack
+    for tid in ids:
+        if tid in stack:
+            die(f"requires cycle: {' -> '.join(stack + [tid])}")
+        if tid in seen:
+            continue
+        seen.add(tid)
+        closure(templates[tid].requires, templates, seen, stack + [tid])
+    return seen
+
+
+def global_closure(templates) -> set:
+    globals_ = [t.id for t in templates.values() if t.scope == "global"]
+    return closure(globals_, templates)
+
+
+def parse_recipe(text, templates):
+    m = RECIPE_RE.search(text)
+    if not m:
+        return None
+    raw = re.split(r"[,\s]+", m.group(1).strip())
+    ids = [x for x in raw if x]
+    return ids
+
+
+def resolve(recipe_ids, templates):
+    """Return (ordered_effective_templates, warnings)."""
+    warnings = []
+    gclose = global_closure(templates)
+    is_global = "@global" in recipe_ids
+
+    if is_global:
+        effective = gclose
+    else:
+        for tid in recipe_ids:
+            if tid not in templates:
+                die(f"recipe names unknown template '{tid}'")
+            if templates[tid].scope == "global":
+                warnings.append(
+                    f"'{tid}' is a global template — drop it from this project "
+                    f"recipe; it is inherited from ~/.claude/CLAUDE.md")
+        effective = closure(recipe_ids, templates) - gclose
+
+    ordered = sorted((templates[i] for i in effective),
+                     key=lambda t: (t.order, t.id))
+    return ordered, warnings
+
+
+def render_block(ordered):
+    inner = "\n\n".join(t.body for t in ordered)
+    h = hashlib.sha256(inner.encode()).hexdigest()[:12]
+    block = (f"<!-- BEGIN TEMPLATES v:1 hash:{h} -->\n"
+             f"{inner}\n"
+             f"<!-- END TEMPLATES -->")
+    return block, h
+
+
+def assemble_file(path: Path, templates, write=True):
+    text = path.read_text()
+    recipe = parse_recipe(text, templates)
+    if recipe is None:
+        return None  # not a consuming file
+    ordered, warnings = resolve(recipe, templates)
+    block, h = render_block(ordered)
+
+    if BLOCK_RE.search(text):
+        new_text = BLOCK_RE.sub(lambda _: block, text, count=1)
+    else:
+        # Insert after the recipe comment, one blank line on each side.
+        m = RECIPE_RE.search(text)
+        before = text[:m.end()].rstrip("\n")
+        after = text[m.end():].lstrip("\n")
+        new_text = before + "\n\n" + block + ("\n\n" + after if after.strip() else "\n")
+
+    # Normalize: never more than one blank line, exactly one trailing newline.
+    new_text = re.sub(r"\n{3,}", "\n\n", new_text).rstrip("\n") + "\n"
+
+    changed = new_text != text
+    if write and changed:
+        path.write_text(new_text)
+    return {"path": path, "hash": h, "ids": [t.id for t in ordered],
+            "warnings": warnings, "changed": changed, "new_text": new_text,
+            "old_text": text}
+
+
+def find_consumers():
+    seen = set()
+    for root in SYNC_ROOTS:
+        if not root.exists():
+            continue
+        if root.is_file():
+            seen.add(root)
+            continue
+        for name in ("CLAUDE.md", "AGENTS.md"):
+            for path in root.rglob(name):
+                try:
+                    if RECIPE_RE.search(path.read_text()):
+                        seen.add(path)
+                except (OSError, UnicodeDecodeError):
+                    pass
+    return sorted(seen)
+
+
+def die(msg):
+    print(f"claude-templates: error: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+def cmd_list(args):
+    templates = load_templates()
+    for t in sorted(templates.values(), key=lambda t: (t.order, t.id)):
+        req = f"  requires: {', '.join(t.requires)}" if t.requires else ""
+        print(f"[{t.order:>3}] {t.scope:<7} {t.id}{req}")
+
+
+def cmd_assemble(args):
+    templates = load_templates()
+    path = Path(args.path).expanduser().resolve() if args.path else Path.cwd() / "CLAUDE.md"
+    if not path.exists():
+        die(f"{path} does not exist")
+    res = assemble_file(path, templates, write=True)
+    if res is None:
+        die(f"{path} has no <!-- templates: ... --> recipe")
+    for w in res["warnings"]:
+        print(f"  warning: {w}", file=sys.stderr)
+    state = "updated" if res["changed"] else "already current"
+    print(f"{state}: {path}  (hash:{res['hash']}, {len(res['ids'])} templates)")
+    print(f"  {', '.join(res['ids'])}")
+
+
+def cmd_check(args):
+    templates = load_templates()
+    paths = ([Path(args.path).expanduser().resolve()] if args.path
+             else find_consumers())
+    drift = []
+    for path in paths:
+        res = assemble_file(path, templates, write=False)
+        if res is None:
+            continue
+        if res["changed"]:
+            drift.append(path)
+            print(f"DRIFT: {path}")
+    if drift:
+        print(f"\n{len(drift)} file(s) out of sync. Run: claude-templates assemble <path>",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"ok: {len(paths)} file(s) in sync")
+
+
+def cmd_sync_all(args):
+    templates = load_templates()
+    consumers = find_consumers()
+    if not consumers:
+        print("no consuming files found")
+        return
+    for path in consumers:
+        res = assemble_file(path, templates, write=True)
+        for w in res["warnings"]:
+            print(f"  warning ({path.name}): {w}", file=sys.stderr)
+        state = "updated" if res["changed"] else "current"
+        print(f"{state}: {path}")
+
+
+def main():
+    p = argparse.ArgumentParser(prog="claude-templates")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    pa = sub.add_parser("assemble", help="rebuild the marked region of a file")
+    pa.add_argument("path", nargs="?", help="target file (default ./CLAUDE.md)")
+    pa.set_defaults(func=cmd_assemble)
+
+    pc = sub.add_parser("check", help="fail if any consumer is out of sync")
+    pc.add_argument("path", nargs="?", help="single file (default: scan roots)")
+    pc.set_defaults(func=cmd_check)
+
+    pl = sub.add_parser("list", help="list available templates")
+    pl.set_defaults(func=cmd_list)
+
+    ps = sub.add_parser("sync-all", help="reassemble every consuming file")
+    ps.set_defaults(func=cmd_sync_all)
+
+    args = p.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

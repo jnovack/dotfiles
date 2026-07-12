@@ -131,8 +131,11 @@ spawns a subagent at the assigned model.
 **Claude models (Haiku / Sonnet / Opus):** Spawns a foreground subagent. Reports a synopsis when done and reminds you
 to run `/refactor-checkpoint` before the next phase.
 
-**Codex:** Cannot be auto-spawned. Writes the full prompt to `PROMPT.md` in the project root for the user to paste
+**Codex:** Cannot be auto-spawned. Writes the full prompt to `.local/CODEX-PROMPT.md` for the user to paste
 into their Codex session.
+
+When re-running a phase that is partially complete (e.g. after a failed checkpoint), the subagent is instructed to
+skip steps already marked `Complete` in the Step Index and verify their results instead of redoing them.
 
 ```text
 /refactor-next
@@ -173,7 +176,9 @@ Checks:
 ═══════════════════════════════════════
 ```
 
-On **FAIL**: lists exactly what must be fixed; does not mark the phase complete.
+On **FAIL**: rolls the phase back — its Phase Map row (and any failed Step Index rows) return to `In progress`, a
+`Checkpoint failed` row is appended to the Session Log, and the report lists exactly what must be fixed. The next
+`/refactor-next` re-runs the phase, skipping steps still marked `Complete`.
 
 On **WARN**: phase can advance; flags what to revisit.
 
@@ -194,8 +199,8 @@ On **PASS**: confirms Step Index and Phase Map are marked `Complete`, then tells
 
 ## Codex workflow
 
-For phases assigned Codex, `/refactor-next` writes the full prompt to `PROMPT.md`. Paste it into your Codex session.
-When Codex finishes:
+For phases assigned Codex, `/refactor-next` writes the full prompt to `.local/CODEX-PROMPT.md`. Paste it into your
+Codex session. When Codex finishes:
 
 1. Confirm tests pass.
 2. Confirm the Step Index and Phase Map rows in `.local/REFACTOR.md` are marked `Complete`.

@@ -1,6 +1,6 @@
 ---
 description: Validate a completed TODO item against its Definition of Done (runs tests)
-argument-hint: [id]
+argument-hint: <id>
 ---
 
 # /todo-checkpoint
@@ -11,16 +11,14 @@ Validate that a completed TODO item satisfies its Definition of Done.
 
 ### 1 — Identify the item
 
-If an ID argument was provided, use it.
+An ID argument is required. If none was provided: list every row in `TODO.md`
+with status `done` or `in progress`, report "Provide an ID:
+`/todo-checkpoint <id>`", and stop. Do not guess which item to validate.
 
-Otherwise, determine which `done` item was completed most recently. Table order
-is insertion order, so the last `done` row is **not** necessarily the most
-recent completion. Check `git diff HEAD -- TODO.md` (and `git log -1 -p --
-TODO.md` if the working tree is clean) for the row whose status most recently
-changed to `done`. If exactly one row is `done`, use it. If it is still
-ambiguous, list the `done` items and ask the user which to validate.
-
-- If no item is identified: report "No completed items found. Provide an ID or complete an item first." and stop.
+Find the row with the given ID. If it does not exist, report "ID not found in
+TODO.md." and stop. Its status should be `done` or `in progress` (the item has
+been executed); if it is anything earlier in the lifecycle, report the status
+and stop — there is nothing to validate yet.
 
 Read `.claude/todos/<id>.plan.md` to get the DoD checklist (core and any optional items declared).
 
@@ -80,7 +78,9 @@ FAIL if a relevant doc was not updated.
 ═══════════════════════════════════════
 ```
 
-**On FAIL:** List exactly what needs to be fixed. Do not advance the item.
+**On FAIL:** Set the item's status in `TODO.md` to `in progress` — a failed
+checkpoint means the work is not done, and the index must say so. Then list
+exactly what needs to be fixed. Re-run `/todo-checkpoint <id>` after the fixes.
 
 **On WARN:** The item can stand. Call out what to revisit.
 

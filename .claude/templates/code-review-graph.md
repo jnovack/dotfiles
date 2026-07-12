@@ -1,5 +1,9 @@
+---
+id: code-review-graph
+scope: global
+order: 34
+---
 
-<!-- code-review-graph.md -->
 ## MCP Tools: code-review-graph
 
 **IMPORTANT: This project has a knowledge graph. ALWAYS use the

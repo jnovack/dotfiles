@@ -20,22 +20,24 @@ Print the following verbatim:
 
 LIFECYCLE
 ─────────
-Every TODO item moves through five statuses:
+Every TODO item moves through six statuses:
 
-  raw → spec'd → planned → ready → done
+  raw → spec'd → planned → ready → in progress → done
 
-  raw      Captured. No spec yet.
-  spec'd   Clarified. Acceptance criteria written.
-  planned  Implementation steps and DoD defined.
-  ready    Plan reviewed. Cleared for execution.
-  done     Implemented. Checkpoint passed.
+  raw          Captured. No spec yet.
+  spec'd       Clarified. Acceptance criteria written.
+  planned      Implementation steps and DoD defined.
+  ready        Plan reviewed. Cleared for execution.
+  in progress  Execution started, or checkpoint failed.
+  done         Implemented. Checkpoint passed.
 
 FILES
 ─────
-  TODO.md                       Index table (machine-maintained)
+  TODO.md                       Index table (machine-maintained;
+                                the only place status lives)
   .claude/todos/<ID>.spec.md    What and why, acceptance criteria
   .claude/todos/<ID>.plan.md    How, model tag, DoD checklist
-  .claude/todos/<ID>.PROMPT.md  Generated prompt for non-Claude models
+  .local/<ID>.PROMPT.md         Generated prompt for non-Claude models
 
 TODO.md FORMAT
 ──────────────
@@ -69,14 +71,16 @@ COMMANDS
     Confirm plan file exists, bump to ready.
     Next: /todo-next
 
-  /todo-next
-    Pick the first ready item, spawn a subagent (Claude models)
-    or write <id>.PROMPT.md (non-Claude models). Report results.
+  /todo-next [id]
+    Run the given ready item (or the first ready item if no ID).
+    Marks it in progress, then spawns a subagent (Claude models)
+    or writes .local/<id>.PROMPT.md (non-Claude models).
     Next: /todo-checkpoint <id>
 
-  /todo-checkpoint [id]
+  /todo-checkpoint <id>
     Detect and run tests. Check docs, technical debt, and any
     optional DoD items declared in the plan. Report PASS/FAIL/WARN.
+    On FAIL the item rolls back to in progress.
     Next: /todo-next (on pass)
 
   /todo-help

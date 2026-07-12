@@ -1,5 +1,10 @@
+---
+id: lang-dotnet
+scope: project
+requires: [testing-philosophy]
+order: 64
+---
 
-<!-- lang-dotnet.md -->
 ## dotnet / csharp
 
 ### Target framework and language version
@@ -60,7 +65,6 @@
   repo already uses `FluentAssertions`, stay on v7.x (the last Apache-2.0 release) —
   do NOT upgrade to v8+, which requires a paid commercial license; flag any v8
   reference you encounter.
-- Each test must be independent — no shared mutable state across tests.
 - Mock dependencies at the interface boundary using the repo's existing mock library (Moq, NSubstitute, etc.).
 
 ### Validation
@@ -70,5 +74,3 @@ dotnet build                # must succeed with 0 errors, 0 warnings (or match r
 dotnet test                 # full test suite
 dotnet format --verify-no-changes  # formatting check (if dotnet-format is configured)
 ```
-
-Do not claim tests pass unless `dotnet test` was actually run and exited 0.

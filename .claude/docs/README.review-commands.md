@@ -87,7 +87,9 @@ For test reviews, MODULE reflects the test suite (`INT`, `UNIT`, `E2E`) and TYPE
 
 For dependency reviews, MODULE reflects the ecosystem (`GOMOD`, `NPM`, `PY`, `CARGO`) and TYPE reflects the concern (`UNPIN`, `STALE`, `BREAK`, `AUTO`).
 
-For comprehensibility assessments (`/assessment`), MODULE reflects the file/module and TYPE reflects the comprehensibility failure: `DOC` (missing/misleading documentation), `WHY` (missing inline rationale), `GAP` (pattern applied inconsistently), `NAME` (misleading name), `DEAD` (vestigial code), `CNTR` (unstated implicit contract), `STRCT` (structural confusion).
+For comprehensibility assessments (`/assessment`), MODULE reflects the file/module and TYPE reflects the comprehensibility failure: `DOC` (missing/misleading documentation), `WHY` (missing inline rationale), `GAP` (pattern applied inconsistently), `NAME` (misleading name), `DEAD` (vestigial code), `CNTR` (unstated implicit contract), `STRCT` (structural confusion), `OVER` (unnecessary complexity per the overengineering ladder).
+
+NN increments globally across the report and never resets per module-type pair, so every full ID is unique.
 
 ## Severity levels
 
@@ -151,16 +153,26 @@ Only records findings supported by concrete code evidence. Does not flag specula
 → Next: /review-fix to apply fixes
 ```
 
-### `/review-comprehensive [path]`
+### `/review-comprehensive [path] [dimension...]`
 
-Multi-agent parallel review. Same scope as `/review` but fans out 6 agents simultaneously, each hunting one dimension. Token cost is approximately 5× a standard `/review` run; use when coverage matters more than speed.
+Multi-agent review across six dimensions (`null-errors`, `resources`,
+`concurrency`, `security`, `tests`, `consistency`), any subset selectable.
+Five dimensions review **package-coherent batches** — files grouped by
+directory (soft cap 20, directories never split just to fill a batch), so a
+reviewer compares like with like; `consistency` is a whole-repo pass. Every
+(dimension, batch) result is persisted under `.local/.review-comprehensive/`
+with a ledger, so interrupted runs resume where they left off and subset runs
+accumulate into one report with an explicit Coverage section. Token cost is
+approximately 5× a standard `/review` when all dimensions run.
 
 ```text
-/review-comprehensive
-→ Discover agent: lists all source files
-→ 6 parallel agents: null+errors, resources, concurrency,
-  security, test completeness, convention consistency
-→ Synthesis agent: deduplicates and writes .local/REVIEW.md
+/review-comprehensive [src/] [security concurrency ...]
+→ Plan: resume from ledger.json, or discover files and build
+  package-coherent batches
+→ Analyze: per batch, pending dimensions run as parallel agents;
+  consistency runs once over the whole file set
+→ Synthesize: reads all persisted findings, deduplicates, writes
+  .local/REVIEW.md with a Coverage section
 → Next: /review-fix to apply fixes
 ```
 
@@ -233,7 +245,7 @@ Scope:
 
 ### `/review-deps [path]`
 
-Dependency hygiene audit. Reads all package manager manifests and lockfiles. Scope to a path with `/review-deps`; omit for the full repository.
+Dependency hygiene audit. Reads all package manager manifests and lockfiles. Scope to a path with `/review-deps services/`; omit for the full repository.
 
 Scope:
 
@@ -409,7 +421,19 @@ Comprehensibility pass, with triage batching for a large report:
 - `/review`, `/review-comprehensive`, `/assessment`, `/review-triage`,
   `/review-tests`, and `/review-deps` do not modify source files.
   `/review-triage` may modify its source report (backfilling a missing
-  `Suggested Model/Effort` line) but never touches code.
+  `Suggested Model/Effort` line, or re-routing a legacy Haiku assignment to
+  Codex) but never touches code.
+- Sizing is **Codex-first** at generation time and at triage: a
+  zero-ambiguity, mechanical fix defaults to Codex/Medium regardless of
+  severity; Haiku/Low is used only when a Codex handoff is not viable for
+  that finding.
+- `/review-fix` and `/assessment-fix` orchestrate pinned to **Sonnet** — the
+  playbook is deliberately linear so a sonnet session can follow it. Fix
+  subagents run at each finding's sized model, and the orchestrator delegates
+  nontrivial validation (e.g. re-deriving a constant) to an Opus subagent.
+- `/review-tests` and `/review-deps` emit `Suggested Model/Effort` lines even
+  though no `-fix` command targets their reports yet — forward compatibility
+  for a future fix path.
 - `/update-actions` modifies `.github/workflows/` files directly. The working tree is left dirty for operator review; nothing is staged or committed.
 - `/review-fix` and `/assessment-fix` never branch, stage, or commit.
 - If the target report is missing or the filter matches zero findings, `/review-fix`/`/assessment-fix` reports that and stops without changing anything.

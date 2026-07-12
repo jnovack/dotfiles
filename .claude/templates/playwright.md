@@ -1,5 +1,10 @@
+---
+id: playwright
+scope: project
+requires: [testing-philosophy]
+order: 52
+---
 
-<!-- playwright.md -->
 ## Playwright Testing
 
 ### Structure

@@ -1,5 +1,6 @@
 ---
 description: Execute the next ready TODO item via a subagent (Claude models) or a prompt file (external models)
+argument-hint: [id]
 ---
 
 # /todo-next
@@ -8,11 +9,16 @@ Execute the next ready TODO item by spawning a subagent or writing a prompt file
 
 ## What to do
 
-### 1 — Find the next ready item
+### 1 — Find the item to run
 
-Read `TODO.md`. Find the first row with status `ready` (top to bottom).
+Read `TODO.md`.
 
-- If no `ready` items exist: report "No ready items. Use `/todo-ready <id>` to mark a planned item ready." and stop.
+- If an ID argument was provided: find that row. If it does not exist, report
+  "ID not found in TODO.md." and stop. If its status is not `ready`, report the
+  current status and the appropriate prior step, and stop.
+- Otherwise: find the first row with status `ready` (top to bottom). If no
+  `ready` items exist: report "No ready items. Use `/todo-ready <id>` to mark a
+  planned item ready." and stop.
 
 ### 2 — Load spec and plan
 
@@ -26,6 +32,12 @@ Read the `model:` field from the plan file.
 
 - **Claude models** (`haiku`, `sonnet`, `opus`): see Claude branch below.
 - **Anything else** (e.g. `codex`, `gemini`): see Non-Claude branch below.
+
+### 4 — Mark the item in progress
+
+Change the item's status in `TODO.md` from `ready` to `in progress` before
+dispatching. This makes a crashed or abandoned run visible, and it is the
+status a failed `/todo-checkpoint` rolls back to.
 
 ---
 
@@ -52,7 +64,7 @@ Construct a prompt with these four parts:
 >
 > 1. Run the project test suite. Do not consider the work done with failing tests.
 > 2. Check each item in the DoD Checklist in the plan above and confirm it is satisfied.
-> 3. Update `TODO.md`: change this item's status from `ready` to `done`.
+> 3. Update `TODO.md`: change this item's status from `in progress` to `done`.
 > 4. Return a brief synopsis: what was implemented, any blockers or open questions, and
 >    confirmation of which DoD items were satisfied.
 
@@ -76,7 +88,14 @@ Run in the **foreground**. After the subagent returns:
 
 Construct the same prompt (Parts 1–4) but write it as raw task content — no wrapper text, no meta-commentary, no "here is what you need to do" framing. Just the content.
 
-Write the prompt to `.claude/todos/<id>.PROMPT.md`.
+Ensure `.local/` exists and `.local/.gitignore` exists containing exactly:
+
+```text
+*
+!.gitignore
+```
+
+Write the prompt to `.local/<id>.PROMPT.md`.
 
 Report:
 
@@ -87,7 +106,7 @@ Report:
 ═══════════════════════════════════════
 
 This item is set for <model>. The prompt has been written to:
-  .claude/todos/<id>.PROMPT.md
+  .local/<id>.PROMPT.md
 
 Copy that file into your <model> session. When it finishes:
 - Confirm tests pass.

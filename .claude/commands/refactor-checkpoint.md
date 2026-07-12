@@ -79,10 +79,16 @@ Print the checkpoint report:
 ═══════════════════════════════════════
 ```
 
-On FAIL: list exactly what must be fixed. Do not mark the phase complete.
+On FAIL: the phase is not complete, and the tracking file must say so. Set the
+phase's row in `## Phase Map` back to `In progress`, set any Step Index rows
+whose work failed validation back to `In progress`, and append a Session Log
+row: `| YYYY-MM-DD | Phase N — [name] | [model] | Checkpoint failed | [what
+must be fixed, brief] |`. Then list exactly what must be fixed. The next
+`/refactor-next` will re-run this phase (its prompt tells the subagent to skip
+steps still marked `Complete`); re-run `/refactor-checkpoint` after.
 
 On WARN: the phase can advance; call out what to revisit later.
 
-On PASS: confirm the phase checkbox in `### Step Index` and the Phase Map row are both
-marked `Complete` in `.local/REFACTOR.md`. If either was missed, update it now.
-Then tell the user to run `/refactor-next` for the next phase.
+On PASS: confirm every row in the phase's `### Step Index` and its Phase Map row
+are marked `Complete` in `.local/REFACTOR.md`. If either was missed, update it
+now. Then tell the user to run `/refactor-next` for the next phase.

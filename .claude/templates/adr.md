@@ -1,5 +1,9 @@
+---
+id: adr
+scope: project
+order: 40
+---
 
-<!-- adr.md -->
 ## Architecture Decision Records
 
 ADRs live in `docs/decisions/`. They are the canonical record of *why* this

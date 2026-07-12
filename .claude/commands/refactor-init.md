@@ -109,6 +109,13 @@ Proceed to Step 4.
 
 ## Step 4 — Write `.local/REFACTOR.md`
 
+Before writing, ensure `.local/` exists and `.local/.gitignore` exists containing exactly:
+
+```text
+*
+!.gitignore
+```
+
 Write the file using the schema below. Every section is required. Do not omit sections
 even if they have minimal content.
 

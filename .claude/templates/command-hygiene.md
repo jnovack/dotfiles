@@ -1,5 +1,9 @@
+---
+id: command-hygiene
+scope: global
+order: 30
+---
 
-<!-- command-hygiene.md -->
 ## Command hygiene (for a stable permission allowlist)
 
 "Always allow" captures the full command string, so only commands with a

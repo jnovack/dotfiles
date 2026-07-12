@@ -1,5 +1,9 @@
+---
+id: commit-style
+scope: global
+order: 31
+---
 
-<!-- commit-style.md -->
 ## Commit Style
 
 All commits must follow Conventional Commits format:

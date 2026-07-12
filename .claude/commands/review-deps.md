@@ -75,6 +75,18 @@ For each High finding, grep the codebase for direct usages of the affected packa
   - Example IDs: `#GOMOD-STALE-01`, `#NPM-UNPIN-02`, `#PY-AUTO-01`
 - For the `Generated:` timestamp, run `date` — do not guess the datetime.
 - No encouraging commentary or meta-notes. Keep findings dense and actionable.
+- Within each finding, add a `**Suggested Model/Effort:**` line in exactly this
+  format — it is parsed by `/review-triage` and any future fix command:
+
+  ```text
+  **Suggested Model/Effort:** <Model> / <Effort> — <one sentence: blast radius or ambiguity>
+  ```
+
+  with Model in {Haiku, Sonnet, Opus, Codex} and Effort in {Low, Medium, High}.
+  Size by blast radius and ambiguity, not severity. Codex-first: zero-ambiguity
+  mechanical fixes default to Codex/Medium; Haiku/Low only when a Codex handoff
+  is not viable for that finding. Major-version upgrades are rarely mechanical —
+  size those by the breaking-change assessment.
 
 ---
 
@@ -120,6 +132,8 @@ One block per file that has findings, ordered by highest severity in that file.
 **Breaking risk:** Low — minor version bump; additive changes expected.
 
 **Local impact:** [which packages or files import this directly]
+
+**Suggested Model/Effort:** `<Model> / <Effort> — <one sentence>` (exact format above — parsed by `/review-triage`).
 
 **Fix:**
 

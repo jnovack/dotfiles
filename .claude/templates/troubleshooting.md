@@ -1,5 +1,9 @@
+---
+id: troubleshooting
+scope: project
+order: 42
+---
 
-<!-- troubleshooting.md -->
 ## Troubleshooting Documentation
 
 Troubleshooting docs live at two levels:

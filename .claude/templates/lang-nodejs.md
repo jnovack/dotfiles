@@ -1,5 +1,10 @@
+---
+id: lang-nodejs
+scope: project
+requires: [testing-philosophy]
+order: 62
+---
 
-<!-- lang-nodejs.md -->
 ## node.js
 
 ### Module system
@@ -52,9 +57,8 @@
 - For a new project with no runner, default to the built-in `node --test` (stable
   since Node 20) — zero dependencies; reach for Vitest/Jest only when the project
   needs their ecosystem (component testing, rich mocking, coverage UI).
-- Each test must be independent — no shared mutable state between tests.
-- Mock external I/O (HTTP, database, filesystem) at the boundary, not deep inside implementation code.
-- Do not use `setTimeout` or arbitrary delays in tests. Use fake timers or proper async patterns.
+- Use fake timers rather than real delays when a test must advance time (the
+  no-arbitrary-sleeps rule is in Testing Philosophy).
 
 ### Validation
 
@@ -63,5 +67,3 @@ node --check src/index.js   # syntax check without running
 npm test                    # run test suite
 npm run lint                # if a lint script exists
 ```
-
-Do not claim tests pass unless `npm test` was actually run and exited 0.

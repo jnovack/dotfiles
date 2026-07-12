@@ -1,6 +1,7 @@
 ---
 description: Mark a planned TODO item as ready for execution (the human review gate)
 argument-hint: <id>
+model: haiku
 ---
 
 # /todo-ready
@@ -15,6 +16,7 @@ Read `TODO.md`. Find the row with the given ID.
 
 - If not found: report "ID not found in TODO.md." and stop.
 - If status is `ready`: report "Already marked ready." and stop.
+- If status is `in progress`: report "Item is in progress — execution has started or a checkpoint failed. Finish the work and run `/todo-checkpoint <id>`." Stop.
 - If status is `done`: report "Already done." and stop.
 - If status is `spec'd` or `raw`: report the current status and suggest the appropriate prior step (`/todo-plan` or `/todo-spec`). Stop.
 - If status is `planned`: proceed.

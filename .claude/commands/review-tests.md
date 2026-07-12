@@ -68,6 +68,17 @@ Read every test file in scope and its corresponding production code. Analyze for
   - NN: 2-digit 1-based integer, incrementing globally across the entire report
     (never resets per module-type pair)
 - Distinguish "not tested at all" (`GAP`) from "tested incorrectly" (`TAUTO`, `MOCK`, etc.).
+- Within each finding, add a `**Suggested Model/Effort:**` line in exactly this
+  format — it is parsed by `/review-triage` and any future fix command:
+
+  ```text
+  **Suggested Model/Effort:** <Model> / <Effort> — <one sentence: blast radius or ambiguity>
+  ```
+
+  with Model in {Haiku, Sonnet, Opus, Codex} and Effort in {Low, Medium, High}.
+  Size by blast radius and ambiguity, not severity. Codex-first: zero-ambiguity
+  mechanical fixes default to Codex/Medium; Haiku/Low only when a Codex handoff
+  is not viable for that finding.
 
 ---
 
@@ -105,6 +116,8 @@ One block per file that has findings, ordered by highest severity in that file.
 **Line(s):** 42
 
 **Issue:** Precise description of what is wrong and why it produces false confidence or missing coverage.
+
+**Suggested Model/Effort:** `<Model> / <Effort> — <one sentence>` (exact format above — parsed by `/review-triage`).
 
 **Fix:**
 

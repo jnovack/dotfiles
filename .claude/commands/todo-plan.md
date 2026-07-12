@@ -18,7 +18,7 @@ Read `.claude/todos/<id>.spec.md`.
 Read `TODO.md` and check the item's status:
 
 - `raw`: suggest running `/todo-spec <id>` first and stop.
-- `planned`, `ready`, or `done`: report the current status and ask if the user wants to re-plan. If no, stop.
+- `planned`, `ready`, `in progress`, or `done`: report the current status and ask if the user wants to re-plan. If no, stop.
 - `spec'd`: proceed.
 
 ### 2 — Recommend a model
@@ -40,10 +40,10 @@ Write `.claude/todos/<id>.plan.md`:
 ```markdown
 ---
 id: <ID>
-status: planned
 model: <haiku|sonnet|opus>
 created: <YYYY-MM-DD>
 ---
+<!-- Status lives in TODO.md only — never here. -->
 
 ## Overview
 

@@ -43,7 +43,11 @@ For each finding in the report:
   *upgrade* effort — never downgrade — if grouping reveals a shared risk the
   isolated generation-time pass couldn't see (e.g. two findings in different
   files both rely on the same undocumented invariant: that's now a
-  cross-file consistency risk, not two independent Low findings).
+  cross-file consistency risk, not two independent Low findings). You may
+  also re-route a generation-time Haiku assignment to Codex under the
+  Codex-first policy below (common in reports that predate the policy) — a
+  model swap toward the cheaper executor is not a downgrade; effort itself
+  never goes down. Update the line in the source report when you do either.
 - If the line is absent (the report predates this field, or was written by a
   tool that doesn't emit it), assign one now using the sizing table below,
   then **write it back into the source report**, inserted immediately before

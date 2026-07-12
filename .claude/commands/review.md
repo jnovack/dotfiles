@@ -118,10 +118,10 @@ risk cannot be ruled out from static analysis alone.
 - If a fix spans multiple locations, list all locations with separate fix blocks.
 - No encouraging commentary or meta-notes. Keep findings dense and actionable.
 - Each finding ID format: `#MODULE-TYPE-NN`
-  - MODULE: 2–4 char uppercase file abbreviation (e.g. `AUTH`, `DB`, `MW`)
-  - TYPE: 2–4 char uppercase issue class (e.g. `NULL`, `INJ`, `RACE`, `LEAK`, `SEC`)
+  - MODULE: 2–5 char uppercase file abbreviation (e.g. `AUTH`, `DB`, `MW`)
+  - TYPE: 2–5 char uppercase issue class (e.g. `NULL`, `INJ`, `RACE`, `LEAK`, `SEC`)
   - NN: 2-digit 1-based integer, incrementing globally across the entire report
-    (never resets per module-type pair)
+    (never resets per module-type pair), so every full ID is unique
 - For legacy/deprecated/compatibility code: grep callers before recommending a fix.
   Categorize as (a) production callers, (b) test-only, or (c) zero callers.
   Recommend deletion if (b) or (c).
@@ -133,12 +133,15 @@ risk cannot be ruled out from static analysis alone.
   ```
 
   with Model in {Haiku, Sonnet, Opus, Codex} and Effort in {Low, Medium, High}.
-  Size by blast radius and ambiguity, not severity: a Critical finding with an
-  unambiguous one-line fix in a single file is still Haiku/Low; a finding whose
-  fix contradicts a governing ADR or requires a product decision the report
-  cannot make unilaterally is Opus/High regardless of diff size. Pick Model by
-  how much reasoning correctness requires and Effort by how much verification
-  trusting it requires, independently of each other.
+  Size by blast radius and ambiguity, not severity. **Codex-first:** any
+  zero-ambiguity, mechanical fix defaults to Codex/Medium — a Critical finding
+  with an unambiguous one-line fix in a single file is still Codex/Medium.
+  Assign Haiku/Low only when a Codex handoff is not viable for that specific
+  finding. A finding whose fix contradicts a governing ADR or requires a
+  product decision the report cannot make unilaterally is Opus/High regardless
+  of diff size. Pick Model by how much reasoning correctness requires and
+  Effort by how much verification trusting it requires, independently of each
+  other.
 
 ---
 

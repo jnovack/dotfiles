@@ -15,7 +15,10 @@ Run the next incomplete phase in the refactor plan. One phase per invocation —
    - Status ≠ `Complete`, **and**
    - Every phase listed in "Depends on" has Status = `Complete` (or the field is `—`).
 3. That is the **current phase**. Read its full section in `.local/REFACTOR.md`.
-4. Check the `### Step Index` — if any rows are `In progress` or `Not started`, the phase is not done.
+4. Consistency check: if the Phase Map and the phase's `### Step Index` disagree
+   (Phase Map says `Complete` but steps are open, or every step is `Complete`
+   but the Phase Map row is not), flag the inconsistency and stop — do not run
+   anything until the operator resolves which is true.
 5. Note the phase's **Model** from the Phase Map row.
 6. Construct the prompt and run by model — see below.
 
@@ -42,8 +45,10 @@ table, and every `### Step N.x` section in order (full content, all code blocks)
 Append exactly as written:
 
 > You are executing a complete refactor phase. Work through each step in the Step Index
-> in order. For each step, complete the implementation described in its section, then
-> mark it `Complete` in the `### Step Index` table in `.local/REFACTOR.md`.
+> in order. Skip any step already marked `Complete` in the Step Index — verify its
+> result exists in the code rather than redoing it. For each remaining step, complete
+> the implementation described in its section, then mark it `Complete` in the
+> `### Step Index` table in `.local/REFACTOR.md`.
 > After all steps are done:
 >
 > 1. Run the test command from `.local/REFACTOR.md` §Test Command.
@@ -72,8 +77,9 @@ Run in the **foreground** so the synopsis returns before you report to the user.
 
 ### Codex
 
-Codex cannot be auto-spawned. Write the full constructed prompt to `PROMPT.md` in the
-project root for the user to paste into their Codex session. Then output:
+Codex cannot be auto-spawned. Ensure `.local/.gitignore` exists (containing `*` and
+`!.gitignore`), then write the full constructed prompt to `.local/CODEX-PROMPT.md`
+for the user to paste into their Codex session. Then output:
 
 ```text
 ═══════════════════════════════════════
@@ -81,7 +87,7 @@ project root for the user to paste into their Codex session. Then output:
  Model: Codex
 ═══════════════════════════════════════
 
-Prompt written to PROMPT.md. Paste it into your Codex session.
+Prompt written to .local/CODEX-PROMPT.md. Paste it into your Codex session.
 
 When Codex finishes:
 - Confirm tests pass.

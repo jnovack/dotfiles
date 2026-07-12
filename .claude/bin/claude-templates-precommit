@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Pre-commit drift guard for the Claude templating machine.
+#
+# Fails the commit if any CLAUDE.md / AGENTS.md in this repo has a templates
+# recipe whose marked region is out of sync with the templates (e.g. someone
+# hand-edited inside the markers, or templates changed upstream and the file
+# was never re-assembled).
+#
+# Install in a consuming repo, either:
+#   ln -s ~/Source/dotfiles/.claude/bin/claude-templates-precommit \
+#         .git/hooks/pre-commit
+# or via a shared hooks dir:
+#   git config core.hooksPath .githooks   # then drop this file in .githooks/
+set -euo pipefail
+
+INJECTOR="$HOME/Source/dotfiles/.claude/bin/claude-templates"
+[ -x "$INJECTOR" ] || { echo "claude-templates injector not found; skipping"; exit 0; }
+
+root="$(git rev-parse --show-toplevel)"
+status=0
+
+while IFS= read -r -d '' f; do
+  grep -ql "<!-- templates:" "$f" || continue
+  "$INJECTOR" check "$f" || status=1
+done < <(find "$root" -maxdepth 2 \( -name CLAUDE.md -o -name AGENTS.md \) -print0)
+
+if [ "$status" -ne 0 ]; then
+  echo
+  echo "Template drift detected. Re-run: claude-templates assemble <file>" >&2
+fi
+exit "$status"

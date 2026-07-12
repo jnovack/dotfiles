@@ -48,10 +48,10 @@ Write `.claude/todos/<id>.spec.md`:
 ```markdown
 ---
 id: <ID>
-status: spec'd
 summary: <one-line summary>
 created: <YYYY-MM-DD>
 ---
+<!-- Status lives in TODO.md only — never here. -->
 
 ## What
 

@@ -1,5 +1,10 @@
+---
+id: lang-golang
+scope: project
+requires: [testing-philosophy, command-hygiene]
+order: 60
+---
 
-<!-- lang-golang.md -->
 ## go
 
 ### Formatting
@@ -185,20 +190,9 @@ When the application calls for metrics, apply the following rules:
 
 ### Testing
 
-- Test negative cases with equal rigor as positive cases: for every happy path
-  test, consider its failure modes — invalid input, missing data, permission
-  denied, timeout, partial failure, and resource exhaustion. A function with
-  one positive test and no negative tests is undertested regardless of coverage
-  percentage.
-- Prefer the smallest test level that can prove correctness; do not jump to e2e
-  when a unit or integration test would cover the behavior adequately.
-- When fixing a bug, add the narrowest regression test that would have failed
-  before the fix.
-- Do not add brittle tests that depend on timing guesses, pixel layout,
-  incidental text formatting, or internal implementation details unless the
-  requirement explicitly depends on them.
-- If no test is added, explain why the change is low risk or already covered
-  by existing tests.
+The language-agnostic rules (negative cases, smallest sufficient level,
+regression tests, independence, no brittle timing) live in the Testing
+Philosophy section. Go-specific mechanics follow.
 
 #### Test Pyramid — Layer Definitions
 
@@ -242,9 +236,6 @@ go test -tags=smoke ./...             # smoke
 go test -tags=e2e ./...               # e2e
 go test -race ./...                   # always run for shared-state code
 ```
-
-Never claim a test suite passes unless the appropriate command was run
-and exited 0.
 
 #### What to Write Unprompted
 

@@ -55,6 +55,8 @@ Phase 3 — [name]                        [NOT STARTED — waiting on Phase 2]
 
 Rules:
 
+- The model shown on step rows is the phase's model repeated — steps do not
+  have individual model assignments; do not hunt for a per-step model field.
 - Show all step rows for any phase that has at least one step started.
 - For phases not yet started, collapse to one line noting what they depend on.
 - If a phase's deps are incomplete, mark it ✗ and state what is blocking it.

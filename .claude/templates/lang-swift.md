@@ -1,5 +1,10 @@
+---
+id: lang-swift
+scope: project
+requires: [testing-philosophy]
+order: 66
+---
 
-<!-- lang-swift.md -->
 ## swift
 
 Covers macOS and iOS application development. Shared rules first; platform
@@ -189,9 +194,6 @@ platform glue. Everything else lives in local SPM packages inside the repo:
 - Swift Testing (`@Test`, `#expect`, `#require`) for all new unit tests.
   XCTest remains for UI tests (`XCUIApplication`) and existing suites — do not
   mix frameworks within one file.
-- Test negative cases with equal rigor as positive cases: invalid input,
-  missing data, permission denied, timeout, cancellation mid-flight. A
-  function with one positive test and no negative tests is undertested.
 - Parameterized tests (`@Test(arguments:)`) are the table-driven idiom — use
   them wherever cases share a shape.
 - Core-package tests run with `swift test` and no simulator — this is the main
@@ -202,8 +204,6 @@ platform glue. Everything else lives in local SPM packages inside the repo:
 - UI tests are for critical user journeys only, and only when asked. Do not
   add brittle tests that depend on timing guesses, pixel layout, or incidental
   accessibility-identifier structure.
-- When fixing a bug, add the narrowest regression test that would have failed
-  before the fix.
 
 ### Validation
 
@@ -217,7 +217,5 @@ xcodebuild -scheme {App} -destination 'platform=iOS Simulator,name=iPhone 16' bu
 
 - Package-level `swift test` is the fast inner loop; `xcodebuild test` against
   both destinations is required before claiming a multiplatform change works.
-- Never claim a test suite passes unless the appropriate command was run and
-  exited 0.
 - Treat new warnings as failures — do not commit code that adds to the warning
   count, especially concurrency diagnostics.

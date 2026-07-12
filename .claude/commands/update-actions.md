@@ -32,6 +32,13 @@ Skip these entirely. Do not look up newer versions. Do not modify the line. Incl
 
 Find every `.github/workflows/*.yml` and `.github/workflows/*.yaml` file. Read all of them. Build a deduplicated list of every `uses:` reference that does NOT have a `# wontfix` comment, noting the current pin for each.
 
+Skip these non-upgradeable `uses:` forms entirely — do not look up versions for them and omit them from the report:
+
+- Local actions and local reusable workflows referenced by path (`uses: ./...`) — they have no version pin.
+- Docker image references (`uses: docker://...`) — image tags are not GitHub releases; leave them alone.
+
+Remote reusable workflows (`uses: owner/repo/.github/workflows/file.yml@ref`) ARE in scope — treat the `@ref` pin exactly like an action pin.
+
 Classify each pin format — this determines the output format when updating:
 
 | Format | Example | Class |

@@ -59,19 +59,19 @@ Analyze all source files for:
 - Do not add encouraging commentary, filler phrases, or meta-notes. Keep it dense and actionable.
 - Do not re-explain the finding inside the fix block. The fix should speak for itself.
 - For any finding involving legacy, deprecated, compatibility, or parallel-path code: before recommending a comment fix, grep production callers. Categorize results as: (a) production callers, (b) test-only callers, (c) zero callers. If (b) or (c), recommend deletion over documentation. If (a), document why the legacy path exists and what replaces it.
-- Within each finding, add a line with the suggested model and effort (Haiku/Sonnet/Opus/Codex; Low/Medium/High) needed to correctly apply the fix. Size by blast radius and ambiguity, not by the finding's severity label — a Critical finding that's a one-line, unambiguous comment in a single file is still Haiku/Low; a Warning whose fix requires amending a governing ADR or a product decision the report cannot make unilaterally is Opus/High regardless of how small the resulting diff looks. See the sizing table below.
+- Within each finding, add a line with the suggested model and effort (Haiku/Sonnet/Opus/Codex; Low/Medium/High) needed to correctly apply the fix. Size by blast radius and ambiguity, not by the finding's severity label — a Critical finding that's a one-line, unambiguous comment in a single file is still Codex/Medium (Haiku/Low only when a Codex handoff isn't viable for that finding); a Warning whose fix requires amending a governing ADR or a product decision the report cannot make unilaterally is Opus/High regardless of how small the resulting diff looks. See the sizing table below.
 
 ### Model/Effort sizing table
 
 | Tier | Criteria |
 | --- | --- |
-| Haiku / Low | Pure comment/doc fix, one file, one location, zero behavior change, zero ambiguity in the fix's correctness. |
+| Codex / Medium | Zero ambiguity in the fix's correctness, zero behavior change, mechanical to apply — one location or many. **Default tier for anything this cheap** (Codex-first policy: Codex execution costs no Claude tokens). |
+| Haiku / Low | Same zero-ambiguity, mechanical shape as Codex/Medium, used only when a Codex handoff is not viable for that specific finding. |
 | Sonnet / Low | No behavior change, but the fix needs cross-file consistency, or correctness on a widely-used interface/type/contract, to get right. |
 | Sonnet / Medium | Small structural cleanup (dedupe, hoist, delete dead code, extract a helper) contained to one package; needs a caller check and/or a test touch-up. |
 | Sonnet / High | The correct fix is a real behavior change, not just wording — needs verification of an assumption and a test before landing. |
 | Opus / Medium | Needs Opus-level reasoning to get right (e.g. an actual concurrency-safety argument, not a restated assumption) but does not need a human product decision — the agent can resolve it correctly on its own once it reasons carefully, it just can't be trusted to a lighter model. |
 | Opus / High | Architecture/ADR-governance conflict, or a product decision the report cannot make unilaterally. Flag that a human checkpoint is needed before any code is written — do not let a fix pass silently pick a default. |
-| Codex / Medium | Mechanical, low-judgment edit repeated across many locations or files, where diff precision matters more than reasoning — a strong batching candidate. |
 
 This table is illustrative, not exhaustive — pick the model by how much
 reasoning correctness requires and the effort by how much verification
@@ -138,13 +138,14 @@ Group findings by file. Within each file, order by line number.
 | DEAD | Unreachable, unused, or vestigial code a reader will waste time on |
 | CNTR | Implicit contract — assumption about inputs, call order, or state not captured at the interface |
 | STRCT | Structural confusion — logic split or bled across locations in a misleading way |
+| OVER | Unnecessary complexity — fails the overengineering ladder (speculative abstraction, new dependency for a few lines, hand-rolled stdlib/platform feature) |
 
 #### ID Format
 
 `#<MODULE>-<TYPE>-<NN>`
 
-- **MODULE**: 2–4 char uppercase abbreviation of the filename (e.g., AUTH, DB, API, UI, CFG)
+- **MODULE**: 2–5 char uppercase abbreviation of the filename (e.g., AUTH, DB, API, UI, CFG)
 - **TYPE**: from table above
-- **NN**: 2-digit left-zero-padded integer, incrementing globally across the entire report (never resets per file); e.g., `01`, `02`, … `10`, `11`
+- **NN**: 2-digit left-zero-padded integer, incrementing globally across the entire report (never resets per file), so every full ID is unique; e.g., `01`, `02`, … `10`, `11`
 
 Example heading: `#### 🟡 Warning — #DB-GAP-07 — Connection error handler missing in \`queryBatch\``

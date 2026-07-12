@@ -1,5 +1,9 @@
+---
+id: markdown-lint
+scope: global
+order: 28
+---
 
-<!-- markdown-lint.md -->
 ## Markdown Lint Rules
 
 All `.md` files must be lint-free. Fix ALL warnings in any file touched, including

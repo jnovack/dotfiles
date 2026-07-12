@@ -1,6 +1,7 @@
 ---
 description: Capture a raw TODO item with a generated ID and append it to TODO.md
 argument-hint: <description>
+model: haiku
 ---
 
 # /todo-add
@@ -43,6 +44,9 @@ Derive a **descriptor** (2–8 uppercase chars) from the most distinctive noun o
 - If no existing IDs share the prefix, start at `01`.
 
 Final format: `CATEGORY-DESCRIPTOR-##` (e.g. `TEST-SMOKE-03`, `FEAT-REGISTRY-01`).
+The full ID must be unique across all existing IDs — per-group numbering
+guarantees this; if a collision somehow exists anyway, keep incrementing until
+it doesn't.
 
 ### 3 — Ensure TODO.md exists
 

@@ -1,5 +1,10 @@
+---
+id: commit-handoff
+scope: global
+requires: [commit-style]
+order: 32
+---
 
-<!-- commit-handoff.md -->
 ## Commit handoff
 
 I run my own commits. Do NOT run `git commit`, `git add`, or `git push`.

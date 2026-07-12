@@ -12,7 +12,7 @@ subagent, and no checkpoint to confirm the work actually landed cleanly. This sy
 ## Lifecycle
 
 ```text
-raw → spec'd → planned → ready → done
+raw → spec'd → planned → ready → in progress → done
 ```
 
 | Status | Meaning |
@@ -21,7 +21,11 @@ raw → spec'd → planned → ready → done
 | spec'd | Clarified. Acceptance criteria written. |
 | planned | Implementation steps and DoD defined. |
 | ready | Plan reviewed. Cleared for execution. |
+| in progress | Execution started, or a checkpoint failed. Needs work. |
 | done | Implemented. Checkpoint passed. |
+
+Status lives in `TODO.md` only — the spec and plan sidecar files carry no
+status field, so there is nothing to drift out of sync.
 
 ## File layout
 
@@ -40,6 +44,7 @@ raw → spec'd → planned → ready → done
   .claude/todos/
     <ID>.spec.md             <- what, why, acceptance criteria
     <ID>.plan.md             <- how, model tag, DoD checklist
+  .local/
     <ID>.PROMPT.md           <- generated prompt for non-Claude models (if used)
 ```
 
@@ -105,19 +110,22 @@ The user can edit the `model:` field to any value, including non-Claude models.
 Confirms the plan file exists and bumps status from `planned` to `ready`. This is the human review gate — run it
 after you have read the plan and are satisfied with it.
 
-### `/todo-next`
+### `/todo-next [id]`
 
-Picks the first `ready` item and executes it.
+Runs the given `ready` item, or the first `ready` item if no ID is provided.
+Marks the item `in progress` in `TODO.md` before dispatching, so a crashed or
+abandoned run is visible.
 
 **Claude models (haiku/sonnet/opus):** Constructs a prompt from the spec and plan, spawns a subagent at the specified
-model, reports a synopsis, and reminds you to run `/todo-checkpoint`.
+model, reports a synopsis, and reminds you to run `/todo-checkpoint <id>`.
 
-**Non-Claude models:** Writes the raw prompt to `.claude/todos/<id>.PROMPT.md` and stops. Copy that file into your
+**Non-Claude models:** Writes the raw prompt to `.local/<id>.PROMPT.md` and stops. Copy that file into your
 external model session. When it finishes, run `/todo-checkpoint <id>`.
 
-### `/todo-checkpoint [id]`
+### `/todo-checkpoint <id>`
 
-Validates the most recently completed item (or a specific ID) against the DoD:
+Validates a completed item against the DoD. The ID is required — with no
+argument it lists the `done` and `in progress` items and stops:
 
 **Core (always checked):**
 
@@ -132,7 +140,9 @@ Validates the most recently completed item (or a specific ID) against the DoD:
 - API changelog
 - Smoke tests
 
-Reports `PASS`, `FAIL`, or `WARN` per criterion and an overall verdict.
+Reports `PASS`, `FAIL`, or `WARN` per criterion and an overall verdict. On
+`FAIL` the item's status rolls back to `in progress` — the index never claims
+success for work that failed its checkpoint.
 
 ### `/todo-help`
 
