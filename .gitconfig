@@ -88,12 +88,12 @@
     untracked = red
 
 [commit]
-    template = /Users/jnovack/.stCommitMsg
+	template = /Users/jnovack/.stCommitMsg
     gpgsign = true
 
 [core]
     pager = less -r
-    excludesfile = /Users/jnovack/.gitignore_global
+	excludesfile = /Users/jnovack/.gitignore
 
 [credential]
     helper = osxkeychain
@@ -118,3 +118,6 @@
 
 [include]
     path = ~/.gitconfig.local
+[user]
+	name = Justin J. Novack
+	email = jnovack@gmail.com

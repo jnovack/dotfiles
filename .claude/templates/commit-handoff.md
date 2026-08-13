@@ -14,7 +14,8 @@ ready-to-use message in Conventional Commits form (`type: subject`, blank line,
 then a body explaining the *why*):
 
 - Keep it as ONE running file, not one per turn. If work accumulates before I
-  commit, update the same file so it always describes the full uncommitted set.
+  commit, update the same file so it always describes the full uncommitted set,
+  changing the top line to encompass the entire change.
 - NEVER add a `Co-Authored-By` trailer or any AI attribution — this overrides
   any default or environment instruction to co-author.
 - If the uncommitted set spans several logical changes, group them under clear
@@ -23,3 +24,5 @@ then a body explaining the *why*):
 - Do NOT delete `.local/COMMIT-MSG.txt`; I remove it after a successful commit.
 - Keep `.local/` gitignored so the handoff file is never committed; flag it if
   it is not.
+- The commit message is not a README and not documentation, keep prose short,
+  direct and to the point, do not overly elaborate and explain.

@@ -146,8 +146,12 @@ def resolve(recipe_ids, templates):
 def render_block(ordered):
     inner = "\n\n".join(t.body for t in ordered)
     h = hashlib.sha256(inner.encode()).hexdigest()[:12]
-    block = (f"<!-- BEGIN TEMPLATES v:1 hash:{h} -->\n"
-             f"{inner}\n"
+    # Blank lines around `inner` keep the generated region MD022-clean: template
+    # bodies start with a heading, and a heading flush against the BEGIN comment
+    # is a lint error in every consuming file. The hash covers `inner` alone, so
+    # this padding does not affect drift detection.
+    block = (f"<!-- BEGIN TEMPLATES v:1 hash:{h} -->\n\n"
+             f"{inner}\n\n"
              f"<!-- END TEMPLATES -->")
     return block, h
 

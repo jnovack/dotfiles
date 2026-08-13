@@ -44,7 +44,8 @@ Read reactively, not eagerly:
 - No editorializing in favor of the chosen path
 - Alternatives Considered must be honest about why they lost
 - Consequences must include what was sacrificed, not just what was gained
-- Hard 300 word limit per ADR — if you need more, your decision scope is too wide
+- Soft 300 word limit per ADR — if you need more, your decision scope is too wide;
+  verify your decision scope is accurate, if it is, word limit is ok.
 
 ### ADR creation is post-execution only
 
