@@ -5,6 +5,16 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
+# Put Homebrew on PATH before oh-my-zsh loads: the `tmux` plugin (and the
+# auto-attach block below) probe for `tmux` at load time, and tmux spawns panes
+# as interactive non-login shells that never read ~/.zprofile. shellenv is
+# idempotent, so running it here is safe even when .zprofile also ran it.
+if [[ -x /opt/homebrew/bin/brew ]]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -x /usr/local/bin/brew ]]; then
+  eval "$(/usr/local/bin/brew shellenv)"
+fi
+
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
@@ -221,12 +231,6 @@ export NVM_DIR="$HOME/.nvm"
 
 
 export SDKROOT="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null)"
-
-if [[ -x /opt/homebrew/bin/brew ]]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
-elif [[ -x /usr/local/bin/brew ]]; then
-  eval "$(/usr/local/bin/brew shellenv)"
-fi
 
 if command -v brew >/dev/null 2>&1; then
   # Load azure completions
