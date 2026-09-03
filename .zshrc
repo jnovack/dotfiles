@@ -249,8 +249,12 @@ export PATH="$HOME/.local/bin:$PATH"
 _load_ca_bundle() {
     local cert_dir="${HOME}/.certs"
     local bundle="${cert_dir}/.bundle.pem"
+    local system_roots="/opt/homebrew/etc/openssl@3/cert.pem"
     [[ -d "$cert_dir" ]] || return
-    cat "$cert_dir"/*.pem(N) > "$bundle" 2>/dev/null
+    # Start from the public CA roots (Homebrew's ca-certificates) so tools that
+    # honor SSL_CERT_FILE still trust public HTTPS endpoints, then append the
+    # local/corporate roots from ~/.certs so internal endpoints also verify.
+    { [[ -f "$system_roots" ]] && cat "$system_roots"; cat "$cert_dir"/*.pem(N) 2>/dev/null; } > "$bundle"
     [[ -s "$bundle" ]] && export CURL_CA_BUNDLE="$bundle" SSL_CERT_FILE="$bundle"
 }
 _load_ca_bundle
