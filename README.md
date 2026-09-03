@@ -47,6 +47,23 @@ Machine-local additions live outside the repo:
 
 The canonical files load those local companions natively, so there is no generated merged file to maintain.
 
+## Release Tagging
+
+`.gitconfig` provides `git release major|minor|patch|vX.Y.Z`, which tags a
+version and pushes it. The version comes from the newest tag — never from a
+manifest edited by hand.
+
+If a repo has an executable `.githooks/version`, `git release` calls
+`.githooks/version write <x.y.z>` before tagging and commits the result as
+`chore(release): vX.Y.Z`, so `package.json`, `Cargo.toml`, or whatever else
+records the version follows the tag automatically. Repos without that file are
+untouched.
+
+Typical flow: `git autocommit` then `git release minor`.
+
+See [docs/git-release.md](docs/git-release.md) for the contract, per-ecosystem
+opt-in skeletons, and the `pre-push` guard.
+
 ## Audit
 
 Use `./audit.sh` on existing machines before syncing. It will review:
