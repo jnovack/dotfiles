@@ -81,8 +81,19 @@ the `/hooks` command once, or restart Claude Code, to pick it up.
   anything else unexpected causes it to exit silently rather than block the turn. A hook that
   blocks spuriously would fight the user on unrelated work; that failure mode is worse than an
   occasional missed nudge.
+- **Skips subagents entirely.** Claude Code converts a `Stop` hook into `SubagentStop` when it
+  fires inside a subagent, so a `Stop` entry opts subagents in whether you meant to or not. The
+  script exits early when the hook input carries `agent_type`/`agent_id`, which are present only
+  inside a subagent call. Without that guard the nudge lands on a subagent partway through a
+  delegated task list, redirects its final turn to intent capture, and the remaining items are
+  silently dropped. Intent capture is the orchestrator's job.
+- **Blocks by asking Claude to keep going, never to stop.** A Stop hook's `reason` is fed back as
+  Claude's next instruction, so the wording is load-bearing: it ends by handing the turn back to
+  whatever work was still in flight. An earlier revision closed with "say so explicitly and stop"
+  and reliably truncated multi-step turns at the nudge.
 - Honors `stop_hook_active` (exits immediately if set), so the block it raises resolves in one
-  extra turn instead of looping forever.
+  extra turn instead of looping forever. Claude Code independently overrides a Stop hook after
+  eight consecutive blocks without progress; this guard keeps us well clear of that cap.
 - It **nudges, it does not verify**. The hook cannot judge whether Claude's response to the nudge
   was actually correct or complete — it only forces the question onto the table. The judgment
   call still belongs to whoever is reading the diff.

@@ -13,7 +13,17 @@ Design choices (the failure modes a naive change would reintroduce):
   * Nudges at most ONCE per session (a /tmp sentinel keyed by session_id), so it
     reminds rather than nags every turn while work is uncommitted.
   * Honors stop_hook_active so the block it raises resolves in a single extra
-    cycle instead of looping.
+    cycle instead of looping. Claude Code also hard-overrides a Stop hook after
+    eight consecutive blocks, which this guard keeps us well clear of.
+  * Exits immediately inside SUBAGENTS. Claude Code converts a `Stop` hook to
+    `SubagentStop` when it fires inside a subagent, so without this guard the
+    nudge lands on a subagent working through a delegated task list, spends its
+    final turn on intent capture, and the remaining items are silently dropped.
+    Intent capture belongs to the orchestrator, which still gets nudged on the
+    main thread's Stop.
+  * Blocks with decision "continue", NOT a directive to stop. The reason text is
+    fed back as Claude's next instruction, so any wording like "and stop" reads
+    as an order to end the turn and abandons whatever work was still pending.
 """
 import sys
 import os
@@ -28,6 +38,11 @@ except Exception:
 
 # Already inside a stop-hook-induced continuation -> let the turn end.
 if data.get("stop_hook_active"):
+    sys.exit(0)
+
+# agent_type/agent_id are present ONLY when the hook fires inside a subagent
+# call. See the subagent note in the module docstring for why we bail here.
+if data.get("agent_type") or data.get("agent_id"):
     sys.exit(0)
 
 session = str(data.get("session_id", ""))
@@ -77,13 +92,29 @@ try:
 except Exception:
     pass  # sentinel is best-effort; worst case is a second nudge
 
+# The closing sentence is load-bearing: this text becomes Claude's next
+# instruction, so it must hand the turn back to whatever was in flight. An
+# earlier revision ended with "say so explicitly and stop", which reliably
+# truncated multi-step turns at the nudge.
 reason = (
     "Intent-capture check (AGENTS.md > Change Discipline > Intent Capture): you "
     "changed source this session. For any intentional or non-obvious behavior you "
     "introduced or changed: (1) put the *why* inline at the code point, naming the "
     "failure mode a naive revert would cause; (2) if it is behavior, add or update a "
     "named guard test that fails on revert; (3) persist any decision reached in "
-    "conversation to memory. If nothing you changed qualifies, say so explicitly and stop."
+    "conversation to memory. If nothing you changed qualifies, note that in one line. "
+    "Either way, resume any unfinished work from this turn before ending it."
 )
-print(json.dumps({"decision": "block", "reason": reason}))
+
+# Current Stop/SubagentStop output shape. decision "continue" prevents the stop
+# and feeds `reason` back to Claude; the legacy {"decision": "block"} form still
+# works but is no longer documented. hook_event_name is echoed rather than
+# hardcoded so this stays correct if the subagent guard above is ever removed.
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": data.get("hook_event_name", "Stop"),
+        "decision": "continue",
+        "reason": reason,
+    }
+}))
 sys.exit(0)
