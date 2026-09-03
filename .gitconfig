@@ -8,7 +8,7 @@
     accept-ours = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --ours -- $files; git add -u $files; git rebase --continue; }; f"
     accept-theirs = "!f() { files=\"$@\"; [ -z $files ] && files='.'; git checkout --theirs -- $files; git add -u $files; git rebase --continue; }; f"
     catchup = "!f() { git pull --recurse-submodules; git submodule update --init; git submodule update --recursive; }; f"
-    autocommit = "!f() { git add -A && git commit -F .local/COMMIT-MSG.txt && rm .local/COMMIT-MSG.txt && git push; }; f"
+    autocommit = "!f() { git add -A && git commit -F .local/COMMIT-MSG.txt && rm .local/COMMIT-MSG.txt; }; f"
     branch-default = "!f() { git config branch.master.remote origin; git config branch.master.merge refs/heads/master; }; f"
     pr = "!f() { git fetch origin pull/$1/head:$1; }; f"
     sync = "!f() { git fetch upstream; git merge upstream/`git branch --show-current`; git push origin; }; f"
@@ -39,6 +39,15 @@
         esac; \
         major=$(printf '%s' \"$ver\" | sed -E 's/^(v[0-9]+)\\..*/\\1/'); \
         minor=$(printf '%s' \"$ver\" | sed -E 's/^(v[0-9]+\\.[0-9]+)\\..*/\\1/'); \
+        root=$(git rev-parse --show-toplevel); \
+        if [ -x \"$root/.githooks/version\" ]; then \
+            git -C \"$root\" diff --quiet && git -C \"$root\" diff --cached --quiet || { echo 'release: working tree is dirty; commit or stash before releasing'; exit 1; }; \
+            \"$root/.githooks/version\" write \"${ver#v}\"; \
+            git -C \"$root\" diff --quiet || { \
+                git -C \"$root\" commit -am \"chore(release): $ver\"; \
+                git -C \"$root\" push; \
+            }; \
+        fi; \
         git rev-parse --verify HEAD >/dev/null; \
         git tag -a \"$ver\" -m \"$msg\"; \
         if [ \"${ver#*-}\" = \"$ver\" ]; then \
@@ -121,3 +130,5 @@
 [user]
 	name = Justin J. Novack
 	email = jnovack@gmail.com
+[url "git@github.com:"]
+	insteadOf = https://github.com/
