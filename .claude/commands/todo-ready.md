@@ -12,9 +12,9 @@ Mark a planned TODO item as ready for execution after the user has reviewed the 
 
 ### 1 — Load the item
 
-Read `TODO.md`. Find the row with the given ID.
+Read `.local/TODO.md`. Find the row with the given ID.
 
-- If not found: report "ID not found in TODO.md." and stop.
+- If not found: report "ID not found in .local/TODO.md." and stop.
 - If status is `ready`: report "Already marked ready." and stop.
 - If status is `in progress`: report "Item is in progress — execution has started or a checkpoint failed. Finish the work and run `/todo-checkpoint <id>`." Stop.
 - If status is `done`: report "Already done." and stop.
@@ -23,7 +23,7 @@ Read `TODO.md`. Find the row with the given ID.
 
 ### 2 — Confirm the plan file exists
 
-Check for `.claude/todos/<id>.plan.md`.
+Check for `.local/todos/<id>.plan.md`.
 
 - If missing: report "No plan file found. Run `/todo-plan <id>` first." and stop.
 
@@ -34,7 +34,9 @@ Extract from the plan file:
 - `model:` field
 - Overview section (first sentence)
 
-### 4 — Update TODO.md
+Also read the `Effort` value from the item's `.local/TODO.md` row.
+
+### 4 — Update .local/TODO.md
 
 Change the item's status from `planned` to `ready`.
 
@@ -43,6 +45,7 @@ Change the item's status from `planned` to `ready`.
 ```text
 <ID> — <summary>
 Model:    <model>
+Effort:   <Light|Medium|Heavy>
 Overview: <first sentence of plan overview>
 
 Marked ready. Run /todo-next to execute.
