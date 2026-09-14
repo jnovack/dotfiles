@@ -1,0 +1,126 @@
+name: Release APK
+# Builds the unsigned release APK and attaches it to the GitHub release created
+# by the semver tag. Unsigned is intentional — adjust if this app ships through
+# a store that requires a signed release build.
+#
+# JDK/Gradle/Android SDK are set up per-job so nothing here depends on or
+# mutates persistent, shared state on the runner host — safe even with other
+# projects sharing the fleet. JDK uses actions/setup-java (GitHub-owned); the
+# Android SDK step below is plain shell rather than a third-party setup-android
+# action, in case this org's Actions policy only allows GitHub-owned / verified
+# actions. Both scope ANDROID_HOME/JAVA_HOME to only this job's remaining steps
+# via $GITHUB_ENV.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  validate_tag:
+    runs-on: [self-hosted, linux]
+    outputs:
+      is_valid: ${{ steps.check.outputs.is_valid }}
+    steps:
+      - id: check
+        name: Validate full semver tag
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "is_valid=true" >> "${GITHUB_OUTPUT}"
+          elif [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-((alpha|beta|pre|rc)([.-][0-9A-Za-z]+)*))?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "is_valid=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "is_valid=false" >> "${GITHUB_OUTPUT}"
+            echo "Tag ${GITHUB_REF_NAME} is not a full semver tag like v1.3.0"
+          fi
+
+  create_release:
+    runs-on: [self-hosted, linux]
+    needs: validate_tag
+    if: needs.validate_tag.outputs.is_valid == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          NOTES=$(git log "${PREV}..HEAD" --no-merges --pretty=format:"* %s (%h)")
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes "${NOTES}" \
+            --verify-tag
+
+  build:
+    name: Build unsigned release APK
+    runs-on: [self-hosted, linux]
+    needs: create_release
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        # android-actions/setup-android isn't used here since some orgs only
+        # allow GitHub-owned / verified-marketplace actions — this installs
+        # the SDK directly instead. Version/checksum verified against
+        # developer.android.com's download table; bumping CMDLINE_TOOLS_VERSION
+        # requires updating CMDLINE_TOOLS_SHA256 to match (Google doesn't
+        # publish a separate checksum file for this one). Platform/build-tools
+        # versions must match this project's compileSdk ({{COMPILE_SDK}}).
+        env:
+          ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+        run: |
+          set -euo pipefail
+          CMDLINE_TOOLS_VERSION=15859902
+          CMDLINE_TOOLS_SHA256=4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583
+
+          mkdir -p "${ANDROID_SDK_ROOT}/cmdline-tools"
+          curl -fsSL -o "${RUNNER_TEMP}/cmdline-tools.zip" \
+            "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip"
+          echo "${CMDLINE_TOOLS_SHA256}  ${RUNNER_TEMP}/cmdline-tools.zip" | sha256sum -c -
+
+          unzip -q "${RUNNER_TEMP}/cmdline-tools.zip" -d "${ANDROID_SDK_ROOT}/cmdline-tools"
+          mv "${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools" "${ANDROID_SDK_ROOT}/cmdline-tools/latest"
+
+          # yes exits via SIGPIPE once sdkmanager stops reading stdin (all
+          # prompts answered) — that's expected, not a failure, so pipefail
+          # must be off for just this line or the pipeline reports yes's
+          # SIGPIPE as if sdkmanager itself had failed.
+          set +o pipefail
+          yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
+            --licenses --sdk_root="${ANDROID_SDK_ROOT}" > /dev/null
+          set -o pipefail
+          "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
+            --sdk_root="${ANDROID_SDK_ROOT}" \
+            platform-tools "platforms;android-{{COMPILE_SDK}}" "build-tools;{{BUILD_TOOLS_VERSION}}"
+
+          echo "ANDROID_HOME=${ANDROID_SDK_ROOT}" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}" >> "$GITHUB_ENV"
+
+      - name: Build unsigned release APK
+        run: ./gradlew :app:assembleRelease
+
+      - name: Upload APK to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+          renamed="{{APPLICATION}}-${{ github.ref_name }}.apk"
+          cp "$apk" "$renamed"
+          gh release upload "${{ github.ref_name }}" "$renamed"

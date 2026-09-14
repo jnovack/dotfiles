@@ -1,0 +1,15 @@
+package {{PACKAGE}}.ui.theme
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+
+private val {{THEME_NAME}}Colors = darkColorScheme()
+
+@Composable
+fun {{THEME_NAME}}Theme(content: @Composable () -> Unit) {
+    MaterialTheme(
+        colorScheme = {{THEME_NAME}}Colors,
+        content = content
+    )
+}
