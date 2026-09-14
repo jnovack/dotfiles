@@ -12,7 +12,7 @@
     branch-default = "!f() { git config branch.master.remote origin; git config branch.master.merge refs/heads/master; }; f"
     pr = "!f() { git fetch origin pull/$1/head:$1; }; f"
     sync = "!f() { git fetch upstream; git merge upstream/`git branch --show-current`; git push origin; }; f"
-    noop = "!f() { git commit --allow-empty -m "Trigger Build"; git push origin; }; f"
+    noop = "!f() { git commit --allow-empty -m \"Trigger Build\"; git push origin; }; f"
     release = "!f() { \
         set -e; \
         test -n \"$1\" || { echo 'usage: git release major|minor|patch [message]'; echo '       git release v1.1.1 [message]'; exit 1; }; \
