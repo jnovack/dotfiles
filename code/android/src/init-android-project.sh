@@ -14,7 +14,7 @@ ARCHITECTURE="${3:-kiosk}"
 
 if [[ -z "$APPLICATION" ]]; then
     echo "Usage: $0 <application-name> [package-id] [kiosk|app]" >&2
-    echo "  e.g.  $0 parking-app com.parxcasino.parkingapp kiosk" >&2
+    echo "  e.g.  $0 parking-app com.example.parkingapp kiosk" >&2
     echo "  kiosk (default): plain Activity, classic View system — single-screen kiosk devices" >&2
     echo "  app: ComponentActivity + Jetpack Compose — multi-screen apps with navigation/state" >&2
     echo "  see CLAUDE.md's 'Architecture: kiosk vs. app' section for which shape fits" >&2
