@@ -10,6 +10,7 @@ CANONICAL_FILES="
 .zshrc
 .gitconfig
 .p10k.zsh
+.tmux.conf
 "
 
 section "Dotfiles Sync"
