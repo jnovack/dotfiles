@@ -19,6 +19,18 @@ ensure_local_stub "$HOME/.zshrc.local" "# Machine-local zsh additions live here.
 ensure_local_stub "$HOME/.gitconfig.local" "# Machine-local git settings live here."
 ensure_local_stub "$HOME/.p10k.local.zsh" "# Machine-local p10k additions live here."
 
+# Name the machine-local companion a canonical file actually sources. Appending
+# ".local" is right for .zshrc and .gitconfig but not for .p10k.zsh, whose
+# companion is .p10k.local.zsh -- the suffix has to land before the extension so
+# zsh still sees a .zsh file. Keep this in step with the ensure_local_stub calls
+# above; a wrong name here sends someone to edit a file nothing reads.
+local_companion() {
+  case "$1" in
+    .p10k.zsh) printf '%s\n' "$HOME/.p10k.local.zsh" ;;
+    *)         printf '%s\n' "$HOME/$1.local" ;;
+  esac
+}
+
 sync_file() {
   local rel="$1"
   local source_file="$SCRIPT_DIR/$rel"
@@ -33,7 +45,7 @@ sync_file() {
 
   if [ -e "$target_file" ] && ! is_same_file "$target_file" "$source_file"; then
     err "Refusing to replace $target_file because it differs from the canonical repo file."
-    warn "Move machine-specific changes into ${target_file}.local before retrying."
+    warn "Move machine-specific changes into $(local_companion "$rel") before retrying."
     show_diff "$target_file" "$source_file"
     return 1
   fi

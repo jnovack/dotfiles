@@ -139,6 +139,17 @@ if command -v gpg-connect-agent >/dev/null 2>&1; then
   gpg-connect-agent updatestartuptty /bye >/dev/null 2>&1 || true
 fi
 
+# pinentry-mac needs a window server connection, which an SSH session does not
+# have, so a passphrase prompt over SSH either draws on the physical console --
+# invisible to the remote user -- or fails outright and git aborts the commit.
+# One gpg-agent serves every session, but it forwards PINENTRY_USER_DATA from
+# the *calling* process, so this selects a terminal pinentry per-request.
+#
+# Inert unless pinentry-program honors it; see docs/gpg-signing-over-ssh.md.
+if [[ -n "$SSH_CONNECTION" ]]; then
+  export PINENTRY_USER_DATA=curses
+fi
+
 alias generate-password="cat /dev/urandom | LC_CTYPE=C tr -dc '[:alnum:]' | fold -w 32 | head -n 4"
 
 function openssl-cert-check () {

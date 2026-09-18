@@ -64,6 +64,17 @@ Typical flow: `git autocommit` then `git release minor`.
 See [docs/git-release.md](docs/git-release.md) for the contract, per-ecosystem
 opt-in skeletons, and the `pre-push` guard.
 
+## Commit Signing over SSH
+
+`pinentry-mac` needs a window server, which an SSH session does not have, so GPG
+commit signing that works at the console fails or hangs over SSH. The fix pairs a
+pinentry dispatcher — GUI at the console, curses over SSH — with a LaunchAgent
+that primes gpg-agent from the login keychain at console login, so SSH sessions
+inherit a warm cache and never prompt.
+
+See [docs/gpg-signing-over-ssh.md](docs/gpg-signing-over-ssh.md) for the scripts,
+the `gpg-agent.conf` settings, and the cache-lifetime gotchas.
+
 ## Audit
 
 Use `./audit.sh` on existing machines before syncing. It will review:

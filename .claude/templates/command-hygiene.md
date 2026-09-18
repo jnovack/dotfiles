@@ -19,3 +19,12 @@ stable, generic prefix become reusable rules. Follow these so approvals stick:
   dedicated tool.
 - Put the subcommand/verb early and keep flag order conventional so prefix
   rules match (`az ... list`, `az rest --method get ...`).
+- Do not append `2>&1` or redirect to a file unless the task needs it. A
+  redirect disqualifies the whole command from matching an allow rule; trim
+  verbose output at the source instead (`--query`, `-o tsv`, `--top`), which
+  stays inside the one command a rule can match.
+- Do not join independent commands with `;` or `&&` when each would match an
+  allow rule on its own — issue them as separate tool calls in one response.
+  They run concurrently, each is matched independently, and no separator
+  `echo` is needed. Keep chaining for genuinely dependent commands, and when
+  nothing in the chain is pre-approved anyway.
