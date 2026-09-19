@@ -1,5 +1,5 @@
 ---
-description: Validate a completed TODO item against its Definition of Done (Opus code review, then tests)
+description: Validate a completed TODO item against its Definition of Done (Effort-scaled code review, then tests)
 argument-hint: <id>
 ---
 
@@ -90,8 +90,12 @@ Any `??` entry in `git status --porcelain` that this item plausibly created is p
 its work — `git diff` does not show untracked files, and an item whose deliverable is a
 new file diffs to nothing otherwise.
 
-Then spawn **one `general-purpose` subagent on `model: opus`, in the foreground**,
-instructing it to:
+Then spawn **one `general-purpose` subagent, in the foreground**, on the model
+set by the item's `Effort` value from its `.local/TODO.md` row: `sonnet` for
+`Light`/`Medium`, `opus` for `Heavy`. This mirrors `/todo-plan`'s
+complexity-scaled choice of implementation model — apply the same scaling to
+the review step, since a missed correctness bug on a `Heavy` item is the more
+expensive failure to eat. Instruct it to:
 
 - review **only** that change set, reading the changed files in full plus whatever
   surrounding code it needs to judge them (a finding about new code usually depends on

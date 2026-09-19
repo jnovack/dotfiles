@@ -133,9 +133,11 @@ happens here, not at checkpoint time: the diff is at its largest and freshest th
 the implementer stops, and everything found here is a defect the operator never has to
 see. Skip it only if the item produced no changes at all.
 
-The reviewer must be a **new `general-purpose` subagent on `model: opus`, run in the
-foreground**. Never reuse the implementing agent — not by `SendMessage`, not by asking it
-to check its own work. An agent reviewing its own output re-reads the intent it had while
+The reviewer must be a **new `general-purpose` subagent, run in the foreground**, on the
+model set by the item's `Effort` value from its `.local/TODO.md` row: `sonnet` for
+`Light`/`Medium`, `opus` for `Heavy` — the same complexity-scaled choice `/todo-plan`
+already makes for the implementer, applied here to the review step instead. Never reuse
+the implementing agent — not by `SendMessage`, not by asking it to check its own work. An agent reviewing its own output re-reads the intent it had while
 writing, so a comment that says the wrong thing still looks right to it; a reader with no
 memory of that intent is the only one who sees what is actually on the page, and is the
 same position the next human will be in.
