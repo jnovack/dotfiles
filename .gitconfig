@@ -10,7 +10,36 @@
     catchup = "!f() { git pull --recurse-submodules; git submodule update --init; git submodule update --recursive; }; f"
     autocommit = "!f() { git add -A && git commit -F .local/COMMIT-MSG.txt && rm .local/COMMIT-MSG.txt; }; f"
     branch-default = "!f() { git config branch.master.remote origin; git config branch.master.merge refs/heads/master; }; f"
-    pr = "!f() { git fetch origin pull/$1/head:$1; }; f"
+    # `pr` dispatches on argument shape: all digits = fetch that PR (the
+    # original behavior), anything else = open a PR against that base. A
+    # branch named only of digits would misdispatch to fetch; call
+    # `gh pr create` directly if that ever happens.
+    pr = "!f() { \
+        case \"${1:-}\" in \
+            ''|*[!0-9]*) ;; \
+            *) exec git fetch origin \"pull/$1/head:$1\" ;; \
+        esac; \
+        command -v gh >/dev/null 2>&1 || { echo 'git pr: needs the GitHub CLI (brew install gh)' >&2; exit 1; }; \
+        head=$(git rev-parse --abbrev-ref HEAD); \
+        [ \"$head\" = HEAD ] && { echo 'git pr: detached HEAD, nothing to open a PR for' >&2; exit 1; }; \
+        base=${1:-$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null)}; \
+        [ -n \"$base\" ] || { echo 'git pr: could not resolve the default branch; pass a base (git pr main)' >&2; exit 1; }; \
+        [ \"$head\" = \"$base\" ] && { echo \"git pr: already on $base\" >&2; exit 1; }; \
+        [ $# -gt 0 ] && shift; \
+        git fetch -q origin \"$head\" 2>/dev/null; \
+        git rev-parse --verify -q \"refs/remotes/origin/$head\" >/dev/null || { echo \"git pr: $head is not on origin yet - git push -u origin $head\" >&2; exit 1; }; \
+        ahead=$(git rev-list --count \"origin/$head..$head\"); \
+        [ \"$ahead\" -gt 0 ] && { \
+            echo \"git pr: $ahead commit(s) not on origin/$head; a PR is built from the remote\" >&2; \
+            git --no-pager log --oneline \"origin/$head..$head\" >&2; \
+            echo 'git pr: run git push first' >&2; \
+            exit 1; }; \
+        git fetch -q origin \"$base\" 2>/dev/null; \
+        [ \"$(git rev-list --count \"origin/$base..origin/$head\" 2>/dev/null)\" = 0 ] && { echo \"git pr: origin/$head has nothing that origin/$base lacks\" >&2; exit 1; }; \
+        existing=$(gh pr list --head \"$head\" --base \"$base\" --state open --json url -q '.[0].url' 2>/dev/null); \
+        [ -n \"$existing\" ] && { echo \"git pr: already open - $existing\"; exit 0; }; \
+        gh pr create --base \"$base\" --head \"$head\" --fill \"$@\"; \
+    }; f"
     sync = "!f() { git fetch upstream; git merge upstream/`git branch --show-current`; git push origin; }; f"
     noop = "!f() { git commit --allow-empty -m \"Trigger Build\"; git push origin; }; f"
     release = "!f() { \
