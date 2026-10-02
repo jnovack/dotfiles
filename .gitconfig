@@ -1,4 +1,13 @@
 
+# Set User before include so that overrides take effect.
+[user]
+	name = Justin J. Novack
+	email = jnovack@gmail.com
+
+# include must be set AFTER user to override
+[include]
+    path = ~/.gitconfig.local
+
 [alias]
     summary = log --graph --decorate --pretty=oneline --abbrev-commit
     sum = log --graph --decorate --pretty=format:'%C(yellow)%h %C(magenta)%an%Creset: %s%Creset - %Cgreen%cr%C(auto)%d%Creset' --abbrev-commit --date=relative
@@ -154,10 +163,5 @@
 [push]
     default = simple
 
-[include]
-    path = ~/.gitconfig.local
-[user]
-	name = Justin J. Novack
-	email = jnovack@gmail.com
 [url "git@github.com:"]
 	insteadOf = https://github.com/
