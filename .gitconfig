@@ -111,6 +111,17 @@
         msg=$(git log --reverse --format='%s' \"$base..$old_head\"); \
         git reset --soft \"$base\" && git commit --edit -m \"${msg:-squash}\"; \
     }; f"
+    # `reauthor` rewrites commits made before switching accounts to the
+    # current user.name/user.email. No argument = the last commit; a ref =
+    # every commit after it (git reauthor origin/main). Author date resets to
+    # now. Force-push (--force-with-lease) if the commits were already pushed.
+    reauthor = "!f() { \
+        if [ -z \"${1:-}\" ]; then \
+            git commit --amend --reset-author --no-edit; \
+        else \
+            git rebase -r \"$1\" --exec 'git commit --amend --reset-author --no-edit'; \
+        fi; \
+    }; f"
 
 [color]
     branch = auto
