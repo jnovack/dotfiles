@@ -59,7 +59,7 @@ committed.
     TODO.md                  <- index table of LIVE work only, machine-maintained
     todos/
       <ID>.spec.md           <- what, why, acceptance criteria
-      <ID>.plan.md           <- how, model tag, DoD checklist, baseline/reviewed SHAs
+      <ID>.plan.md           <- how, placement, model tag, DoD checklist, baseline/reviewed SHAs
     completed/
       <ID>.spec.md           <- moved here by a passing /todo-checkpoint
       <ID>.plan.md
@@ -134,6 +134,8 @@ Grounds the spec in the tree before writing it — the row's stated diagnosis is
 a sonnet verification pass over the finished spec. That pass checks two things: every factual claim about the repo
 (paths, symbols, caller counts, "X appears nowhere"), and the preconditions the prescribed approach depends on but
 never states. The second is what earns it: every claim in a spec can be true while the approach still cannot run.
+It also writes Constraints with placement in mind: a constraint forbidding changes to a shared helper forces a copy, so
+it is kept only when genuinely required, with its reason.
 
 ### `/todo-plan <id>`
 
@@ -141,9 +143,12 @@ Reads the spec. Writes `<id>.plan.md` with a numbered implementation plan, a mod
 checklist. Bumps status to `planned`, and revises the `Effort` column if writing the concrete steps shows the item
 is bigger or smaller than the spec read.
 
-Anchors every cited path, symbol and signature against the current tree before writing, then runs a sonnet
-verification pass: do the anchors resolve, is each step executable in order, and do the steps cover the spec's
-Acceptance Criteria. `/todo-next` dispatches this file verbatim, so an error here is inherited as instruction.
+Anchors every cited path, symbol and signature against the current tree before writing, and records a `## Placement`
+section: where each new symbol lives and what existing code it reuses, with a rule of three on copies (see *Keeping
+the project cohesive*). Then it runs a sonnet verification pass: do the anchors resolve, is each step executable in
+order (including whether its validation commands match anything), do the steps cover the spec's Acceptance Criteria,
+and does the placement hold up. `/todo-next` dispatches this file verbatim, so an error here is inherited as
+instruction.
 
 The model recommendation follows this guide:
 
@@ -158,7 +163,8 @@ The user can edit the `model:` field to any value, including non-Claude models.
 ### `/todo-ready <id>`
 
 Confirms the plan file exists and bumps status from `planned` to `ready`. This is the human review gate — run it
-after you have read the plan and are satisfied with it.
+after you have read the plan and are satisfied with it. Its report lists every copy the plan keeps, so a duplication
+is approved deliberately rather than unseen.
 
 ### `/todo-next [id]`
 
@@ -168,9 +174,11 @@ abandoned run is visible.
 
 **Claude models (haiku/sonnet/opus):** Constructs a prompt from the spec and plan, spawns a subagent at the specified
 model, then — once it returns — verifies the bookkeeping, re-runs the tests itself, and
-spawns a **second, separate** Opus subagent to review what the first one wrote. It
-adjudicates those findings, records a `reviewed:` SHA in the plan, and reports the review
-outcome alongside the synopsis. The item you get back has already had its obvious defects
+spawns a **second, separate** subagent to review what the first one wrote (sonnet for
+`Light`/`Medium` Effort, opus for `Heavy`). It adjudicates those findings, records a
+`reviewed:` SHA in the plan, and reports the review outcome alongside the synopsis. The
+implementer reuses existing code before adding, and may edit a file the plan does not name
+when placement requires it, recording why in the plan's Placement table. The item you get back has already had its obvious defects
 removed, rather than leaving them for a hand-run `/review` to find later.
 
 **Non-Claude models:** Writes the raw prompt to `.local/<id>.PROMPT.md` and stops. Copy that file into your
@@ -204,7 +212,11 @@ which it used rather than degrading silently.
 
 An ordinary defect found here is fixed in place and does not fail the checkpoint — that
 is the process working. A finding that reveals a violated Constraint or a missed
-Acceptance Criterion is a FAIL.
+Acceptance Criterion is a FAIL. Every finding ends applied, dismissed with evidence, or —
+when it lies outside anything the item touched — tracked as a new `raw` TODO; "residual" is
+not an outcome. Every command the plan's DoD names is re-run, a command that matches
+nothing fails its item, and validation that cannot run here is reported as "not run",
+never as a pass.
 
 **Core (always checked):**
 
@@ -236,6 +248,37 @@ generated `<ID>.PROMPT.md` is deleted rather than archived, being derived from t
 files that were just kept. Other rows frequently cite a retired ID for context — those
 references stay resolvable against `.local/completed/`, so do not rewrite them or clear
 the directory to tidy up.
+
+After a pass it **fixes ahead**: it audits the spec and plan of the item `/todo-next` will
+run next, plus any planned or ready item that depends on the one just retired, against the
+repaired tree — drifted anchors, renamed symbols, helpers it should now reuse, broken
+validation commands — and repairs them in place without executing anything. Mechanical
+corrections keep a `ready` item ready; a change to approach, scope, Acceptance Criteria or
+Constraints drops it back to `planned` so you re-approve it with `/todo-ready`.
+
+## Keeping the project cohesive
+
+An implementing agent sees the spec, the plan, and the files it opens, so it tends to put
+new code next to its caller, copy the nearest similar code, and add one more entry to
+whatever hand-maintained list it touches. Each choice is locally reasonable; across many
+items they add up to a pile of near-duplicate functions. The suite pushes back at each
+step:
+
+- **`/todo-spec`** names the existing helpers the approach should build on, and keeps a
+  Constraint that forces a copy only when it is genuinely required.
+- **`/todo-plan`** decides placement before anything is written: search for an existing
+  near-equivalent, put new code in the module that owns the concern, and apply a rule of
+  three — any copy, "mirror", or third hand-maintained copy of a list or constant must
+  extract the shared piece or record why not. Its verifier checks the placement.
+- **`/todo-ready`** shows you every copy the plan keeps.
+- **`/todo-next`** has the agent reuse before adding, and lets it edit a shared file the
+  plan did not name rather than copy code to stay inside the plan's files.
+- **`/todo-checkpoint`** reviews placement, and turns a consolidation too large for the
+  item into a new TODO instead of a silent copy.
+
+There is no cohesion phase, because items are independent. Follow-up TODOs are the
+signal: when several pile up around one area, that consolidation belongs on the refactor
+track, whose cohesion pass reviews many changes together.
 
 ### `/todo-help`
 

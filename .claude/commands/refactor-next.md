@@ -99,15 +99,22 @@ Assemble four parts in order:
 
 ### Part 0 — Shared context
 
-Paste, in full, the three marker-delimited shared sections: `shared:intent`,
-`shared:hard-constraints`, `shared:definition-of-done`. Introduce them with:
+Paste, in full, the marker-delimited shared sections: `shared:intent`,
+`shared:hard-constraints`, `shared:definition-of-done` and `shared:design-map`. A
+tracking file written before the Design Map existed has no `design-map` markers; paste
+the other three and note the gap in your report rather than inventing a map.
+Introduce them with:
 
-> The following three sections are reproduced in full from `.local/REFACTOR.<kebab>.md`.
+> The following sections are reproduced in full from `.local/REFACTOR.<kebab>.md`.
 > They are complete as given — **do not open that file.**
+
+The Design Map is the only view a phase agent gets of the project beyond its own files.
+Without it, the agent places code by looking at its neighbors, which is how a refactor
+ends up with a near-duplicate helper in every package it touched.
 
 **Paste them; do not cite them.** A subagent told to "read §Hard Constraints" opens a
 ~90KB tracking file to retrieve ~500 tokens, and pulls every other phase's steps into
-its context on the way past. Inlining all three costs ~1.1k tokens and is the single
+its context on the way past. Inlining them costs ~2k tokens and is the single
 biggest lever on how much context a phase agent has left for its actual work. The same
 applies to any other `.local/` document the preamble leans on: quote the passage, never
 the section number.
@@ -138,6 +145,20 @@ selected refactor's real tracking-file name so the subagent never has to resolve
 > including where it contradicts a Step Index row already marked `Complete`. Those
 > marks are precisely what failed validation; treat the corrections as authoritative
 > over them. Do not delete the section: the checkpoint removes it once it passes.
+>
+> **Place code for the project, not just the phase.** Before you add a function, type,
+> constant, file or hand-maintained list entry, check the §Design Map Placement table,
+> then search for an existing near-equivalent — the code graph's semantic search if the
+> repo has one, then grep by behavior, not only by name. If something already does the
+> job, extend or reuse it. Prefer extending an existing shape to adding a parallel one.
+> If correct placement means changing a file outside **Files to modify** — extending a
+> shared helper instead of copying it, exporting a constant instead of duplicating it —
+> make that change, keep it minimal, and record it: add a §Design Map Placement row and
+> a `placement: <file> — <reason>` entry in your Session Log note. Do not copy code to
+> stay inside the file list. That restriction exists to stop unplanned work, not to
+> force duplication, and the checkpoint accepts a recorded placement edit that matches
+> the Design Map. If the right consolidation is bigger than this phase can absorb, make
+> the local change and add the consolidation to §Design Map Follow-ups.
 >
 > After all steps are done:
 >
@@ -238,11 +259,13 @@ writing, so a comment that says the wrong thing still looks right to it; only a 
 without that memory sees what is actually on the page, which is the position every future
 reader is in.
 
-Give it `git diff <baseline>` plus untracked files, §Hard Constraints and the phase's own
-requirements quoted inline, and the standing instructions: report only, never edit; read
+Give it `git diff <baseline>` plus untracked files, §Hard Constraints, §Design Map and
+the phase's own requirements quoted inline, and the standing instructions: report only, never edit; read
 changed files in full plus the surrounding code needed to judge them; cite the governing
 ADR per finding or say none was found; check the phase's own edits for the defect class
-the phase exists to remove, if it has one; verify a tool is actually unavailable before
+the phase exists to remove, if it has one; check placement against the §Design Map — a new helper or constant that duplicates an existing
+one, code in the wrong module, a copy made to stay inside **Files to modify**, an
+unrecorded placement edit; verify a tool is actually unavailable before
 reporting it so; write findings to `.local/REVIEW.md`; an empty report is a useful result,
 so do not pad it.
 

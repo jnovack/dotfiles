@@ -33,6 +33,9 @@ Extract from the plan file:
 
 - `model:` field
 - Overview section (first sentence)
+- `## Placement` section: count the rows that reuse or extend existing code, and list
+  every row kept as a copy (a plan written before the section existed has none — report
+  "not recorded")
 
 Also read the `Effort` value from the item's `.local/TODO.md` row.
 
@@ -47,6 +50,10 @@ Change the item's status from `planned` to `ready`.
 Model:    <model>
 Effort:   <Light|Medium|Heavy>
 Overview: <first sentence of plan overview>
+Placement: <N reuse/extend; copies kept: <list, or "none">>
 
 Marked ready. Run /todo-next to execute.
 ```
+
+Copies kept are listed because this is the human gate: a duplication approved here
+without being seen is the kind that accumulates.

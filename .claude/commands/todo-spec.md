@@ -56,6 +56,13 @@ uncertainty — that uncertainty is yours to remove here, not to pass downstream
 Ask the user only what the tree cannot answer. A root cause is discoverable; a
 product decision — whether a removed capability should come back — is not.
 
+When the approach adds code, note the existing helpers and modules it should build on,
+so `/todo-plan` starts from them. Write **Constraints** with placement in mind: a
+constraint that forbids touching a shared helper ("do not change package X") forces the
+implementer to copy that helper instead of extending it. Keep such a constraint only
+when it is genuinely required, and say why, so the copy it forces is a decision rather
+than an accident.
+
 ### 5 — Write the spec file
 
 Write `.local/todos/<id>.spec.md`:

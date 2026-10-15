@@ -99,6 +99,18 @@ On a retry, add:
 
 **Part 4 — Closing instructions:**
 
+> **Place code for the project, not just this item.** Before you add a function, type,
+> constant, file or hand-maintained list entry, check the plan's `## Placement`
+> section, then search for an existing near-equivalent — the code graph's semantic
+> search if the repo has one, then grep by behavior, not only by name. If something
+> already does the job, extend or reuse it. Prefer extending an existing shape to
+> adding a parallel one. If correct placement means changing a file the Steps do not
+> name — extending a shared helper instead of copying it, exporting a constant instead
+> of duplicating it — make that change, keep it minimal, and add a row to the plan's
+> Placement table saying why. Do not copy code to stay inside the files the Steps name.
+> If the right placement would break a spec **Constraint**, keep the local change and
+> report the conflict in your synopsis instead of working around the Constraint.
+>
 > When you have completed the implementation:
 >
 > 1. Run the project test suite. Do not consider the work done with failing tests.
@@ -106,8 +118,9 @@ On a retry, add:
 >    If the plan carries a `## Corrections` section, every item in it must also be
 >    satisfied.
 > 3. Update `.local/TODO.md`: change this item's status from `in progress` to `done`.
-> 4. Return a brief synopsis: what was implemented, any blockers or open questions, and
->    confirmation of which DoD items were satisfied. Claim only what you actually ran —
+> 4. Return a brief synopsis: what was implemented, any blockers or open questions,
+>    any placement edits outside the Steps' files, and confirmation of which DoD items
+>    were satisfied. Claim only what you actually ran —
 >    a checkpoint will re-run the tests and read the diff, so an overstated claim costs
 >    a round rather than buying one.
 
@@ -152,6 +165,13 @@ instructions:
   found;
 - check the item's own edits for the defect class the item exists to remove, if it has
   one — the likeliest place to introduce a seventh wrong claim is a change correcting six;
+- cover correctness, regressions, security, Constraint violations, lost behavior or
+  comments, missing coverage (including no guard over a list or constant the item
+  edited in more than one place), and inaccurate completion claims;
+- check placement against the plan's `## Placement` section (quote it inline): a new
+  helper or constant that duplicates an existing one, code in the wrong module, a copy
+  made to stay inside the files the Steps name, an unrecorded placement edit;
+- classify every finding as in scope or out of scope, with the reason for the latter;
 - verify a tool is actually unavailable before reporting it so — a globally cached
   `npx --offline <tool>` often works when nothing is declared in the repo;
 - write findings to `.local/REVIEW.md` in the format `/review` produces;
@@ -160,7 +180,8 @@ instructions:
 **Adjudicate every finding yourself**, applying the same rules `/todo-checkpoint` uses:
 verify each against the tree before acting, apply what survives smallest-correct-change
 first, prove any new guard test actually fails without its fix, escalate nothing silently,
-and delete `.local/REVIEW.md` once every finding is applied or dismissed with evidence.
+track each out-of-scope finding as a new `raw` TODO rather than a "residual", and delete
+`.local/REVIEW.md` once every finding is applied, dismissed with evidence, or tracked.
 Update the repo's commit-message handoff to cover what you changed.
 
 If `.local/REVIEW.md` already exists when you get here, the operator ran `/review` by
@@ -181,7 +202,9 @@ commit object without touching the tree — when it is dirty. If neither is avai
 
 - Which item ran, its `Effort` value from `.local/TODO.md`, and which model implemented it.
 - A 3–5 sentence synopsis of what was done.
-- Review outcome: findings by severity, how many applied, how many dismissed and why.
+- Review outcome: findings by severity, how many applied, how many dismissed and why,
+  and any new TODOs added for out-of-scope findings.
+- Placement edits made outside the files the Steps named, and why.
 - Any blockers or open questions either agent flagged.
 - Remind the user to run `/todo-checkpoint <id>` before moving on.
 

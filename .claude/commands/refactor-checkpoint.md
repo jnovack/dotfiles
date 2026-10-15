@@ -1,14 +1,21 @@
 ---
-description: Validate the most recently completed refactor phase against its Definition of Done (Opus code review, then tests); retires the refactor when its last phase passes
+description: Validate and repair the most recently completed refactor phase against its Definition of Done (Opus code review, then tests), then audit and repair the next phase's plan without executing it; retires the refactor when its last phase passes
 argument-hint: [<refactor>] [phase]
 ---
 
 # /refactor-checkpoint
 
 Validate that the most recently completed phase satisfies its Definition of Done before
-the refactor advances. Run this after every phase, before the next `/refactor-next`.
-When the phase that passes is the refactor's last, this also retires the refactor —
-mirroring `/todo-checkpoint`.
+the refactor advances, fixing every in-scope defect rather than reporting it. Run this
+after every phase, before the next `/refactor-next`. When the phase passes and more phases
+remain, it then **fixes ahead**: audits the next phase's plan against the repaired tree
+and corrects the plan in place, without implementing any of it. When the phase that
+passes is the refactor's last, this also retires the refactor — mirroring
+`/todo-checkpoint`.
+
+**Never commit, stash, reset, discard, or delete user work**, and never `git checkout` a
+path — the phase's work is normally uncommitted, and the tree often also carries earlier
+phases' uncommitted work and unrelated operator edits. Restore a probe by editing back.
 
 ---
 
@@ -45,6 +52,17 @@ If that row is `Partial`: report "Most recent phase is partial — checkpoint
 cannot run until the phase is fully complete. Finish the phase first." Stop.
 
 If no such row exists: report "No completed phases found in the session log." Stop.
+
+Read the repository's conventions file, the tracking file's §Intent, §Hard Constraints,
+§Definition of Done and §Design Map (when present), the validated phase's section, and the **next** phase's section
+(step 7 audits it). Also collect every item earlier rows deferred ("deferred to Phase
+N") — a deferral aimed at the validated phase is part of its scope.
+
+**Attribute the change set before judging it.** `**Baseline:**` is often a commit that
+predates earlier phases' still-uncommitted work, so `git diff <baseline>` can include
+another phase's files. Use **Files to modify** and the Session Log to separate this
+phase's changes from earlier phases' and from unrelated operator edits; judge earlier
+phases' files only where this phase touched them, and leave unrelated changes alone.
 
 ### 2 — Review the change set in an Opus subagent
 
@@ -93,6 +111,16 @@ that this phase plausibly created — and spawn **one `general-purpose` subagent
   found, rather than implying the check passed;
 - quote §Hard Constraints and the phase's own requirements inline in the prompt, so the
   reviewer can catch a violation the test suite cannot;
+- cover correctness, regressions, security, scope and contract violations, **lost
+  behavior or comments** (deleted or reworded intent, a dropped branch or log line),
+  missing coverage — including the absence of a guard over any duplicated list,
+  constant or contract the phase edited in more than one place — placement against
+  §Design Map (quote it inline when the tracking file has one: a duplicated helper,
+  code in the wrong module, a copy made to stay inside **Files to modify**), and
+  inaccurate completion claims (DoD boxes, Step Index marks, Session Log notes);
+- classify every finding as **in scope** or **out of scope**, giving the reason for the
+  latter (see item 2 of the adjudication below), and never park an in-scope gap as a
+  "residual";
 - **report only — never edit code.** The reviewer has no authority to change the tree;
   adjudication is yours;
 - write findings to `.local/REVIEW.md` in the format `/review` produces, and return a
@@ -112,6 +140,19 @@ the phase's own Session Log note is:
 2. **Apply what survives**, smallest correct change first. Where the proposed fix would
    contradict an ADR or delete the only place a decision was written down, apply the
    architecturally correct fix instead and say why the proposed one was wrong.
+
+   **"Residual" is not a third outcome.** Every observation — including ones you or
+   the reviewer would call a nit, a residual, pre-existing, or out of scope — ends as
+   *applied*, *dismissed with evidence*, or *out of scope with a scope reason*. A gap is
+   **in scope** when it concerns code, tests or docs this phase touched, or a contract
+   this phase created or extended — for example, a comment in a touched file requiring
+   two lists to stay aligned, with no test enforcing it after the phase edited both.
+   **Out of scope** requires that the fix would land only in files and behavior the
+   phase did not touch and no plan item assigned to it; record those in the Session Log
+   row and the final report, never as silent "residual risk". Seen 2026-10-09: a
+   checkpoint logged "no cross-file STAGE_ORDER vs SCHEDULE_STAGE_KEYS parity test" as
+   an out-of-scope residual although the phase had just edited both lists; a follow-up
+   pass added the guard in a dozen lines and proved it red.
 3. **Prove new guard tests actually guard.** If a finding adds a test, mutate the
    production code it claims to protect, watch the test fail, restore **by editing back —
    never `git checkout`**, which would discard the phase's uncommitted work — and confirm
@@ -134,7 +175,9 @@ judge the tree as it now stands, not as the phase left it.
 
 ### 3 — Run tests
 
-Read `.local/REFACTOR.<kebab>.md` `## Test Command`. Run it exactly as written.
+Run the narrowest relevant checks first — the packages and test files the phase
+touched — so a failure points at its cause. Then read `.local/REFACTOR.<kebab>.md`
+`## Test Command` and run it exactly as written.
 
 If tests fail:
 
@@ -173,10 +216,21 @@ empty change set.
 
 Assess three things against what you read:
 
-**Scope** — did the phase modify anything outside its **Files to modify** line? FAIL for
-source files, WARN for docs and tests. Say which of the two you think happened: the agent
-went off-plan, or the plan was wrong about what the change requires. The correct fix for
-the second is to widen **Files to modify**, not to revert working code.
+**Scope** — did the phase modify anything outside its **Files to modify** line? Judge
+each such file:
+
+- **A recorded placement edit** — a `placement:` entry in the phase's Session Log note
+  and a §Design Map Placement row, consistent with the Design Map (a shared helper
+  extended or a constant exported instead of copied) — is correct work. WARN, and widen
+  **Files to modify** to include it. Failing it would teach the next phase to copy code
+  to stay inside the list.
+- **A source file with no recorded reason, or a placement that contradicts the Design
+  Map**: FAIL.
+- **Docs and tests**: WARN.
+
+Say which happened: the agent went off-plan, or the plan was wrong about what the change
+requires. The correct fix for the second is to widen **Files to modify**, not to revert
+working code.
 
 **Fidelity** — for each `### Step N.x` marked `Complete`, is there something in the change
 set that implements it? A step marked `Complete` with nothing behind it is a false
@@ -190,7 +244,19 @@ down precisely because the failures they describe are ones the test suite does n
 ### 5 — Check each Definition of Done criterion
 
 Read the phase's `### Definition of Done` checklist from `.local/REFACTOR.<kebab>.md`.
-For each checklist item, assess PASS or FAIL with a brief note.
+For each checklist item, assess PASS or FAIL with a brief note. A ticked box is a claim,
+not evidence:
+
+- **Re-run every command a DoD item names**, including build-tagged, integration,
+  browser or lint commands that `## Test Command` does not cover.
+- **A command must demonstrably exercise something.** A `-run` pattern that matches no
+  test, or a grep that cannot match, passes vacuously — FAIL that item and fix the
+  command. Seen 2026-10-09: a DoD's `go test -run Playwright` matched zero test names
+  and had been reported green.
+- **Record validation that cannot run here honestly** — no Docker, no browser, or a
+  step needing live, external, privileged or destructive access the plan gates behind
+  operator approval. Report it as "not run: <reason>", never as PASS, and do not take
+  a gated action to make the item pass.
 
 Then check these structural criteria regardless of the phase:
 
@@ -213,36 +279,12 @@ but flag it).
 **ADRs** — If any phase DoD item explicitly requires an ADR, verify the file exists in
 `docs/decisions/`. FAIL if required and missing. N/A if not required.
 
-### 6 — Report
+### 6 — Record the outcome
 
-Print the checkpoint report:
-
-```text
-═══════════════════════════════════════
- Checkpoint — <kebab> — Phase N — [name]
-═══════════════════════════════════════
- Code review      PASS / WARN / N/A — [N findings: A applied, D dismissed]
- Tests            PASS / FAIL
- Diff review      PASS / FAIL / WARN — [scope | fidelity | constraints]
- Code quality     PASS / FAIL — [note]
- Technical debt   PASS / FAIL — [note]
- Documentation    PASS / FAIL — [list]
- Test coverage    PASS / WARN — [note]
- ADRs             PASS / FAIL / N/A
- DoD checklist    PASS / FAIL — [N of M items met]
-───────────────────────────────────────
- Overall:  PASS — phase is complete
-        or FAIL — [N] criteria not met; do not advance
-        or WARN — phase can advance, but review [items]
-═══════════════════════════════════════
-```
-
-The **Code review** row reports step 2. `PASS` covers both "no findings" and "findings
-found and fixed here" — a defect the checkpoint caught and repaired is the process
-working, not the phase failing. Use `WARN` for a finding deliberately left unfixed, and
-name it. A finding that escalated under item 4 of step 2 does not belong on this row at
-all: it fails the criterion it actually violated (Diff review, or the specific DoD item)
-so the reason survives into the `### Corrections` section.
+Decide the overall result from steps 2–5 — PASS, FAIL or WARN, as defined by the report
+in step 8 — and update the tracking file to match. Tick a DoD box only for an item
+verified in this run, and mark a Step Index or Phase Map row `Complete` only when the
+implementation genuinely satisfies it.
 
 **On FAIL** — the phase is not complete, and the tracking file must say so.
 
@@ -279,7 +321,12 @@ so the reason survives into the `### Corrections` section.
 4. List exactly what must be fixed. Re-run `/refactor-next <kebab>` — it picks up the
    Corrections section — then `/refactor-checkpoint <kebab>` again.
 
-**On WARN:** the phase can advance; call out what to revisit later.
+**On WARN:** the phase can advance; call out what to revisit later. Apply the On PASS
+bookkeeping below.
+
+**On PASS or WARN**, append one Session Log row, as terse decision lines:
+`| YYYY-MM-DD | Phase N — checkpoint | [model] | Review | PASS/WARN; [exact validation commands and results, including any "not run: <reason>"] |`.
+Its Status is `Review`, so a later checkpoint skips it when looking for the phase row.
 
 **On PASS:** confirm every row in the phase's `### Step Index` and its Phase Map row are
 marked `Complete` in `.local/REFACTOR.<kebab>.md`. If either was missed, update it now.
@@ -290,8 +337,8 @@ Then check whether this was the **last** phase — every row in `## Phase Map` n
 `Complete`:
 
 - **More phases remain.** In `.local/REFACTOR.md`, update this refactor's Phases column
-  to `<completed> / <total>` (and Status to `active` if it was still `blocked`). Tell the
-  user to run `/refactor-next` for the next phase.
+  to `<completed> / <total>` (and Status to `active` if it was still `blocked`). Then
+  fix ahead (step 7).
 
 - **This was the last phase — retire the refactor** (mirrors `/todo-checkpoint`):
 
@@ -313,3 +360,102 @@ Then check whether this was the **last** phase — every row in `## Phase Map` n
   4. Report the refactor complete and retired. If any phase's Definition of Done required
      an ADR, remind the user to run `/adr` now — the archived file in `.local/completed/`
      is still the reference for it.
+
+### 7 — Fix ahead: audit and repair the next phase's plan
+
+Run this only when the result is PASS or WARN **and** more phases remain. Skip it on
+FAIL — the phase goes back to `/refactor-next`, so the next phase has no settled
+baseline yet — and on retirement, when nothing is ahead. Say which in the report.
+
+The next phase's plan was written before any of the work it builds on existed. Earlier
+phases and this checkpoint's own fixes move files, rename symbols and establish
+contracts the plan could only guess at, and `/refactor-next` hands that plan to a
+subagent verbatim. A stale instruction reaches the subagent as fact; correcting it here
+costs a plan edit, while correcting it after the run costs a failed checkpoint.
+
+1. **Treat the repaired working tree as the next phase's baseline**, including every fix
+   applied in steps 2–5.
+2. **Verify every assumption in the next phase's section** against the current code,
+   dependency versions and APIs, the repository's conventions file, and the contracts
+   earlier phases established:
+   - every path in **Files to modify** exists, or is marked new;
+   - every cited line, function, flag, target, field or config key still exists and
+     says what the plan says it says;
+   - every fact the phase will write into code or docs (defaults, field shapes, ordering,
+     operational steps) matches the code that defines it — read the code rather than
+     trusting an earlier phase's summary;
+   - every item earlier phases deferred to this phase is present in its steps;
+   - everything new the phase will add has a §Design Map Placement row that still
+     holds against the current tree — including helpers earlier phases created that it
+     should now reuse instead of copying;
+   - every DoD command works as written and matches something: dry-run it where that is
+     non-mutating (`make -n`, `go test -list`, a grep), and treat a zero match as a
+     broken command.
+3. **Repair the plan in place**: dependencies, scope, **Files to modify**, ordered steps,
+   tests, behavioral deltas, safety and authorization gates, the Definition of Done, and
+   the session bookkeeping instructions. Delete stale, impossible or contradictory
+   instructions rather than annotating them. When a corrected fact is repeated elsewhere
+   — §Hard Constraints, later phases, ADR notes — correct every copy, or the stale one
+   wins on the run that reads it. Edit section by section; never rewrite the whole
+   tracking file, since `.local/` is gitignored and a bad write cannot be recovered.
+4. **Do not execute the next phase.** Leave its Phase Map row and every Step Index row
+   `Not started`, leave `**Baseline:**` and `**Reviewed:**` unset, and change no source,
+   test, doc or config file on its behalf. The reverse holds too: do not pull next-phase
+   work back into the phase you just validated.
+5. **Run non-mutating consistency checks** over the revised plan and tree where useful:
+   phase statuses, `git status --short` unchanged apart from your step 2–5 fixes, and
+   `git diff --check`.
+6. **Append a Session Log row**, as terse decision lines:
+   `| YYYY-MM-DD | Phase N+1 — plan audit | [model] | Review | [corrections made]; Phase N+1 remains Not started |`.
+   If the audit finds nothing to correct, record that instead.
+
+### 8 — Report
+
+Print the checkpoint report:
+
+```text
+═══════════════════════════════════════
+ Checkpoint — <kebab> — Phase N — [name]
+═══════════════════════════════════════
+ Code review      PASS / WARN / N/A — [N findings: A applied, D dismissed, O out of scope]
+ Tests            PASS / FAIL
+ Diff review      PASS / FAIL / WARN — [scope | fidelity | constraints]
+ Code quality     PASS / FAIL — [note]
+ Technical debt   PASS / FAIL — [note]
+ Documentation    PASS / FAIL — [list]
+ Test coverage    PASS / WARN — [note]
+ ADRs             PASS / FAIL / N/A
+ DoD checklist    PASS / FAIL — [N of M items met, K not run]
+ Next-phase plan  REPAIRED / NO CHANGES / SKIPPED — [N corrections | reason skipped]
+───────────────────────────────────────
+ Overall:  PASS — phase is complete
+        or FAIL — [N] criteria not met; do not advance
+        or WARN — phase can advance, but review [items]
+═══════════════════════════════════════
+```
+
+The **Code review** row reports step 2. `PASS` covers both "no findings" and "findings
+found and fixed here" — a defect the checkpoint caught and repaired is the process
+working, not the phase failing. Use `WARN` for an out-of-scope finding recorded under
+item 2 of step 2, and name it. A finding that escalated under item 4 of step 2 does not
+belong on this row at all: it fails the criterion it actually violated (Diff review, or
+the specific DoD item) so the reason survives into the `### Corrections` section.
+
+The **Next-phase plan** row reports step 7 and never affects **Overall**: the validated
+phase passes or fails on its own work.
+
+Below the box, report these separately, citing `file:line` where it helps the user
+verify:
+
+- **Completed-phase findings and fixes** — what was applied, dismissed (with evidence),
+  or recorded as out of scope (with the scope reason).
+- **Validation** — the exact commands run and their results, including every
+  "not run: <reason>".
+- **Next-phase plan corrections** — what step 7 changed, or why it was skipped.
+- **Confirmation that the next phase was not executed.**
+- **Blockers and residual risks** — out-of-scope findings and anything left for the
+  operator to decide.
+
+Then name the next command: `/refactor-next <kebab>` after a PASS or WARN with phases
+remaining, `/refactor-next <kebab>` to retry after a FAIL, or `/adr` after retirement
+when an ADR is due.

@@ -51,6 +51,33 @@ Where the spec's approach depends on something existing (a helper, a fixture, a
 field, an interface), name it in the step with its actual location, not as a
 description the executing agent has to resolve on its own.
 
+### 3b — Decide placement for the project, not the neighborhood
+
+The implementing agent sees the spec, the plan and the files it opens. Left to itself
+it puts new code next to its caller, copies the nearest similar code, and adds one more
+entry to whatever hand-maintained list it touches. Each choice is locally reasonable;
+across many items they produce a project of near-duplicate functions with no coherent
+shape. The plan is the cheapest place to decide where code belongs.
+
+For each function, type, constant, file or list entry the Steps will add or move:
+
+1. **Search for an existing near-equivalent first** — the code graph's semantic search
+   where the repo has one, then grep by behavior rather than by name. If one exists, the
+   step extends or reuses it.
+2. **Place it in the module that owns the concern**, per the conventions file's
+   architecture rules and the modules around it. A helper whose siblings live in a
+   shared package goes there, even when only one caller exists today.
+3. **Apply the rule of three.** A step that copies an existing block, "mirrors" another
+   component, or adds the third or later hand-maintained copy of a list, constant or
+   mapping must either extract the shared piece (as an earlier step) or record why the
+   copy stays, plus the test that keeps the copies aligned. "The original is unexported"
+   or "lives in another package" is not a reason by itself — exporting or moving it is
+   usually the smaller long-term change. If a spec **Constraint** forbids touching the
+   original, ask the user rather than defaulting to the copy.
+
+Record the decisions in the plan's `## Placement` section. An extraction larger than
+the item can absorb is a new TODO (`/todo-add`), named in the report, not a silent copy.
+
 ### 4 — Write the plan file
 
 Write `.local/todos/<id>.plan.md`:
@@ -73,6 +100,17 @@ created: <YYYY-MM-DD>
 
 <Numbered implementation steps. Specific enough that a subagent can execute without inventing
 type signatures, method names, or file paths.>
+
+## Placement
+
+<From step 3b. "None — modifies existing code only." when nothing is added or moved.>
+
+| New or moved | Lives in | Reuses / extends | Why not shared (or: shared) |
+| --- | --- | --- | --- |
+| `<symbol or file>` | `<path>` | `<existing helper>` | <reason> |
+
+<The implementer appends a row for anything it adds that this table did not anticipate,
+and for any file it changed outside the Steps for placement.>
 
 ## DoD Checklist
 
@@ -99,7 +137,7 @@ produces. `/todo-next` dispatches this file verbatim, so an error here is an
 error the implementing agent inherits as instruction.
 
 Spawn **one `general-purpose` subagent on `model: sonnet`, in the foreground**,
-report-only. Give it the plan file, the spec file, and the repo root, with three
+report-only. Give it the plan file, the spec file, and the repo root, with four
 jobs:
 
 1. **Resolve every anchor.** For each file path, symbol, signature, and line
@@ -109,16 +147,24 @@ jobs:
 
 2. **Check each step is executable in order.** Does any step depend on a state
    no earlier step establishes? Does any step prescribe an API, helper, or test
-   harness that cannot do what the step needs? Name the step number.
+   harness that cannot do what the step needs? Does every validation or DoD command
+   work as written and match something (dry-run it where that is non-mutating:
+   `make -n`, `go test -list`, a grep)? Name the step number.
 
 3. **Check the plan covers the spec's Acceptance Criteria.** Every criterion
    should be reachable by following the Steps. Report any criterion no step
    produces, and any step that goes beyond the spec's scope.
 
+4. **Check placement.** For each Placement row and each step that adds code: does an
+   existing near-equivalent already do the job (search by behavior, not name)? Is the
+   location the module that owns the concern? Report every copy, "mirror" or
+   third-copy step without a recorded decision, and every copy justified only by
+   visibility ("unexported", "other package").
+
 Tell it that an empty report is an acceptable outcome, that it must not edit any
 file, and that it must not propose a different approach — the approach was
-settled in the spec. It reports mechanical defects in the plan, not opinions
-about it.
+settled in the spec. Placement is not approach: where code lives is in scope, what
+it does is not. It reports mechanical defects in the plan, not opinions about it.
 
 **Then adjudicate the report yourself**, confirming each finding against the
 tree before correcting the plan. A finding that reveals the *spec's* approach
@@ -143,6 +189,8 @@ lines), update the value. Note the change in the report if you make one.
 - State the recommended model and briefly explain why.
 - State the Effort value, and whether the plan revised it from `/todo-spec`'s estimate.
 - List which optional DoD items were included and why.
+- State the placement decisions: what reuses existing code, what is extracted, what
+  stays a copy and why, and any follow-up TODOs added.
 - State what the verification pass found — anchors corrected, steps reordered,
   or "clean" — and name anything left as a known risk.
 - Suggest next step: review the plan file and run `/todo-ready <id>` when satisfied.

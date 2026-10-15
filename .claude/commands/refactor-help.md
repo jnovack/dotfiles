@@ -74,8 +74,13 @@ COMMANDS
 ────────
   /refactor-init [plan-path]
     Opus. Reviews the plan, asks clarifying questions, assigns a model
-    to each phase, writes .local/REFACTOR.<kebab>.md, and adds the index
-    row. Default plan source: .local/PLAN.md.
+    to each phase, builds the Design Map (modules, single sources of
+    truth, placement; rule of three on copies), adds an Opus cohesion
+    phase before the final one, writes .local/REFACTOR.<kebab>.md, and
+    adds the index row. Then a fresh Opus subagent reviews the file against the repo
+    (code claims, DoD checks, reference coverage, conventions, parity,
+    tests); findings are adjudicated and applied, decisions asked.
+    Default plan source: .local/PLAN.md.
     Next: /refactor-status, then /refactor-next
 
   /refactor-status [<refactor>]
@@ -85,17 +90,21 @@ COMMANDS
   /refactor-next [<refactor>]
     Runs the next eligible phase via a subagent at the phase's model.
     No arg → the single active/planning refactor; a kebab title picks
-    one when several are live. Records the baseline, runs the phase,
-    reviews it in a second Opus subagent, adjudicates, records the
-    reviewed SHA, bumps the index row.
+    one when several are live. Records the baseline, runs the phase
+    (Design Map in the prompt; reuse before adding; recorded placement
+    edits outside the file list allowed), reviews it in a second Opus
+    subagent, adjudicates, records the reviewed SHA, bumps the index row.
     Next: /refactor-checkpoint
 
   /refactor-checkpoint [<refactor>] [phase]
     Validates the just-completed phase: reviews the delta since the
-    reviewed SHA, runs tests, checks the diff and the Definition of
-    Done. On FAIL → writes ### Corrections, sets the index row to
-    blocked. On PASS of the LAST phase → retires the refactor (removes
-    the index row, moves the file to .local/completed/).
+    reviewed SHA, fixes in-scope findings, runs tests, checks the diff
+    and re-runs the Definition of Done commands. On FAIL → writes
+    ### Corrections, sets the index row to blocked. On PASS with
+    phases left → fixes ahead: repairs the next phase's plan against
+    the tree, without executing it. On PASS of the LAST phase →
+    retires the refactor (removes the index row, moves the file to
+    .local/completed/).
     Next: /refactor-next (on pass, more phases) or /adr (on retire)
 
   /refactor-help

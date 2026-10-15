@@ -85,18 +85,22 @@ COMMANDS
 
   /todo-plan <id>
     Read the spec, write <id>.plan.md with implementation steps,
-    model recommendation, and DoD checklist. Bump to planned.
+    placement decisions (reuse before adding; rule of three on
+    copies), model recommendation, and DoD checklist. Bump to planned.
     Revise Effort if the steps change the picture.
     Next: review the plan, then /todo-ready <id>
 
   /todo-ready <id>
-    Confirm plan file exists, bump to ready.
+    Confirm plan file exists, bump to ready. Shows any copies the
+    plan keeps, since this is the human gate.
     Next: /todo-next
 
   /todo-next [id]
     Run the given ready item (or the first ready item if no ID).
     Marks it in progress, then spawns a subagent (Claude models)
-    or writes .local/<id>.PROMPT.md (non-Claude models).
+    or writes .local/<id>.PROMPT.md (non-Claude models). The agent
+    reuses existing code before adding, and may edit a file the plan
+    does not name when placement requires it, recording why.
     With an ID, also re-runs an in progress item whose plan carries
     a ## Corrections section from a failed checkpoint.
     Next: /todo-checkpoint <id>
@@ -104,14 +108,20 @@ COMMANDS
   /todo-checkpoint <id>
     Review whatever /todo-next did not already review, and adjudicate
     every finding FIRST — fixes land before the tests, so the tree
-    that gets tested is the tree that gets committed. Then run tests
-    and check acceptance criteria, docs, technical debt, and any
-    optional DoD items declared in the plan. Report PASS/FAIL/WARN.
+    that gets tested is the tree that gets committed. In-scope findings
+    are fixed; out-of-scope ones become new raw TODOs. Then run tests,
+    re-run every DoD command, and check acceptance criteria, docs,
+    technical debt, and any optional DoD items declared in the plan.
+    Report PASS/FAIL/WARN.
     On FAIL the item rolls back to in progress and a ## Corrections
     section is written into the plan for the retry to pick up.
     On PASS the row is REMOVED from .local/TODO.md and the spec/plan
-    move to .local/completed/.
-    Next: /todo-next (on pass)
+    move to .local/completed/. Then it fixes ahead: repairs the next
+    ready item's plan (and dependents') against the tree, without
+    running it; a change beyond mechanical fixes drops that item back
+    to planned for re-approval.
+    Next: /todo-next (on pass), or /todo-ready <id> if fix-ahead
+    moved the next item back to planned
 
   /todo-help
     Print this guide.

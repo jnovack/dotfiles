@@ -74,6 +74,7 @@ hand.
 ## Hard Constraints <- must-not-change rules and API contract guards (marker-delimited)
 ## Model and Effort Guide
 ## Definition of Done  (marker-delimited)
+## Design Map       <- modules, single sources of truth, placement table, follow-ups (marker-delimited)
 ## Session Handoff Protocol
 ## Orchestral Operation
 ## Test Command
@@ -87,7 +88,24 @@ hand.
   Step 1.a ...
   ### Corrections   <- written by a failed checkpoint; mandatory scope on the retry
   Definition of Done
+
+## Phase K — Cohesion pass  <- added by /refactor-init before the final validation/ADR phase
 ```
+
+## Keeping the project cohesive
+
+Every phase agent sees its own files and little else, so each one tends to put new code next to where it is used,
+copy the nearest template, and add one more entry to whatever hand-maintained list it touches. Each choice is locally
+reasonable; across many phases they add up to a pile of near-duplicate functions. Three mechanisms push back:
+
+- **Design Map** — `/refactor-init` decides placement once, with the whole project in view: the modules involved, the
+  single sources of truth, and where every new symbol lives. A "rule of three" forces an extract-or-justify decision on
+  any step that says "mirror"/"copy" or adds a third hand-maintained copy. The map is pasted into every phase prompt.
+- **Placement over file lists** — `/refactor-next` agents search for an existing near-equivalent before adding code,
+  and may change a file outside **Files to modify** when correct placement needs it, recording why. The checkpoint
+  treats a recorded placement edit as a WARN that widens the list, not a FAIL.
+- **Cohesion pass** — an Opus phase near the end reviews the whole refactor's diff, and its only job is subtraction:
+  parallel code paths, copied lists and constants, misplaced helpers, indirection that does not pay for itself.
 
 The Phase Map and Step Index are maintained by the skills. Do not edit status values by hand.
 
@@ -111,8 +129,16 @@ Converts a plan (`.local/PLAN.md` by default, or the path given) into
 where design judgment is applied to the whole plan.
 
 Before writing anything, Opus reviews the plan for risks, gaps, and ambiguities, then asks clarifying questions. It
-assigns a model to each phase, checks for spec completeness, weak Definitions of Done, dependency ordering issues, and
-parallel-safety conflicts. Answers are incorporated before the file is written.
+assigns a model to each phase, builds the Design Map and placement decisions, adds the cohesion phase, and checks for
+spec completeness, weak Definitions of Done, dependency ordering issues, and parallel-safety conflicts. Answers are
+incorporated before the file is written.
+
+After writing, a **second, fresh Opus subagent** reviews the tracking file against the repository itself: it verifies
+the plan's claims about current code, runs every mechanical DoD check to see whether it can pass within the phase's
+scope, searches for references a rename would miss, and checks repo conventions, behavior parity, safety guards and
+test-first coverage. The init agent adjudicates the report, asks the user any decisions it raises, and applies the
+fixes. One round, logged as a `Review` row in the Session Log. The first review only checks the plan against itself;
+this one catches what is only visible from the code, before any phase agent inherits it.
 
 ```text
 /refactor-init
@@ -120,6 +146,7 @@ parallel-safety conflicts. Answers are incorporated before the file is written.
 → Reviews the plan, asks clarifying questions
 → Writes .local/REFACTOR.<kebab>.md with all phases, model assignments, and DoD
 → Creates .local/REFACTOR.md (if absent) and appends the refactor's row
+→ Fresh Opus subagent reviews the file against the repo; findings adjudicated, decisions asked, fixes applied
 → Next: /refactor-status to confirm, then /refactor-next to start
 ```
 
@@ -156,8 +183,8 @@ Runs the next incomplete phase whose dependencies are all complete. One phase pe
 - **No argument** — the single index row with status `planning` or `active`; errors and lists them if 0 or >1.
 - **A kebab title** — that refactor.
 
-Records the phase's baseline commit, constructs a prompt from the Standard Preamble, phase steps, and closing
-instructions, then spawns a subagent at the assigned model.
+Records the phase's baseline commit, constructs a prompt from the shared sections (including the Design Map), the
+Standard Preamble, phase steps, and closing instructions, then spawns a subagent at the assigned model.
 
 **Claude models (Haiku / Sonnet / Opus):** foreground subagent. When it returns, verifies the bookkeeping, re-runs the
 phase's tests, then spawns a **second, separate** Opus subagent to review what the first one wrote, adjudicates the
@@ -172,14 +199,18 @@ and to treat the phase's `### Corrections` section as mandatory scope — author
 
 ### `/refactor-checkpoint [<refactor>] [phase]`
 
-Validates the most recently completed phase against its Definition of Done. Run this after every phase.
+Validates the most recently completed phase against its Definition of Done, fixing every in-scope defect rather than
+reporting it, then **fixes ahead**: audits the next phase's plan against the repaired tree and corrects it in place
+without executing it. Run this after every phase.
 
 - First argument is a kebab title → that refactor; a following number is the phase.
 - First argument is a bare number, or none → the single active refactor from the index; the number is the phase.
 
 Checks: **code review** (delta since the `**Reviewed:**` SHA, adjudicated before the tests), **tests**, **diff review**
 (scope / fidelity / Hard Constraints), **code quality**, **technical debt**, **documentation**, **test coverage**,
-**ADRs**.
+**ADRs**, and the **DoD checklist** — every command a DoD item names is re-run, and validation that cannot run here is
+reported as "not run", never as a pass. A finding ends applied, dismissed with evidence, or out of scope with a scope
+reason; "residual" is not an outcome for a gap in code the phase touched.
 
 ```text
 ═══════════════════════════════════════
@@ -190,6 +221,7 @@ Checks: **code review** (delta since the `**Reviewed:**` SHA, adjudicated before
  Diff review      PASS — scope | fidelity | constraints
  ...
  DoD checklist    PASS — 4 of 4 items met
+ Next-phase plan  REPAIRED — 3 corrections
 ───────────────────────────────────────
  Overall:  PASS — phase is complete
 ═══════════════════════════════════════
@@ -202,8 +234,8 @@ On **WARN**: phase can advance; flags what to revisit.
 
 On **PASS**:
 
-- **more phases remain** — Step Index and Phase Map are confirmed `Complete`, the index `Phases` count is bumped, and
-  you are told to run `/refactor-next`.
+- **more phases remain** — Step Index and Phase Map are confirmed `Complete`, the index `Phases` count is bumped, the
+  next phase's plan is audited and repaired (it stays `Not started`), and you are told to run `/refactor-next`.
 - **this was the last phase** — the refactor is **retired**: the index row is removed, and
   `.local/REFACTOR.<kebab>.md` (plus any `.RUNNOTES.md`) moves to `.local/completed/REFACTOR.<kebab>.completed.md`. If
   any phase's DoD required an ADR, you are reminded to run `/adr`.

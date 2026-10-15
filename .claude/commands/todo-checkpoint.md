@@ -1,11 +1,19 @@
 ---
-description: Validate a completed TODO item against its Definition of Done (Effort-scaled code review, then tests)
+description: Validate and repair a completed TODO item against its Definition of Done (Effort-scaled code review, then tests), then audit and repair the next ready item's plan without executing it
 argument-hint: <id>
 ---
 
 # /todo-checkpoint
 
-Validate that a completed TODO item satisfies its Definition of Done.
+Validate that a completed TODO item satisfies its Definition of Done, fixing every
+in-scope defect rather than reporting it. When the item passes, **fix ahead**: audit the
+plan of the item `/todo-next` will run next against the repaired tree, and correct it in
+place without executing it.
+
+**Never commit, stash, reset, discard, or delete user work**, and never `git checkout` a
+path. The item's work is normally uncommitted, and the tree often also carries other
+items' or a refactor's uncommitted work and unrelated operator edits. Restore a probe by
+editing back.
 
 ## What to do
 
@@ -24,6 +32,10 @@ Read `.local/todos/<id>.spec.md` and `.local/todos/<id>.plan.md` to get the acce
 criteria and the DoD checklist (core and any optional items declared).
 
 - If the plan file is missing: report it and proceed with core DoD only — flag the missing plan as a WARN.
+
+Also read the repository's conventions file, and note the item `/todo-next` would pick
+next (the first `ready` row other than this one) plus any `planned` or `ready` item
+whose spec **Dependencies** cites this ID. Step 6 audits them.
 
 ### 2 — Review whatever has not been reviewed yet
 
@@ -90,6 +102,12 @@ Any `??` entry in `git status --porcelain` that this item plausibly created is p
 its work — `git diff` does not show untracked files, and an item whose deliverable is a
 new file diffs to nothing otherwise.
 
+**Attribute the change set before judging it.** `git diff <baseline>` includes every
+uncommitted change in the tree, so it can carry another item's work, a refactor phase's,
+or unrelated operator edits. Use the plan's Steps and Placement section to separate this
+item's changes from the rest; judge other work only where this item touched it, and
+leave it alone.
+
 Then spawn **one `general-purpose` subagent, in the foreground**, on the model
 set by the item's `Effort` value from its `.local/TODO.md` row: `sonnet` for
 `Light`/`Medium`, `opus` for `Heavy`. This mirrors `/todo-plan`'s
@@ -113,6 +131,19 @@ expensive failure to eat. Instruct it to:
 - **verify a tool is unavailable before reporting it as such.** A globally cached
   `npx --offline <tool>` frequently works when nothing is declared in the repo, and
   "could not check" reported as "cannot be checked" silently drops a criterion;
+- cover correctness, regressions, security, Constraint violations, **lost behavior or
+  comments** (deleted or reworded intent, a dropped branch or log line), missing
+  coverage — including the absence of a guard over any duplicated list, constant or
+  contract the item edited in more than one place — and inaccurate completion claims
+  (DoD boxes, the executing agent's synopsis);
+- **check placement against the project, not just the neighborhood.** Quote the plan's
+  Placement section inline. For each new function, type, constant, file or list entry:
+  does an existing near-equivalent already do the job (search by behavior, not name)?
+  Is it in the module that owns that concern? Was code copied rather than a shared
+  helper extended? Is this the third or later hand-maintained copy of something?
+- classify every finding as **in scope** or **out of scope**, giving the reason for the
+  latter (see item 2 of the adjudication below), and never park an in-scope gap as a
+  "residual";
 - **report only — never edit code.** The reviewer has no authority to change the tree;
   adjudication is yours;
 - write findings to `.local/REVIEW.md` in the format `/review` produces, and return a
@@ -132,6 +163,21 @@ the executing agent's synopsis was:
    contradict an ADR, a spec **Constraint**, or the only place a decision was written
    down, apply the architecturally correct fix instead and say why the proposed one was
    wrong.
+
+   **"Residual" is not a third outcome.** Every observation — including ones you or the
+   reviewer would call a nit, a residual, pre-existing, or out of scope — ends as
+   *applied*, *dismissed with evidence*, or *out of scope with a scope reason*. A gap is
+   **in scope** when it concerns code, tests or docs this item touched, or a contract it
+   created or extended — for example, a comment in a touched file requiring two lists to
+   stay aligned, with no test enforcing it after the item edited both. **Out of scope**
+   requires that the fix would land only in files and behavior the item did not touch,
+   and no Acceptance Criterion or plan step covers it. Track each out-of-scope finding,
+   including a consolidation too large for this item, as a new `raw` row in
+   `.local/TODO.md` (ID and row format exactly as `/todo-add` generates them), and name
+   it in the report — never leave it as silent "residual risk". Seen 2026-10-09: a
+   refactor checkpoint logged a missing list-parity guard as an out-of-scope residual
+   although the phase had just edited both lists; a follow-up pass added it in a dozen
+   lines.
 3. **Prove new guard tests actually guard.** If a finding adds a test, mutate the
    production code it claims to protect, watch the test fail, restore **by editing back —
    never `git checkout`**, which would discard the item's uncommitted work — and confirm
@@ -169,7 +215,8 @@ judge the tree as it now stands, not as the executing agent left it.
 
 ### 3 — Detect and run tests
 
-Detect the project test command in this order (a Makefile `test` target is the
+Run the narrowest relevant checks first — the packages and test files the item touched —
+so a failure points at its cause. Then detect the project test command in this order (a Makefile `test` target is the
 project's canonical gate and may run more than the bare tool would):
 
 1. `Makefile` present with a `test` target → `make test`
@@ -179,9 +226,19 @@ project's canonical gate and may run more than the bare tool would):
 
 If none detected: report "Could not detect test command — run tests manually and confirm pass." Treat as WARN for this criterion only, not FAIL.
 
-Run any additional suite the plan's DoD or validation steps name — a tagged
-integration run, a second package manager's suite — and report it on the same row. An
-item validated by a suite the auto-detection does not reach is not validated.
+Run every additional command the plan's DoD or validation steps name — a tagged
+integration run, a second package manager's suite, a lint or grep check — and report it
+on the same row. An item validated by a suite the auto-detection does not reach is not
+validated. A ticked DoD box is a claim, not evidence, so re-run the command behind it:
+
+- **A command must demonstrably exercise something.** A `-run` pattern that matches no
+  test, or a grep that cannot match, passes vacuously — FAIL that item and fix the
+  command. Seen 2026-10-09: a plan's `go test -run Playwright` matched zero test names
+  and had been reported green.
+- **Record validation that cannot run here honestly** — no Docker, no browser, or a step
+  needing live, external, privileged or destructive access that requires the operator's
+  approval. Report it as "not run: <reason>", never as PASS, and do not take a gated
+  action to make the item pass.
 
 If a command is detected and tests **fail**:
 
@@ -202,10 +259,10 @@ Report PASS, FAIL, or WARN for each:
 
 **Code review** — result from step 2. `PASS` covers both "no findings" and "findings
 found and fixed here" — a defect the checkpoint caught and repaired is the process
-working, not the item failing. Use `WARN` for a finding deliberately left unfixed, and
-name it. A finding that escalated under item 5 of step 2 does not belong on this row at
-all: it fails the criterion it actually violated, so the reason survives into the
-`## Corrections` section.
+working, not the item failing. Use `WARN` for an out-of-scope finding tracked as a new
+TODO under item 2 of step 2, and name it. A finding that escalated under item 5 of
+step 2 does not belong on this row at all: it fails the criterion it actually violated,
+so the reason survives into the `## Corrections` section.
 
 **Tests** — result from step 3.
 
@@ -231,24 +288,11 @@ synopsis was written by the agent under validation; it is a claim, not evidence.
 Narrow an overstated claim to what its cited proof actually supports rather than
 accepting or rejecting it whole.
 
-### 5 — Report
+### 5 — Record the outcome
 
-```text
-═══════════════════════════════════════
- Checkpoint — <id> — <summary>
-═══════════════════════════════════════
- Code review      PASS / WARN / N/A — [N findings: A applied, D dismissed]
- Tests            PASS / FAIL / WARN — [note]
- Acceptance       PASS / FAIL — [N of M criteria met]
- Docs             PASS / FAIL / WARN — [note]
- Technical debt   PASS / FAIL — [note]
- <one line per optional item, if any>
-───────────────────────────────────────
- Overall:  PASS — item is complete
-        or FAIL — [N] criteria not met
-        or WARN — can advance, review [items]
-═══════════════════════════════════════
-```
+Decide the overall result from steps 2–4 — PASS, FAIL or WARN, as defined by the report
+in step 7 — and update the files to match. Tick a plan DoD box only for an item verified
+in this run.
 
 **On FAIL** — the work is not done, and the index must say so.
 
@@ -279,7 +323,7 @@ accepting or rejecting it whole.
 3. Tell the user to re-run `/todo-next <id>` — it picks up the Corrections section — then
    `/todo-checkpoint <id>` again.
 
-**On WARN:** The item can stand. Call out what to revisit.
+**On WARN:** The item can stand. Call out what to revisit, and retire it as on PASS.
 
 **On PASS — retire the item.** A passing checkpoint ends the item's life; it is not a
 status change. Finished rows left in the index turn a punch-list into something to scroll
@@ -302,9 +346,89 @@ past, and the operator does not revisit completed items.
    generated from the spec and plan, so archiving it would store a third copy of content
    that is already in `.local/completed/`.
 
-5. Tell the user to run `/todo-next` for the next item.
+5. Fix ahead (step 6).
 
 **Other rows may cite this ID** — items routinely reference each other for context or
 sequencing. Those references stay valid: the spec and plan are in `.local/completed/`,
 not gone. Do not rewrite them and do not delete the archived files to tidy up; a
 dangling-looking ID resolves there.
+
+### 6 — Fix ahead: audit and repair the next item's plan
+
+Run this only when the result is PASS or WARN. Skip it on FAIL — the item goes back to
+`/todo-next` and the tree is not settled — and when there is no target. Say which in the
+report.
+
+**Targets:** the item `/todo-next` will pick next (the first `ready` row), plus any
+`planned` or `ready` item whose spec **Dependencies** cites the item just retired.
+
+A plan is written against the tree as it stood at `/todo-plan` time, and `/todo-next`
+dispatches it verbatim. Every item retired since then may have moved a file, renamed a
+symbol or added a helper the plan should now reuse. A stale anchor reaches the
+implementer as an instruction; correcting it here costs a plan edit, while correcting it
+after the run costs a failed checkpoint.
+
+1. **Treat the repaired working tree as the baseline**, including every fix applied in
+   steps 2–4.
+2. **Verify every assumption in each target's spec and plan** against the current code,
+   dependency versions and APIs, and the repository's conventions file:
+   - every cited path, symbol, signature and line still exists and says what the step
+     assumes;
+   - every fact the item will write into code or docs matches the code that defines it;
+   - every dependency the spec names is now satisfied, or still honestly open;
+   - every Placement row still holds — including helpers the just-retired item created
+     that the target should now reuse instead of copying;
+   - every DoD or validation command works as written and matches something: dry-run it
+     where that is non-mutating (`make -n`, `go test -list`, a grep), and treat a zero
+     match as a broken command.
+3. **Repair in place.** Correct the plan's Steps, Placement and DoD, and the spec, for
+   what fails. Delete stale or contradictory instructions rather than annotating them.
+4. **Respect the human gate.** `ready` means the operator approved the plan as written.
+   Mechanical corrections — a drifted anchor, a renamed symbol, a broken command, a
+   reused helper replacing a copy — keep the status. A change to the approach, scope,
+   **Acceptance Criteria** or **Constraints** sets the item back to `planned`, and the
+   report tells the operator to re-read it and run `/todo-ready <id>`. If the spec's
+   approach no longer works at all, set it to `spec'd` and send it back to
+   `/todo-spec`.
+5. **Do not execute any target.** Leave `baseline:` and `reviewed:` unset and change no
+   source, test, doc or config file on its behalf. Do not pull target work into the
+   item just retired.
+
+### 7 — Report
+
+```text
+═══════════════════════════════════════
+ Checkpoint — <id> — <summary>
+═══════════════════════════════════════
+ Code review      PASS / WARN / N/A — [N findings: A applied, D dismissed, O tracked as new TODOs]
+ Tests            PASS / FAIL / WARN — [note, including any "not run: <reason>"]
+ Acceptance       PASS / FAIL — [N of M criteria met]
+ Docs             PASS / FAIL / WARN — [note]
+ Technical debt   PASS / FAIL — [note]
+ <one line per optional item, if any>
+ Next-item plan   REPAIRED / NO CHANGES / SKIPPED — [ids; N corrections; status changes | reason skipped]
+───────────────────────────────────────
+ Overall:  PASS — item is complete
+        or FAIL — [N] criteria not met
+        or WARN — can advance, review [items]
+═══════════════════════════════════════
+```
+
+The **Next-item plan** row reports step 6 and never affects **Overall**: the item passes
+or fails on its own work.
+
+Below the box, report these separately, citing `file:line` where it helps the user
+verify:
+
+- **Findings and fixes** — what was applied, dismissed (with evidence), or tracked as a
+  new TODO (with its ID and the scope reason).
+- **Validation** — the exact commands run and their results, including every
+  "not run: <reason>".
+- **Next-item plan corrections** — what step 6 changed and any status it moved, or why
+  it was skipped.
+- **Confirmation that no target item was executed.**
+- **Blockers and residual risks** — anything left for the operator to decide.
+
+Then name the next command: `/todo-next` after a PASS or WARN (or `/todo-ready <id>`
+first when step 6 moved the next item back to `planned`), or `/todo-next <id>` to retry
+after a FAIL.
