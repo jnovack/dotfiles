@@ -1,0 +1,4 @@
+interface:
+  display_name: "TODO Closeout"
+  short_description: "Review and repair a completed TODO"
+  default_prompt: "Use $todo-closeout to review and repair the implementation of the most recently completed TODO."

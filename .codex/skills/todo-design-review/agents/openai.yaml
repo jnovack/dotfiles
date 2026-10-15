@@ -1,0 +1,4 @@
+interface:
+  display_name: "TODO Design Review"
+  short_description: "Tighten a TODO spec and plan before implementation"
+  default_prompt: "Use $todo-design-review to review TODO=<identifier>, resolve spec questions with me, and correct the implementation plan without changing code."

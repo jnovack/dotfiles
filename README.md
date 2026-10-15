@@ -47,6 +47,39 @@ Machine-local additions live outside the repo:
 
 The canonical files load those local companions natively, so there is no generated merged file to maintain.
 
+## Codex Skills
+
+Shared personal skills live in `.codex/skills/`:
+
+- `refactor-handoff`
+- `todo-closeout`
+- `todo-design-review`
+
+`sync.sh` also runs `sync-skills.sh`, which links each skill into
+`${CODEX_HOME:-$HOME/.codex}/skills`. It leaves built-in skills and other local
+skills alone. Identical existing copies are backed up outside the skills
+directory before linking; differing copies or other symlinks are left untouched
+and reported for manual reconciliation.
+
+After committing and pushing these files, run this on each other machine:
+
+```sh
+cd ~/Source/dotfiles
+git pull --ff-only
+./sync-skills.sh
+```
+
+Edit the tracked files in `.codex/skills/` to share future changes. Existing links
+pick up changes after a pull; rerun the sync command when adding new skills.
+Restart Codex if an updated skill does not appear.
+
+For setups using another discovery directory, set `DOTFILES_SKILLS_DIR` when
+running either sync command, for example:
+
+```sh
+DOTFILES_SKILLS_DIR="$HOME/.agents/skills" ./sync-skills.sh
+```
+
 ## Release Tagging
 
 `.gitconfig` provides `git release major|minor|patch|vX.Y.Z`, which tags a

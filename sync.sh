@@ -61,4 +61,6 @@ for file in $CANONICAL_FILES; do
   sync_file "$file" || status=1
 done
 
+"$SCRIPT_DIR/sync-skills.sh" || status=1
+
 exit "$status"
