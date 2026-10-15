@@ -7,12 +7,12 @@ order: 25
 
 ## Commitment Durability
 
-Saying something will be tracked or carried forward is not the same as making it
-durable — only an artifact something will actually re-read counts.
+Chat is not storage: work deferred only in a response is lost when the session ends.
 
-- Before claiming a note will "carry forward," write it into the exact file/section a
-  later step re-reads — not into chat, a summary, or a log nothing downstream consults.
-- Track anything that must survive past the current turn as an explicit task (e.g.
-  TodoWrite), not a verbal aside — long sessions drop verbal intentions silently.
-- Update cross-session memory and tracking files as facts change, not only at natural
-  closure points — staleness accrues exactly when nothing forces a revisit.
+- Before ending a turn, file every deferred item — open decisions, cleanups,
+  circle-backs, things noticed but not fixed, anything "for later" — in
+  `.local/TODO.md` via the `todo-add` skill. Do it; don't suggest it.
+- Cite each deferred item in the summary by its TODO ID. An item without one is lost.
+- For an open decision, record the question and the options in the row.
+- TodoWrite dies with the session; it never replaces a TODO row.
+- Update memory and tracking files when facts change, not only at wrap-up.

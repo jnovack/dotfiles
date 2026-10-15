@@ -9,67 +9,84 @@ order: 60
 
 ### Formatting
 
-- All Go code must be `gofmt`-clean before committing. Run `gofmt -l .` — any output is a failure.
-- Imports must be grouped and ordered by `goimports`: stdlib, then external, then internal. Do not hand-sort.
-- Do not leave unused imports or variables — the compiler rejects them, and they indicate incomplete work.
+- All Go code must be `gofmt`-clean before committing. Run `gofmt -l .` — any
+  output is a failure.
+- Imports must be grouped and ordered by `goimports`: stdlib, then external,
+  then internal. Do not hand-sort.
+- Do not leave unused imports or variables — the compiler rejects them, and
+  they indicate incomplete work.
 
 ### Error handling
 
-- Check every error. Do not assign errors to `_` unless the function is documented as always-nil.
-- Wrap errors with context using `fmt.Errorf("operation: %w", err)` so callers can use `errors.Is`/`errors.As`.
-- Do not use `panic` in library or application code for recoverable errors. Reserve it for truly unrecoverable
+- Check every error. Do not assign errors to `_` unless the function is
+  documented as always-nil.
+- Wrap errors with context using `fmt.Errorf("operation: %w", err)` so callers
+  can use `errors.Is`/`errors.As`.
+- Do not use `panic` in library or application code for recoverable errors.
+  Reserve it for truly unrecoverable
   programmer errors (e.g. invalid state at init time).
-- Do not use `log.Fatal` or `os.Exit` deep inside packages unless the user requires it — only at `main()` or top-level entrypoints.
+- Do not use `log.Fatal` or `os.Exit` deep inside packages unless the user
+  requires it — only at `main()` or top-level entrypoints.
 
 ### Idioms
 
 - Accept interfaces, return concrete types.
-- Use `context.Context` as the first argument in any function that does I/O, makes network calls, or may need cancellation.
-- Use `defer` for cleanup, but be aware that deferred calls in loops execute at function return, not loop iteration.
-- Short variable names (`i`, `v`, `err`) are fine in short scopes. Use descriptive names across function boundaries.
+- Use `context.Context` as the first argument in any function that does I/O,
+  makes network calls, or may need cancellation.
+- Use `defer` for cleanup, but be aware that deferred calls in loops execute
+  at function return, not loop iteration.
+- Short variable names (`i`, `v`, `err`) are fine in short scopes. Use
+  descriptive names across function boundaries.
 
 ### Documentation (GoDoc)
 
-Every package has a package comment, but only some deserve a full doc.go. Two tiers:
+Every package has a package comment, but only some deserve a full doc.go. Two
+tiers:
 
-- **Contract packages** get a full doc.go: the package is imported by two or more other
-  packages AND defines a contract the source alone does not show — lifecycle ordering,
-  concurrency guarantees, wire/data formats, ldflags injection points, or an extension
-  point other packages implement against. Document the purpose, the contract, and any
-  non-obvious design decisions. Nothing else.
-- **Everything else** gets a brief package comment, ten lines or fewer: what the package
-  provides and who consumes it. It may live atop the primary source file instead of a
-  separate doc.go.
+- **Contract packages** get a full doc.go: the package is imported by two or
+  more other packages AND defines a contract the source alone does not show —
+  lifecycle ordering, concurrency guarantees, wire/data formats, ldflags
+  injection points, or an extension point other packages implement against.
+  Document the purpose, the contract, and any non-obvious design decisions.
+  Nothing else.
+- **Everything else** gets a brief package comment, ten lines or fewer: what
+  the package provides and who consumes it. It may live atop the primary source
+  file instead of a separate doc.go.
 
 Rules that apply to both tiers:
 
-- Never include file-layout listings, "why this is a separate package" rationale, or
-  prose that restates code structure. All of it is derivable from the code and goes
-  stale silently the moment the code moves.
-- When several packages implement one shared pattern (e.g. pipeline stages), document
-  the pattern once in the contract package they implement against; each implementation
-  documents only its deltas — data source, outputs, quirks.
-- Right-sizing cuts both ways: an oversized doc.go that violates its tier should be
-  shrunk, not preserved.
+- Never include file-layout listings, "why this is a separate package"
+  rationale, or prose that restates code structure. All of it is derivable
+  from the code and goes stale silently the moment the code moves.
+- When several packages implement one shared pattern (e.g. pipeline stages),
+  document the pattern once in the contract package they implement against;
+  each implementation documents only its deltas — data source, outputs,
+  quirks.
+- Right-sizing cuts both ways: an oversized doc.go that violates its tier
+  should be shrunk, not preserved.
 
 ### Concurrency
 
 - Every goroutine must have a defined owner responsible for its lifetime.
-- Do not start a goroutine without a way to observe its termination (via `sync.WaitGroup`, channel drain, or context cancellation).
-- Prefer channels for communication, mutexes for protecting shared state — do not mix casually.
-- Run the race detector on tests: `go test -race ./...`. A race condition is a bug, not a warning.
+- Do not start a goroutine without a way to observe its termination (via
+  `sync.WaitGroup`, channel drain, or context cancellation).
+- Prefer channels for communication, mutexes for protecting shared state — do
+  not mix casually.
+- Run the race detector on tests: `go test -race ./...`. A race condition is a
+  bug, not a warning.
 
 ### Building
 
-- To produce a binary, use `make build` or `go build -o bin/<binary>` — never let `go build` drop a binary
-  in the project root.
-- To verify a change compiles (no artifact wanted), use `go build ./...` — it discards output and covers
-  every package, unlike `go build ./cmd/...`.
+- To produce a binary, use `make build` or `go build -o bin/<binary>` — never
+  let `go build` drop a binary in the project root.
+- To verify a change compiles (no artifact wanted), use `go build ./...` — it
+  discards output and covers every package, unlike `go build ./cmd/...`.
 
 ### Project Structure
 
-Follow [https://github.com/golang-standards/project-layout/](https://github.com/golang-standards/project-layout/) as
-closely as possible.
+Follow
+[github.com/golang-standards/project-layout](https://github.com/golang-standards/project-layout/)
+as closely as possible.
 
 ```text
 {repo}/
@@ -79,7 +96,7 @@ closely as possible.
 ├── cmd/
 │   └── {application}/
 │       └── main.go           # entry point only — flag parsing, wiring, shutdown
-├── deployments/              # Kubernetes manifests, Helm charts, Grafana dashboards, etc.
+├── deployments/              # Kubernetes manifests, Helm charts, dashboards
 ├── docs/                     # user-facing documentation
 ├── internal/                 # all non-exported application logic
 │   └── {package}/
@@ -87,7 +104,7 @@ closely as possible.
 │       └── {file}_test.go    # test files live next to the code they test
 ├── scripts/
 │   ├── variables.mk          # computed build variables (VERSION, REVISION, etc.)
-│   └── go.mk                 # Go-specific Makefile targets (build, test, vet, clean)
+│   └── go.mk                 # Go targets: build, test, vet, clean
 ├── test/                     # integration, function, smoke, or e2e testing;
 │   └── fixtures/             # fixture files used by tests;
 ├── Makefile                  # includes scripts/go.mk; top-level targets only
@@ -95,8 +112,10 @@ closely as possible.
 └── go.sum
 ```
 
-- `main.go` is **wiring only** — parse flags, instantiate types, start goroutines, block on signal, shut down cleanly.
-- All logic lives under `internal/`. No `pkg/` unless we have specific exportable packages, which is very rare.
+- `main.go` is **wiring only** — parse flags, instantiate types, start
+  goroutines, block on signal, shut down cleanly.
+- All logic lives under `internal/`. No `pkg/` unless we have specific
+  exportable packages, which is very rare.
 - Never put a `main.go` at the repository root.
 
 ### Project initialization
@@ -131,7 +150,8 @@ these files — use the script to ensure exact repeatability.
 When Windows binaries are needed, please apply the following rules:
 
 - Use `filepath.Join()` everywhere — never hardcode `/` as a path separator.
-- Use `os.UserHomeDir()` for home directory detection — never expand `~` manually.
+- Use `os.UserHomeDir()` for home directory detection — never expand `~`
+  manually.
 - Use `runtime.GOOS` switch for OS-specific defaults when necessary:
   - Windows: hardcoded system path (e.g. `C:\actions-runner`)
   - darwin: `filepath.Join(os.UserHomeDir(), "...")`
@@ -141,17 +161,20 @@ When Windows binaries are needed, please apply the following rules:
 
 ### Additional Libraries, Modules and Dependencies
 
-- Do not add a module without calling it out explicitly. Run `go mod tidy` after any dependency change.
-- Prefer the standard library. The stdlib covers most needs.  Notable exceptions below:
-- Pin indirect dependencies by running `go mod tidy` and committing both `go.mod` and `go.sum`.
+- Do not add a module without calling it out explicitly. Run `go mod tidy`
+  after any dependency change.
+- Prefer the standard library. The stdlib covers most needs. Notable
+  exceptions are below.
+- Pin indirect dependencies by running `go mod tidy` and committing both
+  `go.mod` and `go.sum`.
 - Pin build tools (`mockery`, `golangci-lint`, etc.) with the `tool` directive
-  in `go.mod` (`go get -tool <module>`, Go 1.24+) and invoke via `go tool <name>` —
-  no untracked global installs.
+  in `go.mod` (`go get -tool <module>`, Go 1.24+) and invoke via
+  `go tool <name>` — no untracked global installs.
 
 #### Flags
 
-Use [`github.com/jnovack/flag`](https://github.com/jnovack/flag) — drop-in replacement for `flag` with env-var and
-config-file support.
+Use [`github.com/jnovack/flag`](https://github.com/jnovack/flag) — a drop-in
+replacement for `flag` with env-var and config-file support.
 
 ```go
 fs := flag.NewFlagSetWithEnvPrefix(os.Args[0], "", flag.ExitOnError)
@@ -159,17 +182,22 @@ myFlag := fs.String("my-flag", "default", "description")
 _ = fs.Parse(os.Args[1:])
 ```
 
-- Flag `--my-flag` maps to env var `MY_FLAG` automatically (uppercase, dashes → underscores).
-- No prefix needed when env vars are unambiguous; use a prefix if the binary shares a namespace with other tools.
+- Flag `--my-flag` maps to env var `MY_FLAG` automatically (uppercase,
+  dashes → underscores).
+- No prefix is needed when env vars are unambiguous; use a prefix if the
+  binary shares a namespace with other tools.
 - Always include a `--version` flag (see Build Version above).
 
 #### Logging
 
-Use `log/slog` exclusively for services where log files will be parsed by a computer.  For applications designed to run
-by a user, please use `rs/zerolog`.
+Use `log/slog` exclusively for services where log files will be parsed by a
+computer. For applications designed to run by a user, please use `rs/zerolog`.
 
 ```go
-slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: l})))
+slog.SetDefault(slog.New(slog.NewJSONHandler(
+    os.Stderr,
+    &slog.HandlerOptions{Level: l},
+)))
 ```
 
 - Set level from `--log-level` flag at startup.
@@ -182,16 +210,19 @@ slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Lev
 
 When the application calls for metrics, apply the following rules:
 
-- Register counters and histograms once (in the type that owns the state machine) — do not recreate them per scrape.
-- Implement `prometheus.Collector` (`Describe` + `Collect`) for gauges whose label values change at runtime.
+- Register counters and histograms once (in the type that owns the state
+  machine) — do not recreate them per scrape.
+- Implement `prometheus.Collector` (`Describe` + `Collect`) for gauges whose
+  label values change at runtime.
 - Use `prometheus.NewRegistry()` (not the default registry) for testability.
-- Expose `{namespace}_info` as a gauge = 1 with constant labels for static identity (instance identifier, version,
-  revision, OS).
+- Expose `{namespace}_info` as a gauge = 1 with constant labels for static
+  identity (instance identifier, version, revision, OS).
 - Use `orUnknown(s string) string` helper — never emit empty label values.
 - Histogram buckets for duration metrics: `1, 5, 60, 300, 600, 1800, 3600` seconds.
-- Metric label cardinality: ensure label sets are bounded (no unbounded dynamic values like timestamps or UUIDs as labels).
-- Use `github.com/prometheus/client_golang/prometheus/testutil` (`CollectAndCompare`, `ToFloat64`) for Prometheus metric
-  assertions.
+- Metric label cardinality: ensure label sets are bounded (no unbounded dynamic
+  values like timestamps or UUIDs as labels).
+- Use `github.com/prometheus/client_golang/prometheus/testutil`
+  (`CollectAndCompare`, `ToFloat64`) for Prometheus metric assertions.
 
 ### Testing
 
@@ -201,13 +232,13 @@ Philosophy section. Go-specific mechanics follow.
 
 #### Test Pyramid — Layer Definitions
 
-| Layer       | Scope                              | Dependencies     | Speed    |
-| ----------- | ---------------------------------- | ---------------- | -------- |
-| Unit        | Single function/method             | Mocks/stubs only | < 1s     |
-| Integration | Multiple components, single binary | Mocks acceptable | < 30s    |
-| Functional  | Full feature slice                 | Mocks acceptable | < 2min   |
-| Smoke       | Critical path, post-deploy         | Real             | < 5min   |
-| E2E         | Full system, user journey          | Real             | Uncapped |
+| Layer | Scope | Dependencies | Speed |
+| --- | --- | --- | --- |
+| Unit | Single function/method | Mocks/stubs only | < 1s |
+| Integration | Multiple components, single binary | Mocks acceptable | < 30s |
+| Functional | Full feature slice | Mocks acceptable | < 2min |
+| Smoke | Critical path, post-deploy | Real | < 5min |
+| E2E | Full system, user journey | Real | Uncapped |
 
 #### Directory Structure + Build Tags
 

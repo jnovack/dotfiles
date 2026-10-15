@@ -8,6 +8,5 @@ order: 12
 
 - Summarize exactly what changed.
 - Mention assumptions briefly.
-- Call out risks or follow-up work when relevant.
-- Explaining *why* you chose an approach matters — but prefer recording the why
-  inline in the code or docs over stating it only in chat.
+- Call out risks when relevant. Follow-up work is cited by TODO ID (see
+  Commitment Durability).
