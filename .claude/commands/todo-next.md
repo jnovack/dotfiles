@@ -7,19 +7,29 @@ argument-hint: [id]
 
 Execute the next ready TODO item by spawning a subagent or writing a prompt file for external models.
 
+Before any successful tracker update or default queue selection, read and apply
+[Priority and order](../docs/README.todo-commands.md#priority-and-order).
+It defines the table schema, priority assessment, dependency checks, stable
+ordering and reporting. Invalid invocations that stop at a gate stay read-only.
+
 ## What to do
 
 ### 1 — Find the item to run
 
-Read `.local/TODO.md`.
+Read `.local/TODO.md` and assess the current priority/dependency order under
+the shared policy before selecting. Preserve lifecycle statuses and explicit
+operator assignments; priority never substitutes for readiness.
 
 - If an ID argument was provided: find that row. If it does not exist, report
   "ID not found in .local/TODO.md." and stop. If its status is `ready`, proceed. If its
   status is `in progress`, see **Retry after a failed checkpoint** below. For any other
   status, report the current status and the appropriate prior step, and stop.
-- Otherwise: find the first row with status `ready` (top to bottom). If no
-  `ready` items exist: report "No ready items. Use `/todo-ready <id>` to mark a
-  planned item ready." and stop. Never pick an `in progress` item without an explicit
+- Otherwise: select the eligible `ready` item with the smallest `Order`.
+  Verify hard dependencies and external prerequisites; skip blocked ready
+  items and report why. If all ready items are blocked, report their blockers
+  and stop. If no `ready` items exist: report "No ready items. Use `/todo-ready <id>` to mark a
+  planned item ready." Report the lowest-Order item's required preparation
+  step, then stop. Never pick an `in progress` item without an explicit
   ID — a retry is a deliberate act, not something to sweep up automatically.
 
 **Retry after a failed checkpoint.** An `in progress` item is a retry only when
@@ -39,6 +49,10 @@ Read `.local/todos/<id>.spec.md` and `.local/todos/<id>.plan.md`.
 
 - If either file is missing: report which is missing, suggest re-running `/todo-spec` or `/todo-plan`, and stop.
 
+Before dispatch (including explicit IDs and retries), verify prerequisites
+against current evidence. An explicit ID bypasses queue position only.
+Unresolved dependencies, cycles or external blockers stop dispatch.
+
 ### 3 — Check the model
 
 Read the `model:` field from the plan file.
@@ -51,6 +65,9 @@ Read the `model:` field from the plan file.
 Change the item's status in `.local/TODO.md` from `ready` to `in progress` before
 dispatching. This makes a crashed or abandoned run visible, and it is the
 status a failed `/todo-checkpoint` rolls back to.
+
+Re-read the tracker, preserve other rows, and reassess/renumber the queue
+under the shared policy without interrupting other in-progress work.
 
 Then record the current commit in the plan file's frontmatter, so the checkpoint can
 identify this item's change set no matter what state the tree is in when it runs:
@@ -89,6 +106,9 @@ On a retry, add:
 > the plan is already implemented — verify it against the tree rather than redoing it,
 > and do not revert working code to re-execute a step.
 
+Include the shared guide's Priority and order section verbatim in this
+context so the implementer receives the policy used to maintain the queue.
+
 **Part 2 — Spec:**
 
 > (verbatim content of `<id>.spec.md`)
@@ -117,7 +137,9 @@ On a retry, add:
 > 2. Check each item in the DoD Checklist in the plan above and confirm it is satisfied.
 >    If the plan carries a `## Corrections` section, every item in it must also be
 >    satisfied.
-> 3. Update `.local/TODO.md`: change this item's status from `in progress` to `done`.
+> 3. Re-read `.local/TODO.md`, change only this item's `in progress` status to `done`,
+>    and reassess Priority/Order under the shared policy. Preserve other edits.
+>    Do not remove the row or unblock dependents yet: `done` awaits checkpoint.
 > 4. Return a brief synopsis: what was implemented, any blockers or open questions,
 >    any placement edits outside the Steps' files, and confirmation of which DoD items
 >    were satisfied. Claim only what you actually ran —
@@ -137,7 +159,8 @@ Run in the **foreground**.
 
 **First, verify the bookkeeping yourself — the synopsis is a claim, not evidence.** An
 agent can finish the code correctly and still skip every closing item it was given. Check
-that `.local/TODO.md` says `done`, and re-run the test command rather than trusting that
+that `.local/TODO.md` says `done`, reconcile Priority/Order under the shared
+policy, and re-run the test command rather than trusting that
 it was run. Fill in whatever is missing yourself instead of re-running the item; the code
 is already written and a re-run risks undoing it.
 
@@ -200,7 +223,8 @@ commit object without touching the tree — when it is dirty. If neither is avai
 
 ### Report
 
-- Which item ran, its `Effort` value from `.local/TODO.md`, and which model implemented it.
+- Which item ran, its Effort, Priority and Order from `.local/TODO.md`, and which model implemented it.
+- Queue changes and the next eligible ready item or preparation step; do not execute it.
 - A 3–5 sentence synopsis of what was done.
 - Review outcome: findings by severity, how many applied, how many dismissed and why,
   and any new TODOs added for out-of-scope findings.
@@ -241,7 +265,7 @@ This item is set for <model>. The prompt has been written to:
 
 Copy that file into your <model> session. When it finishes:
 - Confirm tests pass.
-- Confirm .local/TODO.md status is updated to done.
+- Confirm .local/TODO.md status is updated to done and Priority/Order have been reassessed without retiring the row.
 - Run /todo-checkpoint <id> to validate the DoD.
 ```
 

@@ -1,12 +1,17 @@
 ---
-description: Capture a raw TODO item with a generated ID and append it to .local/TODO.md
+description: Capture a raw TODO, assess its priority and insert it into the ordered .local/TODO.md queue
 argument-hint: <description>
 model: haiku
 ---
 
 # /todo-add
 
-Capture a raw TODO item with a generated ID and append it to the repo's `.local/TODO.md` index.
+Capture a raw TODO item with a generated ID, assess priority, and insert it into the repo's `.local/TODO.md` queue.
+
+Before any successful tracker update or default queue selection, read and apply
+[Priority and order](../docs/README.todo-commands.md#priority-and-order).
+It defines the table schema, priority assessment, dependency checks, stable
+ordering and reporting. Invalid invocations that stop at a gate stay read-only.
 
 ## What to do
 
@@ -38,7 +43,7 @@ Derive a **descriptor** (2–8 uppercase chars) from the most distinctive noun o
 **Find the next numeral:**
 
 - Read `.local/TODO.md` (if it exists) and collect all IDs in the table.
-- List all filenames in `.local/todos/` (if the directory exists).
+- List all filenames in `.local/todos/` and `.local/completed/` (if present); retired IDs must not be reused.
 - Find all existing IDs that share the same `CATEGORY-DESCRIPTOR-` prefix.
 - Take the highest numeral found. New ID numeral = highest + 1, zero-padded to 2 digits.
 - If no existing IDs share the prefix, start at `01`.
@@ -66,20 +71,21 @@ If `.local/TODO.md` does not exist, create it:
 ```markdown
 # TODO
 
-| ID | Status | Effort | Summary |
-| --- | --- | --- | --- |
+| Order | Priority | ID | Status | Effort | Summary |
+| --- | --- | --- | --- | --- | --- |
 ```
 
-If `.local/TODO.md` exists but its table has no `Effort` column (an older file),
-add the column to the header, the separator, and every existing row — use `—`
-for rows you cannot size at a glance.
+For an older tracker, migrate its columns in place using the shared policy.
+Preserve row data and explicit operator ordering; do not reset existing priorities.
 
-### 4 — Append the row
+### 4 — Assess priority and insert the row
 
-Add a new row to the table:
+Read available dependency context and apply the shared priority/order policy.
+Use P2 if urgency is unknown; capture unresolved prerequisites in Ordering notes.
+Insert the row at its assessed queue position, then renumber all Order values:
 
 ```text
-| <ID> | raw | — | <description, truncated to ~80 chars> |
+| <Order> | <P0|P1|P2|P3> | <ID> | raw | — | <description, truncated to ~80 chars> |
 ```
 
 `Effort` starts as `—`. It is a guess at how much code, time, and token budget
@@ -92,6 +98,7 @@ Create the directory if it does not exist.
 
 ### 6 — Report
 
-- State the generated ID.
+- State the generated ID, assessed Priority and Order, with the impact/dependency reason.
+- Report queue changes and the next eligible ready item or preparation step.
 - Confirm the row was added to `.local/TODO.md`.
 - Suggest next step: `/todo-spec <id>`

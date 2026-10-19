@@ -74,14 +74,95 @@ creates `.local/.gitignore` (`*` / `!.gitignore`) the first time it runs.
 ```markdown
 # TODO
 
-| ID | Status | Effort | Summary |
-| --- | --- | --- | --- |
-| FEAT-REGISTRY-01 | ready | Medium | Migrate service to RegistryRunner |
-| TEST-SMOKE-01 | raw | — | Add smoke tests for get-* binaries |
+| Order | Priority | ID | Status | Effort | Summary |
+| --- | --- | --- | --- | --- | --- |
+| 1 | P1 | FEAT-REGISTRY-01 | ready | Medium | Migrate service to RegistryRunner |
+| 2 | P2 | TEST-SMOKE-01 | raw | — | Add smoke tests for get-* binaries |
 ```
 
 The table is maintained by the skills. Do not edit status values by hand — use `/todo-ready` and let `/todo-next` and
 `/todo-checkpoint` handle `done`.
+
+## Priority and order
+
+This is the shared policy for every TODO command. `.local/TODO.md` owns
+`Priority` and `Order`, alongside status and effort; do not mirror these fields
+into spec/plan frontmatter. Read columns by header name, not fixed positions.
+Lifecycle status, priority, effort and model choice are independent.
+
+| Priority | Meaning |
+| --- | --- |
+| P0 | Urgent: active outage, confirmed critical security exposure or imminent data loss. Requires concrete evidence or an explicit operator assignment. |
+| P1 | High: confirmed correctness or reliability defect with material operator impact, or an explicit near-term commitment. |
+| P2 | Normal: useful feature work, prevention, maintainability and ordinary documentation work. Default when urgency is unknown. |
+| P3 | Low: optional polish, speculative work or explicitly deferred improvements. |
+
+Assess impact, urgency, known failures, dependencies and operator intent from
+the description, current tree and available sidecars. Do not invent evidence
+or infer priority from category, effort, age or lifecycle status. A raw item
+can be P1, and a ready item can be P3. Preserve explicit operator priorities
+and sequencing; do not silently override them. If new evidence conflicts with
+an explicit assignment, report it and ask before changing that assignment.
+
+### Assess and maintain the queue
+
+1. Re-read the current tracker before writing; preserve unrelated edits and
+   all existing IDs, summaries, effort and statuses except the command's own
+   authorized lifecycle transition. Add missing `Order`, `Priority` or
+   `Effort` columns once for older trackers. Preserve existing priority values;
+   assess missing ones, using P2 when evidence is insufficient. Keep prior row
+   order as the tie-breaker. Never clear a tracker to recreate its table.
+2. Check explicit prerequisites in active specs/plans and raw-item summaries;
+   contextual references and file overlap alone are not blockers. A retired
+   ID resolves through `.local/completed/`; verify its completion evidence.
+   A `done` row still awaits checkpoint and is not a satisfied prerequisite.
+   Missing IDs, dependency cycles and unmet external conditions remain
+   blockers; record them rather than guessing that they are resolved.
+3. Put hard prerequisites before their dependents even when their stated
+   priority is lower. Among independent items, place P0 before P1 before P2
+   before P3. Within a priority, put actionable work before externally blocked
+   work, then preserve existing relative order. Honor explicit operator
+   sequencing. File overlap alone is not a hard dependency, but record a
+   chosen serial sequence when overlapping changes would stale each other.
+4. `Order` is the recommended total queue, numbered 1..N with no gaps or
+   duplicates; physically arrange rows in that order. Keep concise
+   `## Ordering notes` in TODO.md for priority reasons, explicit overrides,
+   dependencies and unresolved blockers, naming the affected IDs. These notes
+   explain exceptions; specs remain the behavioral authority. If dependencies
+   conflict or form a cycle, preserve those items' relative order, report the
+   conflict and block their dispatch; the queue is not proof of eligibility.
+5. After every successful add, spec, plan, ready, dispatch, implementation
+   completion, checkpoint failure or retirement, reassess affected priorities
+   and the remaining queue. New findings go through the same assessment as
+   other additions. On retirement, remove the row, resolve its dependency
+   notes against the archived evidence, and renumber remaining rows. Keep
+   historical references and existing sidecars intact. Never mark another
+   item ready/done or retire it merely because it moved or became unblocked.
+   Reordering does not interrupt or restart an in-progress item.
+6. Report the affected item's priority and order, any changed priorities or
+   sequencing and why, and the next eligible ready item (or the lowest-Order
+   item needing spec/plan/review if none is eligible). If nothing changed,
+   say the assessment retained the queue. Do not execute another item as part
+   of reassessment.
+
+### Select work
+
+For `/todo-next` without an ID, select the ready item with the smallest
+`Order` whose hard dependencies and external prerequisites are verified
+satisfied. A higher-priority raw/planned/blocked item does not prevent a lower
+ready eligible item from running. Skip in-progress/done items by default.
+An explicit ID overrides queue position, not readiness or prerequisites;
+the existing failed-checkpoint retry is still allowed only with Corrections.
+If ready items exist but are all blocked, report their blockers and stop.
+If none are ready, report the next preparation step without promoting or
+executing anything. After a checkpoint, recompute selection from the updated
+queue rather than retaining the next ID captured before retirement.
+
+Examples: adding a confirmed P1 defect places it before independent P2 work;
+equally urgent additions retain existing tie order. A P2 prerequisite stays
+before its P1 dependent. Retiring that prerequisite removes its row and
+renumbers the queue; its dependent retains its current lifecycle status.
+Reprioritizing a raw item never makes it executable.
 
 ## Effort
 
@@ -115,7 +196,7 @@ Common categories: `TEST` `REFACTOR` `CI` `LOG` `FIX` `FEAT` `DOCS` `API` `DB` `
 
 ### `/todo-add <text>`
 
-Capture a raw want. Generates an ID, creates `.local/TODO.md` if it does not exist, appends a `raw` row with `Effort` `—`. No sidecar files yet.
+Capture a raw want. Generates an ID, creates `.local/TODO.md` if it does not exist, inserts a `raw` row with `Effort` `—`, an assessed priority and queue order. No sidecar files yet.
 
 ```text
 /todo-add moxfall-service needs to migrate to RegistryRunner
@@ -168,7 +249,7 @@ is approved deliberately rather than unseen.
 
 ### `/todo-next [id]`
 
-Runs the given `ready` item, or the first `ready` item if no ID is provided.
+Runs the given eligible `ready` item, or the eligible `ready` item with the smallest `Order` if no ID is provided.
 Marks the item `in progress` in `.local/TODO.md` before dispatching, so a crashed or
 abandoned run is visible.
 
@@ -249,7 +330,7 @@ files that were just kept. Other rows frequently cite a retired ID for context �
 references stay resolvable against `.local/completed/`, so do not rewrite them or clear
 the directory to tidy up.
 
-After a pass it **fixes ahead**: it audits the spec and plan of the item `/todo-next` will
+After a pass it reassesses priorities/dependencies and renumbers the remaining queue, then **fixes ahead**: it audits the spec and plan of the item `/todo-next` will
 run next, plus any planned or ready item that depends on the one just retired, against the
 repaired tree — drifted anchors, renamed symbols, helpers it should now reuse, broken
 validation commands — and repairs them in place without executing anything. Mechanical
@@ -294,7 +375,7 @@ The spec and plan process is where optional items get surfaced. If the work warr
 
 ## Migrating an existing TODO list
 
-If your repo already has a narrative TODO list, convert it to the index table format (including the `Effort` column —
-use `—` for anything you cannot size at a glance) and run `/todo-spec <id>` on each item. The skill will detect that
+If your repo already has a narrative TODO list, convert it to the index table format with `Order`, `Priority`
+and `Effort` (use `—` for effort you cannot size at a glance and P2 for unknown urgency) and run `/todo-spec <id>` on each item. The skill will detect that
 the existing description is detailed enough and seed the spec file from it rather than asking redundant questions, and
 it fills in `Effort` as it specs each one.

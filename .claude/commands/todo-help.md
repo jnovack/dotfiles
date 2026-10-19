@@ -44,9 +44,21 @@ FILES
 
 .local/TODO.md FORMAT
 ──────────────────────
-  | ID | Status | Effort | Summary |
-  | --- | --- | --- | --- |
-  | FEAT-REGISTRY-01 | ready | Medium | Migrate service to RegistryRunner |
+  | Order | Priority | ID | Status | Effort | Summary |
+  | --- | --- | --- | --- | --- | --- |
+  | 1 | P1 | FEAT-REGISTRY-01 | ready | Medium | Migrate service to RegistryRunner |
+
+PRIORITY AND ORDER
+──────────────────
+  Priority: P0 urgent, P1 high, P2 normal (default), P3 low.
+  Assess impact and urgency, not effort or status; preserve operator choices.
+  Order: 1..N, matching physical row order. Dependencies precede dependents;
+  independent work follows priority, with stable ties and blocker notes.
+  Every lifecycle update reassesses priority/dependencies and renumbers.
+  Retirement removes the row and refreshes blockers without promoting items.
+  /todo-next picks the smallest-Order ready item with satisfied prerequisites.
+  Explicit IDs override queue position, not readiness or blockers.
+  Full shared policy: ../docs/README.todo-commands.md#priority-and-order
 
 EFFORT
 ──────
@@ -74,7 +86,7 @@ ID FORMAT
 COMMANDS
 ────────
   /todo-add <text>
-    Capture a raw want. Generates an ID, appends a row to .local/TODO.md.
+    Capture a raw want, assess priority and insert into the ordered queue.
     Next: /todo-spec <id>
 
   /todo-spec <id>
@@ -96,7 +108,7 @@ COMMANDS
     Next: /todo-next
 
   /todo-next [id]
-    Run the given ready item (or the first ready item if no ID).
+    Run the given eligible ready item (or smallest eligible Order if no ID).
     Marks it in progress, then spawns a subagent (Claude models)
     or writes .local/<id>.PROMPT.md (non-Claude models). The agent
     reuses existing code before adding, and may edit a file the plan
@@ -116,7 +128,7 @@ COMMANDS
     On FAIL the item rolls back to in progress and a ## Corrections
     section is written into the plan for the retry to pick up.
     On PASS the row is REMOVED from .local/TODO.md and the spec/plan
-    move to .local/completed/. Then it fixes ahead: repairs the next
+    move to .local/completed/. Reassess/renumber the queue, then repair the next
     ready item's plan (and dependents') against the tree, without
     running it; a change beyond mechanical fixes drops that item back
     to planned for re-approval.

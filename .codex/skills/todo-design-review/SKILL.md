@@ -1,6 +1,6 @@
 ---
 name: todo-design-review
-description: Review and tighten a TODO's specification interactively, then correct its implementation plan against the spec and current code before implementation. Edit only specification and plan files; do not implement the TODO or repair source code.
+description: Review and tighten a TODO's specification interactively, then correct its implementation plan against the spec and current code before implementation. Update the spec, plan, and selected TODO row's readiness; do not implement the TODO or repair source code.
 ---
 
 # TODO Design Review
@@ -12,16 +12,18 @@ and an executable implementation plan grounded in the actual project.
 
 - Do the review yourself. Do not spawn subagents or delegate work.
 - Write only the selected TODO's specification and implementation plan files,
-  including their existing embedded checklists or review notes. Create a missing
-  spec or plan only when the authoritative requirements support it; do not invent
-  product intent to fill a gap.
+  including their existing embedded checklists or review notes, plus its tracker
+  row's status as described in Mark ready below. Create a missing spec or plan
+  only when the authoritative requirements support it; do not invent product
+  intent to fill a gap.
 - Read source, tests, configuration, documentation, and history as evidence.
   Do not modify them, execute implementation steps, generate code, install
   dependencies, or run migrations or deployments.
 - Resolve code findings through concrete corrections to the spec or future plan,
   never through source patches. Keep unrelated project findings separate in the
   final response rather than expanding this TODO.
-- Preserve unrelated edits. Do not change tracker status, move or archive files,
+- Preserve unrelated edits. Apart from marking the selected TODO ready after a
+  successful review, do not change tracker statuses, move or archive files,
   mark implementation steps complete, or commit, stash, reset, or discard work.
 
 ## Find the TODO and its intent
@@ -112,12 +114,27 @@ easier implementation.
    checks run during review from checks the implementer must run later.
 6. Re-read the final spec and plan together. Resolve contradictions, stale
    alternatives, omitted requirements, out-of-scope steps, and unsupported
-   assumptions. Keep implementation status unchanged and future steps unchecked.
+   assumptions. Keep future implementation steps unchecked; update tracker
+   readiness only after this final review, as described below.
 
 Use non-mutating checks when they resolve a planning uncertainty. Do not run the
 implementation's entire validation suite merely to review documents, and do not
 claim future checks passed. Record material limits or unavailable evidence in the
 spec or plan so the next agent does not inherit false certainty.
+
+## Mark ready
+
+After both review passes are complete, the spec and plan are consistent, no
+material decisions remain unresolved, and hard dependencies and external
+prerequisites are satisfied, set the selected TODO row's status to `ready` in
+the authoritative tracker. No separate user sign-off is required. If already
+`ready`, leave it as is. Change only that row's status; preserve its other
+columns, queue order, and all unrelated rows.
+
+If material questions or unmet prerequisites remain, leave the status unchanged
+and report exactly what prevents readiness. Do not overwrite an `in progress`
+or completed status with `ready`; resolve the planning target with the user as
+required above. Marking ready does not authorize implementation.
 
 ## Handoff
 
@@ -127,9 +144,10 @@ Report concisely:
 - specification decisions and corrections;
 - plan corrections, including code findings captured as future repairs;
 - checks actually performed and their results;
-- readiness for implementation, unresolved questions, and residual risks;
-- confirmation that only spec/plan files changed, no agents were spawned, and no
-  implementation was executed.
+- readiness for implementation, the tracker status update (or why it stayed
+  unchanged), unresolved questions, and residual risks;
+- confirmation that only spec/plan files and the selected tracker row's status
+  changed, no agents were spawned, and no implementation was executed.
 
 If material questions remain, say the handoff is not ready and identify exactly
 what must be resolved. Otherwise hand back the corrected artifacts for the next

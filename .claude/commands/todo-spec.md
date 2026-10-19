@@ -7,6 +7,11 @@ argument-hint: <id>
 
 Turn a raw TODO item into a written spec by asking clarifying questions and writing a spec file.
 
+Before any successful tracker update or default queue selection, read and apply
+[Priority and order](../docs/README.todo-commands.md#priority-and-order).
+It defines the table schema, priority assessment, dependency checks, stable
+ordering and reporting. Invalid invocations that stop at a gate stay read-only.
+
 ## What to do
 
 ### 1 — Load the item
@@ -163,14 +168,16 @@ the picture.
 
 ### 8 — Update .local/TODO.md
 
-Change the item's status from `raw` to `spec'd`, and set the `Effort` column to
-the estimate from step 7. If the table has no `Effort` column yet (an older
-file), add it — header, separator, and every existing row (`—` where you cannot
-size a row at a glance).
+Change the item's status from `raw` to `spec'd`, and set `Effort` from step 7.
+Reassess its Priority and Order using the verified impact and dependencies,
+then maintain the remaining queue under the shared policy. Correct stale
+blocker notes with evidence; do not promote other items or overwrite explicit
+operator assignments. Migrate older tracker columns in place if needed.
 
 ### 9 — Report
 
-Confirm the spec was written. State the Effort estimate and one line of why.
+Confirm the spec was written. State Effort, Priority and Order with their reasons;
+report queue changes and the next eligible ready item or preparation step.
 State what the verification pass found — claims corrected, preconditions added,
 or "clean" — and name anything left as a known risk. Suggest next step:
 `/todo-plan <id>`

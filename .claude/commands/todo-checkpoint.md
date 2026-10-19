@@ -15,6 +15,11 @@ path. The item's work is normally uncommitted, and the tree often also carries o
 items' or a refactor's uncommitted work and unrelated operator edits. Restore a probe by
 editing back.
 
+Before any successful tracker update or default queue selection, read and apply
+[Priority and order](../docs/README.todo-commands.md#priority-and-order).
+It defines the table schema, priority assessment, dependency checks, stable
+ordering and reporting. Invalid invocations that stop at a gate stay read-only.
+
 ## What to do
 
 ### 1 — Identify the item
@@ -34,8 +39,10 @@ criteria and the DoD checklist (core and any optional items declared).
 - If the plan file is missing: report it and proceed with core DoD only — flag the missing plan as a WARN.
 
 Also read the repository's conventions file, and note the item `/todo-next` would pick
-next (the first `ready` row other than this one) plus any `planned` or `ready` item
-whose spec **Dependencies** cites this ID. Step 6 audits them.
+next (the eligible `ready` item with the smallest `Order`, excluding this one)
+plus any `planned` or `ready` item
+whose spec **Dependencies** cites this ID. This is a provisional list: step 5
+reassesses the queue, and step 6 selects again after retirement.
 
 ### 2 — Review whatever has not been reviewed yet
 
@@ -346,12 +353,19 @@ past, and the operator does not revisit completed items.
    generated from the spec and plan, so archiving it would store a third copy of content
    that is already in `.local/completed/`.
 
-5. Fix ahead (step 6).
+5. Reassess Priority/Order and blockers across the remaining queue using
+   the shared policy. Resolve retired dependency notes from verified evidence
+   for raw/spec'd items too, without promoting their statuses. Renumber rows,
+   then recompute the next eligible ready item before fixing ahead (step 6).
 
 **Other rows may cite this ID** — items routinely reference each other for context or
 sequencing. Those references stay valid: the spec and plan are in `.local/completed/`,
 not gone. Do not rewrite them and do not delete the archived files to tidy up; a
 dangling-looking ID resolves there.
+
+On FAIL, also reassess the failed item's Priority/Order and affected blockers
+under the shared policy. A failure is evidence to assess, not an automatic
+priority escalation; leave dependents blocked and do not execute them.
 
 ### 6 — Fix ahead: audit and repair the next item's plan
 
@@ -359,7 +373,8 @@ Run this only when the result is PASS or WARN. Skip it on FAIL — the item goes
 `/todo-next` and the tree is not settled — and when there is no target. Say which in the
 report.
 
-**Targets:** the item `/todo-next` will pick next (the first `ready` row), plus any
+**Targets:** recompute from the reassessed queue: the eligible `ready` item
+with the smallest `Order` after retirement, plus any
 `planned` or `ready` item whose spec **Dependencies** cites the item just retired.
 
 A plan is written against the tree as it stood at `/todo-plan` time, and `/todo-next`
@@ -426,6 +441,7 @@ verify:
   "not run: <reason>".
 - **Next-item plan corrections** — what step 6 changed and any status it moved, or why
   it was skipped.
+- **Queue assessment** — Priority/Order changes and reasons, resolved or remaining blockers, and the next eligible ready item or preparation step.
 - **Confirmation that no target item was executed.**
 - **Blockers and residual risks** — anything left for the operator to decide.
 

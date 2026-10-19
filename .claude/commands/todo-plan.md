@@ -7,6 +7,11 @@ argument-hint: <id>
 
 Turn a spec'd TODO item into an implementation plan with a model tag and DoD checklist.
 
+Before any successful tracker update or default queue selection, read and apply
+[Priority and order](../docs/README.todo-commands.md#priority-and-order).
+It defines the table schema, priority assessment, dependency checks, stable
+ordering and reporting. Invalid invocations that stop at a gate stay read-only.
+
 ## What to do
 
 ### 1 — Load the spec
@@ -175,7 +180,10 @@ One verification round. Do not re-spawn over your own corrections.
 
 ### 6 — Update .local/TODO.md
 
-Change the item's status from `spec'd` to `planned`.
+Change the item's status from `spec'd` to `planned`. Reassess Priority and
+Order from the concrete plan, dependencies and any newly verified impact.
+Maintain and renumber the queue under the shared policy, preserving explicit
+operator assignments and all unrelated lifecycle statuses.
 
 Re-check the `Effort` column against the enumerated Steps. `/todo-spec` set it
 from the grounded spec; if writing the concrete steps revealed the item is
@@ -185,7 +193,7 @@ lines), update the value. Note the change in the report if you make one.
 
 ### 7 — Report
 
-- Confirm the plan was written.
+- Confirm the plan was written. Report Priority, Order, queue changes and the next eligible ready item or preparation step.
 - State the recommended model and briefly explain why.
 - State the Effort value, and whether the plan revised it from `/todo-spec`'s estimate.
 - List which optional DoD items were included and why.
