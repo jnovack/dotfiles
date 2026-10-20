@@ -330,6 +330,16 @@ files that were just kept. Other rows frequently cite a retired ID for context �
 references stay resolvable against `.local/completed/`, so do not rewrite them or clear
 the directory to tidy up.
 
+A `PASS` or `WARN` then **commits the item** with `git autocommit`, after
+rewriting `.local/COMMIT-MSG.txt` to describe that item alone. Each retired
+item becomes one commit, which is what makes chaining work:
+`/todo-next` → `/todo-checkpoint` → `/todo-next` … always builds on a
+committed tree.
+
+- A `FAIL` never commits.
+- A failed commit is reported as a blocker, and fix-ahead is skipped, so a
+  chain stops rather than stacking the next item onto uncommitted work.
+
 After a pass it reassesses priorities/dependencies and renumbers the remaining queue, then **fixes ahead**: it audits the spec and plan of the item `/todo-next` will
 run next, plus any planned or ready item that depends on the one just retired, against the
 repaired tree — drifted anchors, renamed symbols, helpers it should now reuse, broken

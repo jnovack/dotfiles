@@ -358,6 +358,26 @@ past, and the operator does not revisit completed items.
    for raw/spec'd items too, without promoting their statuses. Renumber rows,
    then recompute the next eligible ready item before fixing ahead (step 6).
 
+6. **Commit the item with `git autocommit`.** This skill explicitly
+   instructs it, which is the exception the global "Commit handoff" rule
+   allows. Each passing item becomes its own commit, so todos can be chained
+   with each `/todo-next` building on a committed tree.
+   - Overwrite `.local/COMMIT-MSG.txt` so it describes **this item only**:
+     a Conventional Commits subject, then a short *why* body that includes
+     any release note or consumer note the plan's DoD requires. Do not
+     append to a message left over from earlier work. Add no AI
+     attribution.
+   - Run `git autocommit` (`git add -A`, commit with the message file, then
+     delete it). Do not substitute `git add` or `git commit`; they are
+     denied.
+   - If there is nothing to commit, skip this step and say so in the
+     report.
+   - If it fails, for example because a hook rejects the commit, do not
+     retry and do not try other git commands. Report the failure as a
+     blocker and stop after step 7. Do not fix ahead, so a chain halts on an
+     uncommitted tree rather than piling the next item onto it.
+   - Never commit on FAIL. Failed work stays uncommitted for the retry.
+
 **Other rows may cite this ID** — items routinely reference each other for context or
 sequencing. Those references stay valid: the spec and plan are in `.local/completed/`,
 not gone. Do not rewrite them and do not delete the archived files to tidy up; a
@@ -369,9 +389,9 @@ priority escalation; leave dependents blocked and do not execute them.
 
 ### 6 — Fix ahead: audit and repair the next item's plan
 
-Run this only when the result is PASS or WARN. Skip it on FAIL — the item goes back to
-`/todo-next` and the tree is not settled — and when there is no target. Say which in the
-report.
+Run this only when the result is PASS or WARN and the step 5 commit did not fail.
+Skip it on FAIL (the item goes back to `/todo-next` and the tree is not settled),
+on a failed commit, and when there is no target. Say which in the report.
 
 **Targets:** recompute from the reassessed queue: the eligible `ready` item
 with the smallest `Order` after retirement, plus any
@@ -421,6 +441,7 @@ after the run costs a failed checkpoint.
  Docs             PASS / FAIL / WARN — [note]
  Technical debt   PASS / FAIL — [note]
  <one line per optional item, if any>
+ Commit           <short sha> / NOTHING TO COMMIT / FAILED — [subject | error] (PASS/WARN only)
  Next-item plan   REPAIRED / NO CHANGES / SKIPPED — [ids; N corrections; status changes | reason skipped]
 ───────────────────────────────────────
  Overall:  PASS — item is complete

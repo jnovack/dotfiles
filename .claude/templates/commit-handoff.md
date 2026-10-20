@@ -9,6 +9,15 @@ order: 32
 
 I run my own commits. Do NOT run `git commit`, `git add`, or `git push`.
 
+The one exception is `git autocommit`, an alias that runs `git add -A`,
+commits with `.local/COMMIT-MSG.txt` and then deletes that file:
+
+- Run it **only** when the current prompt or an invoked skill explicitly
+  says to run `git autocommit`.
+- Never decide to run it yourself: not because the work looks finished, not
+  at the end of a task, and not to tidy up. Without that explicit instruction,
+  leave the commit to me through `.local/COMMIT-MSG.txt`, as described below.
+
 After each unit of work, create or update `.local/COMMIT-MSG.txt` with a
 ready-to-use message in Conventional Commits form (`type: subject`, blank line,
 then a body explaining the *why*):
