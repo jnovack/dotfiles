@@ -1,6 +1,6 @@
 # TODO Skill System
 
-A set of seven Claude Code slash commands for lifecycle-managed TODO tracking. Works in any repo. Every item moves
+A set of eight Claude Code slash commands for lifecycle-managed TODO tracking. Works in any repo. Every item moves
 from a raw captured thought through spec, plan, execution, and validation — the same level of rigor as a formal
 refactor step.
 
@@ -52,6 +52,7 @@ committed.
   todo-ready.md
   todo-next.md
   todo-checkpoint.md
+  todo-loop.md
   todo-help.md
 
 <repo>/
@@ -64,6 +65,7 @@ committed.
       <ID>.spec.md           <- moved here by a passing /todo-checkpoint
       <ID>.plan.md
     <ID>.PROMPT.md           <- generated prompt for non-Claude models (if used)
+    TODO-LOOP.log            <- /todo-loop event log (if used)
 ```
 
 If the repo's root `.gitignore` does not already ignore `.local/**`, `/todo-add`
@@ -346,6 +348,36 @@ repaired tree — drifted anchors, renamed symbols, helpers it should now reuse,
 validation commands — and repairs them in place without executing anything. Mechanical
 corrections keep a `ready` item ready; a change to approach, scope, Acceptance Criteria or
 Constraints drops it back to `planned` so you re-approve it with `/todo-ready`.
+
+### `/todo-loop [--max-items N] [--max-fails 2] [--stall-minutes 20] [--check]`
+
+The unattended driver. For each eligible `ready` item in `Order`, it runs
+`/todo-next` and then `/todo-checkpoint`, which commits, before it starts the next
+item. Every item therefore starts from a clean, committed HEAD. A FAIL retries
+the item once against its `## Corrections`, then stops. The loop never marks
+anything `ready` and never commits on its own; the only commit is the one
+`/todo-checkpoint` makes.
+
+It exists because an overnight chain once stalled for seven hours. A background
+implementer hit a permission prompt in `acceptEdits` mode, and the orchestrator
+had ended its turn to wait for a completion notice that never came. So:
+
+- **Preflight** reads the session's permission mode with
+  `~/.claude/bin/claude-permission-mode` and refuses `default`, `acceptEdits` and
+  `plan`. It also stops on other `CronCreate` jobs in the session, and on a dirty
+  tree that is not the work of the single in-flight item.
+- **Every background agent gets a watchdog.** `~/.claude/bin/agent-watchdog`
+  watches the agent's transcript (`<session>/tasks/<agentId>.output`). If the
+  transcript is silent for `--stall-minutes` while the agent is unfinished, the
+  watchdog exits 2. The loop then logs a `STALL` line and sends a push
+  notification. A stall does not stop the loop: once someone answers the
+  prompt, the agent's completion notice resumes it.
+- Every event is appended to `.local/TODO-LOOP.log`. Every stop names its
+  evidence, leaves the tree untouched and sends a notification.
+
+To schedule it, start the session in auto mode, run `/todo-loop --check`, and
+then create a `CronCreate` one-shot whose prompt invokes the `todo-loop` skill.
+The command file's Scheduling section has the exact steps.
 
 ## Keeping the project cohesive
 

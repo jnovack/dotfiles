@@ -107,6 +107,16 @@ COMMANDS
     .local/completed/).
     Next: /refactor-next (on pass, more phases) or /adr (on retire)
 
+  /refactor-loop [<refactor>] [--through N] [--max-fails 2]
+    Unattended driver. Cycles /refactor-checkpoint → Codex
+    $refactor-handoff (background) → own test run + scope check →
+    git autocommit → /refactor-next. A FAIL re-runs /refactor-next on
+    the Corrections with no Codex and no commit. --through defaults to
+    every phase but the final one. Stops on the limit, --max-fails
+    FAILs of one phase, Codex failure, red tests, a blocked or Codex
+    phase. Never pushes or deploys. Fire once via CronCreate with
+    "/refactor-loop <kebab> --through <N>".
+
   /refactor-help
     Print this guide.
 

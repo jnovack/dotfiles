@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# agent-watchdog — exit when a background Claude Code agent finishes or goes
+# quiet, so an unattended loop is woken instead of waiting forever.
+#
+# Usage: agent-watchdog <task-output-file> [stall-seconds] [poll-seconds]
+#
+#   task-output-file  <session>/tasks/<agentId>.output, the path the agent's
+#                     completion notice names. It symlinks to the agent's live
+#                     transcript, which is appended on every tool call.
+#   stall-seconds     transcript silence that counts as stalled (default 1200)
+#   poll-seconds      check interval (default 60)
+#
+# Exit codes: 0 finished, 2 stalled, 64 usage, 66 transcript missing.
+#
+# Why: on 2026-10-21 an overnight /todo-next implementer hit a permission
+# prompt in acceptEdits mode and sat for seven hours. The orchestrator had
+# ended its turn to await the completion notice, which never came, and nothing
+# noticed. A background agent waiting on a prompt writes nothing, so transcript
+# silence is the observable signal. Run this with run_in_background; its exit
+# re-invokes the orchestrator.
+
+set -u
+
+if [ $# -lt 1 ] || [ $# -gt 3 ]; then
+	echo "usage: agent-watchdog <task-output-file> [stall-seconds] [poll-seconds]" >&2
+	exit 64
+fi
+
+out=$1
+stall=${2:-1200}
+poll=${3:-60}
+
+case "$stall$poll" in
+*[!0-9]*)
+	echo "agent-watchdog: stall-seconds and poll-seconds must be integers" >&2
+	exit 64
+	;;
+esac
+
+# The output file is a symlink; the meta file sits beside its target.
+transcript=$out
+if [ -L "$out" ]; then
+	transcript=$(readlink "$out")
+fi
+meta="${transcript%.jsonl}.meta.json"
+
+mtime() {
+	stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"
+}
+
+while :; do
+	# Check finished first: a finished agent's transcript is also silent, and
+	# reporting it as stalled would send a false alarm.
+	if [ -f "$meta" ] && grep -Eq '"finished" *: *true' "$meta"; then
+		echo "finished: $transcript"
+		exit 0
+	fi
+	if [ ! -e "$transcript" ]; then
+		echo "missing: $transcript" >&2
+		exit 66
+	fi
+	age=$(($(date +%s) - $(mtime "$transcript")))
+	if [ "$age" -ge "$stall" ]; then
+		echo "stalled: no transcript write for ${age}s: $transcript"
+		exit 2
+	fi
+	sleep "$poll"
+done

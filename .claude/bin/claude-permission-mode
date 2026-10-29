@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# claude-permission-mode — print the permission mode a Claude Code session ran
+# its most recent prompt under, or "unknown".
+#
+# Usage: claude-permission-mode <scratchpad-dir>
+#
+# The scratchpad is <tmp>/<project-slug>/<session-id>/scratchpad, and the
+# session transcript is ~/.claude/projects/<project-slug>/<session-id>.jsonl.
+# Each user or scheduled prompt records the mode in effect when it arrived, so
+# a cron-fired run sees the mode it will actually execute under. A mode change
+# made after that prompt is not visible until the next one.
+#
+# Why: unattended loops stall on the first permission prompt nobody is there
+# to answer (seen 2026-10-21 under acceptEdits). Checking the mode up front
+# turns a silent overnight stall into an immediate, named stop. The transcript
+# format is internal to Claude Code, so a missing field prints "unknown"
+# rather than failing; callers decide how to treat that.
+
+set -u
+
+if [ $# -ne 1 ]; then
+	echo "usage: claude-permission-mode <scratchpad-dir>" >&2
+	exit 64
+fi
+
+session_dir=$(dirname "${1%/}")
+session=$(basename "$session_dir")
+slug=$(basename "$(dirname "$session_dir")")
+transcript="$HOME/.claude/projects/$slug/$session.jsonl"
+
+mode=""
+if [ -r "$transcript" ]; then
+	mode=$(grep -o '"permissionMode":"[A-Za-z]*"' "$transcript" | tail -n 1 | cut -d'"' -f4)
+fi
+echo "${mode:-unknown}"

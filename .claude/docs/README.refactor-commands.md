@@ -37,6 +37,7 @@ Per-phase status inside the tracking file is still `Not started` / `In progress`
   refactor-init.md
   refactor-next.md
   refactor-checkpoint.md
+  refactor-loop.md
   refactor-status.md
   refactor-help.md
 
@@ -239,6 +240,29 @@ On **PASS**:
 - **this was the last phase** — the refactor is **retired**: the index row is removed, and
   `.local/REFACTOR.<kebab>.md` (plus any `.RUNNOTES.md`) moves to `.local/completed/REFACTOR.<kebab>.completed.md`. If
   any phase's DoD required an ADR, you are reminded to run `/adr`.
+
+### `/refactor-loop [<refactor>] [--through N] [--max-fails 2]`
+
+Runs the checkpoint → handoff → commit → next-phase cycle unattended, so phases advance without an operator at each
+step. The kebab title resolves as in `/refactor-next`.
+
+```text
+/refactor-checkpoint <kebab>
+  FAIL       → /refactor-next <kebab> (executes ### Corrections); no Codex, no commit; back to checkpoint
+  PASS/WARN  → codex exec -s workspace-write '$refactor-handoff PHASE=<n> NEXT_PHASE=<n+1> ...' (background)
+             → verify exit status, diff scope and the Test Command itself
+             → git autocommit (only if .local/COMMIT-MSG.txt exists)
+             → /refactor-next <kebab>; back to checkpoint
+```
+
+- `--through N` — last phase it may run. Default: every phase except the final one, which needs the operator.
+- `--max-fails K` — consecutive checkpoint FAILs of one phase before it stops. Default `2`.
+
+It stops on the limit, the fail cap, a Codex failure or out-of-scope edit, red tests, a failed commit, a phase blocked
+on dependencies, or a missing `codex` binary, and ends with a report plus any TODO IDs filed.
+Invoking it grants `git autocommit` at that one step only; it never pushes, deploys, executes Playwright or writes to a
+live service. To fire it once later, use `CronCreate` (one-shot, session-only, fires only while the REPL is idle) with
+the prompt `/refactor-loop <kebab> --through <N>`.
 
 ### `/refactor-help`
 

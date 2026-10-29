@@ -41,6 +41,7 @@ FILES
   .local/todos/<ID>.spec.md     What and why, acceptance criteria
   .local/todos/<ID>.plan.md     How, model tag, DoD checklist
   .local/<ID>.PROMPT.md         Generated prompt for non-Claude models
+  .local/TODO-LOOP.log          /todo-loop event log (one line per event)
 
 .local/TODO.md FORMAT
 ──────────────────────
@@ -134,6 +135,17 @@ COMMANDS
     to planned for re-approval.
     Next: /todo-next (on pass), or /todo-ready <id> if fix-ahead
     moved the next item back to planned
+
+  /todo-loop [--max-items N] [--max-fails 2] [--stall-minutes 20] [--check]
+    Unattended driver. Runs /todo-next → /todo-checkpoint (which
+    commits) for each eligible ready item in Order, one at a time,
+    each on a clean committed HEAD. A FAIL retries once on the
+    Corrections. Preflight refuses a prompting permission mode
+    (run in auto), other scheduled jobs and a foreign dirty tree.
+    Every background agent gets a watchdog: silence for
+    --stall-minutes sends a push notification. Logs to
+    .local/TODO-LOOP.log. Never marks items ready, never pushes.
+    Run --check first, then fire once via CronCreate.
 
   /todo-help
     Print this guide.
