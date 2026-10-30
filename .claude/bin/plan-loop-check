@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+"""plan-loop-check — report whether todo plans can run unattended under /todo-loop.
+
+Usage: plan-loop-check [--settings FILE]... PLAN...
+
+A plan is loop-safe when its frontmatter declares `unattended: yes`, it has a
+`## Commands` section listing at least one command, and every command in any
+shell code fence in the file clears the Bash `deny` and `ask` rules of the
+Claude Code settings files. Prints one line per plan, or one per problem:
+
+  PASS  <id>
+  FAIL  <id>  <reason>
+
+Settings default to ~/.claude/settings.json, ./.claude/settings.json and
+./.claude/settings.local.json, whichever exist. --settings replaces that list.
+
+Exit 0 when every plan passes, 1 when any fails, 64 on a usage error, 65 when a
+settings file cannot be parsed (an unreadable policy cannot vouch for anything).
+
+Why: on 2026-10-30 /todo-loop stopped at its first checkpoint. A plan's gate
+said "in a disposable scratch copy" without naming a command, the agent chose
+rsync, and rsync is on the global deny list. Deny rules apply in every
+permission mode, auto included, so the stop was certain before the loop began.
+This turns that into a named failure at /todo-plan, /todo-ready and
+/todo-loop --check time, while the operator is still at the keyboard.
+
+The auto-mode classifier can still refuse a command no rule names; that is not
+predictable from settings, and the loop's watchdog and stop rules cover it.
+"""
+import json
+import os
+import re
+import sys
+
+SHELL_FENCES = {"bash", "sh", "shell", "zsh"}
+
+
+def usage():
+    print("usage: plan-loop-check [--settings FILE]... PLAN...", file=sys.stderr)
+    sys.exit(64)
+
+
+def home():
+    return os.path.expanduser("~")
+
+
+def tilde(text):
+    """Write the home directory as ~ so commands and rules compare alike."""
+    h = home()
+    text = text.replace("${HOME}", "~").replace("$HOME", "~")
+    if h and h != "/":
+        text = text.replace(h, "~")
+    return text
+
+
+def display(path):
+    return tilde(path)
+
+
+def load_rules(paths):
+    """Return [(kind, pattern, source)] for Bash deny and ask rules."""
+    rules = []
+    for path in paths:
+        try:
+            with open(path) as fh:
+                data = json.load(fh)
+        except (OSError, ValueError) as err:
+            print("plan-loop-check: cannot read settings %s: %s" % (path, err), file=sys.stderr)
+            sys.exit(65)
+        perms = data.get("permissions") or {}
+        for kind in ("deny", "ask"):
+            for rule in perms.get(kind) or []:
+                if rule == "Bash":
+                    rules.append((kind, "*", display(path)))
+                    continue
+                m = re.fullmatch(r"Bash\((.*)\)", rule, re.S)
+                if m:
+                    rules.append((kind, m.group(1), display(path)))
+    return rules
+
+
+def rule_matches(pattern, command):
+    pattern = tilde(pattern)
+    if pattern.endswith(":*"):
+        prefix = pattern[:-2]
+        return command == prefix or command.startswith(prefix + " ")
+    regex = "^" + ".*".join(re.escape(part) for part in pattern.split("*")) + "$"
+    if re.match(regex, command, re.S):
+        return True
+    # "rsync *" also covers a bare "rsync".
+    return pattern.endswith(" *") and command == pattern[:-2]
+
+
+def split_commands(line):
+    """Split a shell line into simple commands on && || ; | & outside quotes,
+    and return the bodies of $(...) and `...` substitutions as commands too."""
+    parts, subs = [], []
+    buf, i, quote = [], 0, None
+    while i < len(line):
+        c = line[i]
+        if quote:
+            if quote == '"' and line.startswith("$(", i):
+                body, end = read_paren(line, i + 2)
+                subs.append(body)
+                buf.append(line[i:end])
+                i = end
+                continue
+            if c == "\\" and quote == '"' and i + 1 < len(line):
+                buf.append(line[i:i + 2])
+                i += 2
+                continue
+            buf.append(c)
+            if c == quote:
+                quote = None
+            i += 1
+            continue
+        if c in "'\"":
+            quote = c
+            buf.append(c)
+            i += 1
+            continue
+        if c == "\\" and i + 1 < len(line):
+            buf.append(line[i:i + 2])
+            i += 2
+            continue
+        if line.startswith("$(", i):
+            body, end = read_paren(line, i + 2)
+            subs.append(body)
+            buf.append(line[i:end])
+            i = end
+            continue
+        if c == "`":
+            end = line.find("`", i + 1)
+            end = len(line) if end < 0 else end
+            subs.append(line[i + 1:end])
+            buf.append(line[i:end + 1])
+            i = end + 1
+            continue
+        two = line[i:i + 2]
+        if two in ("&&", "||"):
+            parts.append("".join(buf))
+            buf = []
+            i += 2
+            continue
+        if c in ";|&":
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        buf.append(c)
+        i += 1
+    parts.append("".join(buf))
+    out = []
+    for part in parts:
+        part = part.strip().lstrip("({").rstrip(")}").strip()
+        if part:
+            out.append(part)
+    for body in subs:
+        out.extend(split_commands(body))
+    return out
+
+
+def read_paren(line, start):
+    """Return (body, index after the closing paren) for a $( opened at start."""
+    depth, i = 1, start
+    while i < len(line):
+        if line[i] == "(":
+            depth += 1
+        elif line[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return line[start:i], i + 1
+        i += 1
+    return line[start:], len(line)
+
+
+def variants(command):
+    """The command as written, and with leading VAR=value assignments removed."""
+    command = " ".join(tilde(command).split())
+    yield command
+    stripped = re.sub(r"^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+", "", command)
+    if stripped != command:
+        yield stripped
+
+
+def frontmatter(text):
+    if not text.startswith("---\n"):
+        return {}
+    end = text.find("\n---", 4)
+    if end < 0:
+        return {}
+    fields = {}
+    for line in text[4:end].splitlines():
+        key, sep, value = line.partition(":")
+        if sep and key.strip() and not key.startswith((" ", "\t")):
+            fields[key.strip()] = value.strip()
+    return fields
+
+
+def shell_lines(text):
+    """Yield (in_commands_section, logical_line) for every shell fence."""
+    section, fence, buf = None, None, ""
+    for raw in text.splitlines():
+        line = raw.rstrip("\r")
+        stripped = line.strip()
+        if fence is None:
+            if line.startswith("## "):
+                section = line[3:].strip()
+            m = re.match(r"^\s*(```+|~~~+)\s*([A-Za-z0-9_+-]*)", line)
+            if m:
+                fence = (m.group(1), m.group(2).lower())
+            continue
+        if stripped.startswith(fence[0]) and stripped.strip("`~") == "":
+            fence = None
+            continue
+        if fence[1] not in SHELL_FENCES:
+            continue
+        if stripped.endswith("\\"):
+            buf += stripped[:-1] + " "
+            continue
+        logical = (buf + stripped).strip()
+        buf = ""
+        if logical and not logical.startswith("#"):
+            yield section == "Commands", logical
+
+
+def check_plan(path, rules):
+    name = os.path.basename(path)
+    plan_id = name[:-len(".plan.md")] if name.endswith(".plan.md") else name
+    try:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read().replace("\r\n", "\n")
+    except OSError as err:
+        return plan_id, ["cannot read plan: %s" % err.strerror]
+    fields = frontmatter(text)
+    plan_id = fields.get("id") or plan_id
+    problems = []
+
+    declared = fields.get("unattended")
+    if declared is None:
+        problems.append("no `unattended:` in frontmatter; the plan predates loop-safety "
+                        "(add it and a ## Commands section, or re-run /todo-plan)")
+    else:
+        word = re.match(r"[A-Za-z]*", declared).group(0).lower()
+        reason = declared[len(word):].strip(" \t:—–-")
+        if word == "no":
+            problems.append("declared `unattended: no`" + (" — " + reason if reason else
+                            " with no reason"))
+        elif word != "yes":
+            problems.append("`unattended: %s` must be `yes` or `no — <reason>`" % declared)
+
+    has_section = re.search(r"^## Commands[ \t]*$", text, re.M) is not None
+    listed = 0
+    seen = set()
+    for in_section, logical in shell_lines(text):
+        listed += in_section
+        for command in split_commands(logical):
+            for kind, pattern, source in rules:
+                if any(rule_matches(pattern, v) for v in variants(command)):
+                    key = (kind, pattern, command)
+                    if key in seen:
+                        break
+                    seen.add(key)
+                    verb = "denied" if kind == "deny" else "prompts (ask rule)"
+                    problems.append("%s by Bash(%s) in %s: %s" % (verb, pattern, source, command))
+                    break
+    if not has_section:
+        problems.append("no `## Commands` section naming the exact shell commands to run")
+    elif listed == 0:
+        problems.append("`## Commands` lists no commands in a bash fence")
+    return plan_id, problems
+
+
+def main(argv):
+    settings, plans, i = [], [], 0
+    explicit = False
+    while i < len(argv):
+        if argv[i] == "--settings":
+            if i + 1 >= len(argv):
+                usage()
+            settings.append(argv[i + 1])
+            explicit = True
+            i += 2
+        elif argv[i].startswith("-"):
+            usage()
+        else:
+            plans.append(argv[i])
+            i += 1
+    if not plans:
+        usage()
+    if not explicit:
+        candidates = [
+            os.path.join(home(), ".claude", "settings.json"),
+            os.path.join(".claude", "settings.json"),
+            os.path.join(".claude", "settings.local.json"),
+        ]
+        settings = [p for p in candidates if os.path.isfile(p)]
+    rules = load_rules(settings)
+
+    failed = False
+    for path in plans:
+        plan_id, problems = check_plan(path, rules)
+        if not problems:
+            print("PASS  %s" % plan_id)
+        for problem in problems:
+            failed = True
+            print("FAIL  %s  %s" % (plan_id, problem))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

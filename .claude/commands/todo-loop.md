@@ -19,6 +19,12 @@ give. Nothing noticed. Three rules below exist because of that night: preflight
 refuses a permission mode that prompts, every background agent gets a watchdog,
 and every stall and stop sends a push notification.
 
+On 2026-10-30 the loop ran in auto mode and still stopped at its first checkpoint. A
+plan's gate said "in a disposable scratch copy" without naming a command. The agent
+chose `rsync`, which the global deny list blocks in every mode. Every plan the run will
+touch now passes `~/.claude/bin/plan-loop-check` before the loop relies on it, and
+`--check` reports exactly where an unattended run would stop.
+
 ---
 
 ## Step 0 — Parse flags
@@ -68,7 +74,8 @@ Run once, before the first cycle. Any failure is a stop (with `--check`, a repor
    - `unknown` (the transcript format changed) → log a `WARN` line and continue;
      the watchdog is the backstop.
    - Helper missing or not executable → stop.
-2. **Watchdog.** `~/.claude/bin/agent-watchdog` exists and is executable.
+2. **Helpers.** `~/.claude/bin/agent-watchdog` and `~/.claude/bin/plan-loop-check`
+   exist and are executable.
 3. **No other scheduled jobs.** Run `CronList`. Any job in this session → stop and
    list it. On 2026-10-21 a 5:25am `git autocommit` job shared the session with the
    chain. If an item had been half-written at 5:25, that job would have committed it.
@@ -82,10 +89,27 @@ Run once, before the first cycle. Any failure is a stop (with `--check`, a repor
 7. **Docker**, only when a queued item needs it: if any eligible `ready` item's plan
    names a Docker-backed command (`docker`, `docker compose`, an `e2e` build tag,
    testcontainers), `docker info` must succeed.
-8. **Print the plan** and start. Do not wait for confirmation. Include the mode, the
-   flags, the entry point, and the eligible `ready` items in queue order, up to
-   `--max-items`. With `--check`, print the plan and stop here. The verdict is
-   either "ready to schedule" or the failing check.
+8. **Loop safety.** Run `~/.claude/bin/plan-loop-check` on the plan of every item this
+   run would touch, in run order: the entry-point item when it is not Step 1, then the
+   eligible `ready` items in queue order, up to `--max-items`. A plan that fails names
+   a command the permission settings deny or prompt for, a missing `## Commands`
+   section, or a declared `unattended: no`. Any of these stops the run at that item.
+   - The **first** item fails → stop, quoting every `FAIL` line.
+   - A **later** item fails → the run is not fully unattended. Without `--check`,
+     continue: the cycle's Select step re-checks each item, so the loop retires the
+     items before it and stops there. A checkpoint's fix-ahead may repair the plan in
+     the meantime.
+9. **Print the plan** and start. Do not wait for confirmation. Include the mode, the
+   flags, the entry point, and the items in run order up to `--max-items`, each with its
+   loop-safety result. With `--check`, print the plan and stop here, ending with exactly
+   one verdict:
+   - `READY TO SCHEDULE — <N> items, all loop-safe`
+   - `NOT FULLY UNATTENDED — stops before <ID> after at most <K> items: <FAIL reasons>.
+     Fix: /todo-plan <ID>, or schedule with --max-items <K>`
+   - `NOT READY — <failing preflight check>`
+
+   Do not soften a non-ready verdict. The operator schedules on the strength of this
+   line.
 
 ### Entry point
 
@@ -147,6 +171,10 @@ An Agent call that returns its result directly needs no watchdog.
    - Its plan's `model:` is not `haiku`, `sonnet` or `opus` → stop: `/todo-next`
      would write a prompt file for an external model, which needs the operator.
      The queue is serial, so the loop does not skip past it.
+   - `~/.claude/bin/plan-loop-check .local/todos/<ID>.plan.md` fails → stop, quoting
+     every `FAIL` line. Do not repair the plan here: that is `/todo-plan`'s job, or
+     the previous checkpoint's fix-ahead. The queue is serial, so the loop does not
+     skip past it.
 
 2. **Implement.** Log `START <ID> <model>`, or `RETRY <ID>` on a retry. Run
    `/todo-next <ID>` with the Skill tool and follow it to its end, including its own
@@ -206,6 +234,7 @@ Stop on any of the following:
 - `--max-fails` consecutive FAILs of one item.
 - A failed commit, or a commit the log and git disagree on.
 - An item whose model is external, or a `/todo-next` blocker.
+- An item whose plan fails `plan-loop-check`.
 - A preflight failure, or an entry-point state the table sends to stop.
 - A denied tool call.
 - Any step that needs an action this file does not list.
@@ -252,7 +281,10 @@ Before you leave:
    `cron-auto-mode-gate.py` PreToolUse hook enforces this by denying `CronCreate`
    in any other mode. It checks at scheduling time, and preflight re-checks when
    the job fires.
-2. Run `/todo-loop --check` in that session and fix whatever it reports.
+2. Run `/todo-loop --check` in that session and fix whatever it reports. Only
+   `READY TO SCHEDULE` means the run is expected to finish unattended. On
+   `NOT FULLY UNATTENDED`, either fix the named plans or schedule with the
+   `--max-items` it gives.
 3. Keep the machine awake (on macOS, leave `caffeinate -i` running in another
    terminal), and start Docker if the check says a queued item needs it.
 4. Schedule a one-shot with `CronCreate`, `recurring: false`, with the cron pinned to

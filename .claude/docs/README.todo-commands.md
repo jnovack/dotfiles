@@ -60,7 +60,7 @@ committed.
     TODO.md                  <- index table of LIVE work only, machine-maintained
     todos/
       <ID>.spec.md           <- what, why, acceptance criteria
-      <ID>.plan.md           <- how, placement, model tag, DoD checklist, baseline/reviewed SHAs
+      <ID>.plan.md           <- how, placement, commands, model tag, unattended, DoD, baseline/reviewed SHAs
     completed/
       <ID>.spec.md           <- moved here by a passing /todo-checkpoint
       <ID>.plan.md
@@ -233,6 +233,28 @@ order (including whether its validation commands match anything), do the steps c
 and does the placement hold up. `/todo-next` dispatches this file verbatim, so an error here is inherited as
 instruction.
 
+Every plan is written to run unattended, or to say plainly that it cannot. Its `## Commands` section lists each
+shell command the implementer and checkpoint run, verbatim and self-contained, so no agent has to invent a command
+for a step written in prose. Its frontmatter declares `unattended: yes` or `unattended: no — <reason>`.
+`~/.claude/bin/plan-loop-check` makes that mechanical. It fails a plan that lacks either field, declares `no`, or
+has a command in any shell fence that a Bash `deny` or `ask` rule in the settings files matches. Deny rules apply in
+every permission mode, including auto, so a matching command is a certain stop. This was added after a 2026-10-30
+overnight loop stopped at its first checkpoint: the agent picked `rsync` for an unnamed "scratch copy", and `rsync`
+is denied.
+
+```bash
+~/.claude/bin/plan-loop-check .local/todos/*.plan.md
+```
+
+```text
+PASS  FIX-EXAMPLE-01
+FAIL  TEST-EXAMPLE-02  denied by Bash(rsync *) in ~/.claude/settings.json: rsync -a ./ /tmp/test-example-02/
+FAIL  DOCS-EXAMPLE-03  declared `unattended: no` — needs the staging cluster
+```
+
+Exit 0 when every plan passes, 1 when any fails. The auto-mode classifier can still refuse a command no rule names.
+That cannot be predicted from settings, so the loop's watchdog and stop rules remain the backstop.
+
 The model recommendation follows this guide:
 
 | Model | Work type |
@@ -247,7 +269,8 @@ The user can edit the `model:` field to any value, including non-Claude models.
 
 Confirms the plan file exists and bumps status from `planned` to `ready`. This is the human review gate — run it
 after you have read the plan and are satisfied with it. Its report lists every copy the plan keeps, so a duplication
-is approved deliberately rather than unseen.
+is approved deliberately rather than unseen. It also shows the `plan-loop-check` verdict: `Unattended: NO` does not
+block `ready`, but it tells you `/todo-loop` will stop before this item.
 
 ### `/todo-next [id]`
 
@@ -374,6 +397,11 @@ had ended its turn to wait for a completion notice that never came. So:
   prompt, the agent's completion notice resumes it.
 - Every event is appended to `.local/TODO-LOOP.log`. Every stop names its
   evidence, leaves the tree untouched and sends a notification.
+- **Every plan it will touch passes `plan-loop-check`**, at preflight and again
+  when the item is selected. `--check` ends with one verdict:
+  `READY TO SCHEDULE`, `NOT FULLY UNATTENDED — stops before <ID> after at most
+  <K> items`, or `NOT READY`. Only the first means the run should finish
+  unattended.
 
 To schedule it, start the session in auto mode, run `/todo-loop --check`, and
 then create a `CronCreate` one-shot whose prompt invokes the `todo-loop` skill.

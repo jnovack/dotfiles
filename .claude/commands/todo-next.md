@@ -131,6 +131,15 @@ context so the implementer receives the policy used to maintain the queue.
 > If the right placement would break a spec **Constraint**, keep the local change and
 > report the conflict in your synopsis instead of working around the Constraint.
 >
+> **Run shell commands as the plan's `## Commands` section lists them.** Do not swap a
+> listed command for another tool. A plan step written in prose maps to a line in that
+> section, so use the line. When you need a command the section does not list, use
+> the plainest standard tool for the job (for example `cp -R`, not `rsync`). If a
+> command is denied or the permission system refuses it, do not retry it in another
+> form or through another tool. Stop, and report the exact denied command in your
+> synopsis as a blocker. A denial is the operator's policy, and you may not route
+> around it.
+>
 > When you have completed the implementation:
 >
 > 1. Run the project test suite. Do not consider the work done with failing tests.

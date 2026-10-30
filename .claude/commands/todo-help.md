@@ -100,12 +100,15 @@ COMMANDS
     Read the spec, write <id>.plan.md with implementation steps,
     placement decisions (reuse before adding; rule of three on
     copies), model recommendation, and DoD checklist. Bump to planned.
-    Revise Effort if the steps change the picture.
+    Revise Effort if the steps change the picture. Lists every shell
+    command in ## Commands and declares unattended: yes | no — reason,
+    checked by ~/.claude/bin/plan-loop-check against deny/ask rules.
     Next: review the plan, then /todo-ready <id>
 
   /todo-ready <id>
     Confirm plan file exists, bump to ready. Shows any copies the
-    plan keeps, since this is the human gate.
+    plan keeps and the Unattended verdict, since this is the human
+    gate. Unattended: NO means /todo-loop will stop before the item.
     Next: /todo-next
 
   /todo-next [id]
@@ -141,11 +144,13 @@ COMMANDS
     commits) for each eligible ready item in Order, one at a time,
     each on a clean committed HEAD. A FAIL retries once on the
     Corrections. Preflight refuses a prompting permission mode
-    (run in auto), other scheduled jobs and a foreign dirty tree.
-    Every background agent gets a watchdog: silence for
+    (run in auto), other scheduled jobs and a foreign dirty tree,
+    and runs plan-loop-check on every plan it will touch. Every
+    background agent gets a watchdog: silence for
     --stall-minutes sends a push notification. Logs to
     .local/TODO-LOOP.log. Never marks items ready, never pushes.
-    Run --check first, then fire once via CronCreate.
+    Run --check first; only READY TO SCHEDULE means it should
+    finish unattended. Then fire once via CronCreate.
 
   /todo-help
     Print this guide.

@@ -235,7 +235,9 @@ If none detected: report "Could not detect test command — run tests manually a
 
 Run every additional command the plan's DoD or validation steps name — a tagged
 integration run, a second package manager's suite, a lint or grep check — and report it
-on the same row. An item validated by a suite the auto-detection does not reach is not
+on the same row. Run them **as the plan's `## Commands` section lists them**. Never
+substitute a different tool, and never retry a denied command in another form; a denial
+is a "not run" (below). An item validated by a suite the auto-detection does not reach is not
 validated. A ticked DoD box is a claim, not evidence, so re-run the command behind it:
 
 - **A command must demonstrably exercise something.** A `-run` pattern that matches no
@@ -415,12 +417,24 @@ after the run costs a failed checkpoint.
      that the target should now reuse instead of copying;
    - every DoD or validation command works as written and matches something: dry-run it
      where that is non-mutating (`make -n`, `go test -list`, a grep), and treat a zero
-     match as a broken command.
-3. **Repair in place.** Correct the plan's Steps, Placement and DoD, and the spec, for
-   what fails. Delete stale or contradictory instructions rather than annotating them.
+     match as a broken command;
+   - the plan still runs unattended: `~/.claude/bin/plan-loop-check
+     .local/todos/<target>.plan.md` passes.
+3. **Repair in place.** Correct the plan's Steps, Placement, Commands and DoD, and the
+   spec, for what fails. Delete stale or contradictory instructions rather than
+   annotating them. For a loop-safety `FAIL`, add the missing `unattended:` field and
+   `## Commands` section from the commands the Steps and DoD already name, or swap a
+   denied command for a permitted equivalent that does the same job, following
+   `/todo-plan` step 3c. Where a step needs the operator, or no permitted equivalent
+   exists, write `unattended: no — <reason>` rather than inventing a workaround. Run
+   the check again and report its final output.
 4. **Respect the human gate.** `ready` means the operator approved the plan as written.
    Mechanical corrections — a drifted anchor, a renamed symbol, a broken command, a
-   reused helper replacing a copy — keep the status. A change to the approach, scope,
+   reused helper replacing a copy, a `## Commands` section transcribed from commands the
+   plan already names, a denied command swapped for an equivalent — keep the status.
+   Setting `unattended: no` also keeps it, because it records a fact about the plan
+   rather than changing the approach. Report it on the Next-item plan row, since
+   `/todo-loop` will stop there. A change to the approach, scope,
    **Acceptance Criteria** or **Constraints** sets the item back to `planned`, and the
    report tells the operator to re-read it and run `/todo-ready <id>`. If the spec's
    approach no longer works at all, set it to `spec'd` and send it back to

@@ -44,6 +44,16 @@ Extract from the plan file:
 
 Also read the `Effort` value from the item's `.local/TODO.md` row.
 
+Then run the loop-safety check and keep its output for the report:
+
+```bash
+~/.claude/bin/plan-loop-check .local/todos/<id>.plan.md
+```
+
+A `FAIL` does not block `ready`, because the operator can still run the item by hand. It
+does mean `/todo-loop` will stop before this item, and this gate is where the operator
+must learn that, not at 3am.
+
 ### 4 — Update .local/TODO.md
 
 Verify its hard dependencies and external prerequisites first. If any are
@@ -62,9 +72,15 @@ Priority: <P0|P1|P2|P3>
 Order:    <N> — <priority/dependency reason>
 Overview: <first sentence of plan overview>
 Placement: <N reuse/extend; copies kept: <list, or "none">>
+Unattended: yes
+        or: NO — <each FAIL reason> — /todo-loop will stop before this item
 
 Marked ready. Run /todo-next to execute.
 ```
+
+On `NO`, add one line naming the fix: `/todo-plan <id>` to re-plan with a `## Commands`
+section, or run this item by hand and schedule the loop with `--max-items` set to stop
+before it.
 
 Also report any queue changes and the next eligible ready item.
 
