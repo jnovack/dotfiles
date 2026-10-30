@@ -112,6 +112,7 @@ the two layers:
 | `documentation-style`, `testing-philosophy` | `adr`, `troubleshooting` |
 | `markdown-lint`, `command-hygiene` | — |
 | `commit-handoff`, `code-review-graph` | — |
+| `github-actions`, `running-codex` | — |
 
 ## CLI reference
 
@@ -197,6 +198,10 @@ to your `PATH` (or symlink it to `~/.claude/bin` as the `commands` dir already i
 - **The global `~/.claude/CLAUDE.md` is a consumer too** — it has its own recipe
   and marked region, kept lean because it loads every session. Its `global`
   templates are inherited by every repo; never repeat them in a project recipe.
+- **This repo is public, so employer-specific rules never become templates.**
+  Org names, internal repos, ticket systems and security controls stay
+  hand-written below the `END` marker of each work machine's
+  `~/.claude/CLAUDE.md`. They don't sync, so copy them across by hand.
 - **`commit-style` is required by `commit-handoff`, not a sibling.** Handoff
   (global) is the personal "I run my own commits" workflow and references the
   Conventional Commits format that `commit-style` defines, so the injector pulls
