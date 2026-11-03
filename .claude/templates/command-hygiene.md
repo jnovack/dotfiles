@@ -12,6 +12,12 @@ stable, generic prefix become reusable rules. Follow these so approvals stick:
 - Run tools from the working directory. Do not pass `-C /abs/path` or absolute
   file paths when a relative path or glob works (`git remote -v`, not
   `git -C /Users/.../repo remote -v`).
+- **Never use `git -C`, with an absolute or a relative path**
+  (`git -C ../other-repo log` prompts every time too). To work in another repo,
+  such as a sibling `../other-repo`, run `cd ../other-repo` as its own call,
+  then plain `git log …`, and `cd` back when done. `git log -C <dir>` is not a
+  workaround: after the subcommand, `-C` belongs to the subcommand
+  (`git log -C` means copy detection).
 - Prefer `tool .`, `tool ./...`, or a glob over enumerating many explicit file
   paths in one invocation (`gofmt -l .`, not `gofmt -l a.go b.go c.go ...`).
 - Never inline scripts (`ruby -e`, `bash -c`, `python -c`, `node -e`). They
