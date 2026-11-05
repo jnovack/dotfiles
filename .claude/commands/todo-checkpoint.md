@@ -14,7 +14,10 @@ place without executing it.
 path. The item's work is normally uncommitted, and the tree often also carries other
 items' or a refactor's uncommitted work and unrelated operator edits. Restore a probe by
 editing back. The one commit allowed is the guarded `git autocommit` in step 5, on PASS
-or WARN.
+or WARN. The one `stash` form allowed is exactly `git stash create`, run by this
+orchestrator (never the report-only reviewer) for validation probes the item's spec and
+plan explicitly require, in a freshly created disposable scratch clone. It never touches user work and never
+creates a live-repository `reviewed:` marker.
 
 Before any successful tracker update or default queue selection, read and apply
 [Priority and order](../docs/README.todo-commands.md#priority-and-order).
@@ -55,23 +58,41 @@ green test run means the last thing that touched the code was never tested.
 writes it after reviewing and adjudicating the implementation, so the bulk of the defects
 are normally already gone by the time you get here.
 
-- **`reviewed:` holds a SHA** — review only what changed since it: `git diff <reviewed>`
-  plus untracked files. That covers operator hand-edits and anything you adjudicated in
-  an earlier checkpoint round. **If that delta is empty, skip the review entirely** and
-  mark the row `N/A — reviewed at <sha>, no changes since`. Re-reviewing an unchanged
-  tree buys nothing and costs an Opus pass.
+- **`reviewed:` holds a SHA** — review only what changed since it: a successful
+  `git diff <reviewed>`, plus **every untracked file the item created, whether or not it
+  changed since the review**. The SHA is a `git stash create` snapshot, which excludes
+  untracked files, so it cannot show their content (operator decision: re-review new files
+  rather than record per-file hashes). Enumerate with
+  `git status --porcelain --untracked-files=all` and attribute using the plan's
+  Steps/Placement and the actual changes; include every plausibly item-created file, even
+  outside the plan's file list, and read its content. Ignore unrelated operator files and
+  ignored `.local/` metadata. The delta covers operator hand-edits and anything you
+  adjudicated in an earlier checkpoint round, but not fixes adjudicated before the marker
+  was written. **Only if `git diff <reviewed>` succeeds and is empty, and the item has no
+  untracked files, skip the review** and mark the row
+  `N/A — reviewed at <sha>, no changes since`. Check the command's exit status before
+  judging its output: an error is not an empty delta. If `git diff <reviewed>` fails
+  (including a SHA that no longer resolves; the snapshot is unreferenced and may be
+  garbage-collected, and this command must not retain it with a ref), fall back to the
+  full review below and say why on the Code review row. If the full change set cannot be
+  recovered either, keep the degraded-review WARN; never claim a skip.
 - **`reviewed:` is absent or `dirty`** — run the full review over the whole change set.
   Absent means the item came through the non-Claude branch, was run before this workflow
   existed, or was implemented by hand. This is the fallback, not the normal path.
 
-Skip regardless when the item produced **no changes at all** — nothing in `git diff`,
-nothing untracked — and say so rather than spawning an agent to review nothing. Do **not**
-skip a documentation-only item: prose that reads as fact and is wrong is exactly what a
-test suite cannot catch, and it is the change class this step earns its keep on.
-
 **If `.local/REVIEW.md` already exists, do not spawn a review.** The operator runs
 `/review` by hand; a second pass would duplicate work and overwrite their file. Go
-straight to adjudication with the findings already there.
+straight to adjudication with the findings already there. This applies before any review
+skip, including the `reviewed:` SHA skip above.
+
+Skip regardless only when the item produced **no changes at all**. Gather and attribute
+the full change set first, as described below (baseline diff including committed and
+staged work, plus untracked files), then judge — never on a plain `git diff` or a clean working tree, which hide
+committed or staged work. A missing or invalid baseline, or a failed diff, goes to the
+recovery path below and is never evidence of no work. If there truly is nothing, say so
+rather than spawning an agent to review nothing. Do **not**
+skip a documentation-only item: prose that reads as fact and is wrong is exactly what a
+test suite cannot catch, and it is the change class this step earns its keep on.
 
 When you do spawn, it must be a **new** subagent — never the one that implemented the
 item, and never one asked to re-check its own earlier findings. An agent reviewing work
@@ -90,13 +111,19 @@ git status --porcelain
 ```
 
 That covers all three states the tree can be in at checkpoint time — work still
-uncommitted, work already committed, or a mix — without guessing.
+uncommitted, work already committed, or a mix — without guessing. If the baseline does
+not resolve, treat it as absent and use the fallback below. When a `reviewed:` SHA
+delta was selected above, the reviewer gets that delta (`git diff <reviewed>` plus the
+item's untracked files), not this whole baseline diff; the
+baseline is gathered only to attribute work and to decide whether any exists.
 
 **Without a baseline** (an item dispatched before `/todo-next` recorded one, or run by
 hand), fall back in this order, and say in the report which one you used:
 
-1. **Uncommitted work** — `git status --porcelain` plus `git diff`, when either is
-   non-empty.
+1. **Uncommitted work** — `git status --porcelain` plus `git diff HEAD` (when HEAD
+   resolves; plain `git diff` misses staged-only edits), when either is non-empty. If
+   status still shows attributed staged entries that the diff does not explain, inspect
+   `git diff --cached`. Never modify the index.
 2. **The item's commit**, when the tree is clean. Try `git log --grep=<id>`, then a
    commit whose subject matches the first line of the repo's commit-message handoff file
    if it has one. Before trusting a match, confirm the files it touches are the ones the

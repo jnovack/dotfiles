@@ -290,6 +290,12 @@ model, then — once it returns — verifies the bookkeeping, re-runs the tests 
 spawns a **second, separate** subagent to review what the first one wrote (sonnet for
 `Light`/`Medium` Effort, opus for `Heavy`). It adjudicates those findings, records a
 `reviewed:` SHA in the plan, and reports the review outcome alongside the synopsis. The
+SHA comes from `git stash create` (an unreferenced commit object that leaves the tree,
+index, refs and stash list untouched); if that prints nothing it comes from
+`git rev-parse HEAD`, and if either command fails it is `reviewed: dirty`, never HEAD.
+The snapshot excludes untracked files. `/todo-loop` permits exactly `git stash create`,
+for this marker and for fresh-scratch-clone validation probes the item's spec and plan
+explicitly require. The
 implementer reuses existing code before adding, and may edit a file the plan does not name
 when placement requires it, recording why in the plan's Placement table. The item you get back has already had its obvious defects
 removed, rather than leaving them for a hand-run `/review` to find later.
@@ -304,8 +310,14 @@ argument it lists the `done` and `in progress` items and stops.
 
 **It reviews whatever `/todo-next` has not already reviewed.** The main review happens in
 `/todo-next`, right after the implementer stops; this command reads the `reviewed:` SHA
-from the plan and reviews only what changed since — usually just the fixes adjudicated
-there, and nothing at all if you went straight to checkpoint. With no marker (a
+from the plan and reviews only what changed since: `git diff <reviewed>` plus every
+untracked file the item created, whether or not it changed since, because the snapshot
+cannot show untracked content. It skips the review only when that diff succeeds and is
+empty and the item has no untracked files. Fixes adjudicated before the marker was
+written are not in the delta. If `git diff <reviewed>` fails (for example the unreferenced
+snapshot was garbage-collected), it runs the full review and says why. The checkpoint
+creates no live marker; its orchestrator may only repeat the plan's fresh-scratch
+`git stash create` probes, and the reviewer never writes to Git. With no marker (a
 non-Claude item, or one implemented by hand) it runs the full review itself. Either way
 the review comes *before* the tests, because adjudicating a finding changes code and the
 test run has to validate the tree that will actually be committed. If you already ran

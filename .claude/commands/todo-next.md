@@ -227,9 +227,21 @@ after this point instead of repeating the whole pass. In the plan file's frontma
 reviewed: <sha>
 ```
 
-Use `git rev-parse HEAD` when the tree is clean, or `git stash create` — which writes a
-commit object without touching the tree — when it is dirty. If neither is available, set
-`reviewed: dirty` and let the checkpoint fall back to a full review.
+Pick the SHA in this order. `git stash create` writes an unreferenced commit object
+without touching the tree, index, refs or stash list, and is the one `stash` form the
+loop allows:
+
+1. Run `git stash create`. If it succeeds and prints a valid commit SHA, use that SHA.
+2. If it succeeds and prints nothing (clean tree, or only untracked changes), use the
+   SHA from a successful `git rev-parse HEAD`.
+3. If either required command fails, or no valid SHA results, write `reviewed: dirty`
+   and report the reason. A failed snapshot must not fall back to HEAD: that would claim
+   tracked work was reviewed at a commit that does not contain it. The checkpoint then
+   runs a full review.
+
+The snapshot excludes untracked files (`git stash create` has no `--include-untracked`),
+so the checkpoint always re-reviews the item's untracked files. Fixes adjudicated before
+this marker are not part of the checkpoint delta; only later changes are.
 
 ### Report
 

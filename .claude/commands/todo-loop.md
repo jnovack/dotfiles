@@ -55,7 +55,14 @@ from it.
 - **The loop never commits.** `/todo-checkpoint` runs `git autocommit` on PASS or
   WARN, as its own file instructs; that is the only commit in a run. Never run
   `git add`, `commit`, `push`, `reset`, `checkout`, `stash` or `clean`, never write
-  to a live service, and never deploy.
+  to a live service, and never deploy. The one exception is exactly
+  `git stash create`, in two contexts only: `/todo-next` recording its `reviewed:`
+  marker, and validation probes the selected item's spec and plan explicitly require,
+  run in a freshly created disposable scratch clone, never the live repository. It
+  writes an unreferenced commit object and changes no working-tree content, staged
+  entry, ref or stash list, so a ban on it only forces a needless second full review.
+  Every other `stash` form stays forbidden, and the stop procedure's "do not stash"
+  is unchanged.
 - Never work around a failing test, a denied command, or a spec Constraint. Stop.
 - Do not wrap this in `/loop` or schedule wakeups. Agent completion notices and
   watchdog exits resume the loop.
