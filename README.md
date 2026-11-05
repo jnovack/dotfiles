@@ -27,7 +27,8 @@ The installer will:
 - install baseline apps and tools
 - install `oh-my-zsh` and `powerlevel10k`
 - install Meslo Nerd Font for `powerlevel10k` terminal glyphs
-- sync canonical `.zshrc`, `.gitconfig`, and `.p10k.zsh`
+- sync canonical `.zshrc`, `.gitconfig`, `.p10k.zsh`, and `.tmux.conf`,
+  plus the `~/.claude` directory links (see Sync Model)
 
 ## Sync Model
 
@@ -36,6 +37,7 @@ The repo owns the canonical shared files:
 - `.zshrc`
 - `.gitconfig`
 - `.p10k.zsh`
+- `.tmux.conf`
 
 They are symlinked into `$HOME` by `sync.sh`.
 
@@ -45,7 +47,41 @@ Machine-local additions live outside the repo:
 - `~/.gitconfig.local`
 - `~/.p10k.local.zsh`
 
-The canonical files load those local companions natively, so there is no generated merged file to maintain.
+The canonical files load those local companions natively, so there is no
+generated merged file to maintain.
+
+`sync.sh` also links four directories under `~/.claude` into this repo:
+
+- `~/.claude/bin` -> `.claude/bin`
+- `~/.claude/commands` -> `.claude/commands`
+- `~/.claude/hooks` -> `.claude/hooks`
+- `~/.claude/skills` -> `.claude/skills`
+
+It creates `~/.claude` first. A link that already points at the canonical
+directory is reported as such and left alone. A real file or directory, a
+symlink to anywhere else, or a dangling symlink at one of those paths is
+refused and left untouched; `sync.sh` names it, keeps processing the remaining
+links, and exits nonzero. The same applies, for files and directories alike,
+when the canonical source itself is missing from the checkout: nothing is
+linked to it. `~/.claude/CLAUDE.md` is not linked because
+`claude-templates assemble` generates it. `.claude/docs` and `.claude/templates`
+are not linked because nothing loads them from `~/.claude`.
+
+`sync.sh` never edits `~/.claude/settings.json`. The loop helpers need four
+machine-local allow rules, which you add on each new machine from an attended
+Claude Code session with the `update-config` skill (`/update-config`), once
+each, preserving every other setting:
+
+```text
+Bash(~/.claude/bin/agent-watchdog *)
+Bash(~/.claude/bin/todo-agent-live *)
+Bash(~/.claude/bin/claude-permission-mode *)
+Bash(~/.claude/bin/plan-loop-check *)
+```
+
+These rules match the literal `~/.claude/bin/<helper>` invocation prefix the
+todo commands use. They do not cover other spellings of the path, and they do
+not change what the helpers or hooks do.
 
 ## Codex Skills
 
@@ -100,8 +136,8 @@ opt-in skeletons, and the `pre-push` guard.
 ## Commit Signing over SSH
 
 `pinentry-mac` needs a window server, which an SSH session does not have, so GPG
-commit signing that works at the console fails or hangs over SSH. The fix pairs a
-pinentry dispatcher — GUI at the console, curses over SSH — with a LaunchAgent
+commit signing that works at the console fails or hangs over SSH. The fix pairs
+a pinentry dispatcher — GUI at the console, curses over SSH — with a LaunchAgent
 that primes gpg-agent from the login keychain at console login, so SSH sessions
 inherit a warm cache and never prompt.
 
