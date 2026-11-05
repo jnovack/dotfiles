@@ -74,8 +74,8 @@ Run once, before the first cycle. Any failure is a stop (with `--check`, a repor
    - `unknown` (the transcript format changed) → log a `WARN` line and continue;
      the watchdog is the backstop.
    - Helper missing or not executable → stop.
-2. **Helpers.** `~/.claude/bin/agent-watchdog` and `~/.claude/bin/plan-loop-check`
-   exist and are executable.
+2. **Helpers.** `~/.claude/bin/agent-watchdog`, `~/.claude/bin/plan-loop-check` and
+   `~/.claude/bin/todo-agent-live` exist and are executable.
 3. **No other scheduled jobs.** Run `CronList`. Any job in this session → stop and
    list it. On 2026-10-21 a 5:25am `git autocommit` job shared the session with the
    chain. If an item had been half-written at 5:25, that job would have committed it.
@@ -113,14 +113,49 @@ Run once, before the first cycle. Any failure is a stop (with `--check`, a repor
 
 ### Entry point
 
+When a `done` or `in progress` row exists, run the liveness check below first. Then
+take the first row of this table that matches.
+
 | State at start | Begin at |
 | --- | --- |
 | No `done` or `in progress` row, and the tree is clean | Step 1 |
+| More than one `done` or `in progress` row | Stop and list them |
+| One `done` or `in progress` row, and the liveness check finds a live agent for it | Stop. Another session is still working the item, and taking it over would race that agent's writes to the tree |
+| One `done` or `in progress` row whose last line in the log is a `STALL` | Stop. An earlier run paged the operator about that agent, which may still be waiting for their answer. Once it is gone, the operator runs `/todo-checkpoint <id>` by hand |
 | Exactly one `done` row. The tree is clean, or dirty only with that item's work (files its plan's Steps or Placement name, their tests and docs) | Step 3 for that ID. Its implementer finished but was never checkpointed |
 | Exactly one `in progress` row whose plan carries `## Corrections` | Step 2 as a retry of that ID. The FAIL count starts at 0: it counts only failures seen inside this run |
-| An `in progress` row with no `## Corrections` | Stop. That item's agent may still be running, or it was abandoned. The operator runs `/todo-checkpoint <id>` by hand |
-| More than one `done` or `in progress` row | Stop and list them |
+| Exactly one `in progress` row with no `## Corrections`. The tree is clean, or dirty only with that item's work | Step 3 for that ID, as a **recovery checkpoint** (below). Its run was abandoned mid-item |
 | The tree is dirty with anything else | Stop. `git autocommit` runs `git add -A`, which would sweep unrelated edits into an item's commit |
+
+**Liveness check.** Run `~/.claude/bin/todo-agent-live <sp> <ID> <M*60>` for the
+row's ID, and log its output lines with the entry decision. The helper scans the
+subagent metadata of every session of this project, not only this one, for agents
+whose description names the ID.
+
+- Exit 2: an agent is unfinished and has written its transcript within
+  `--stall-minutes`. It is live.
+- Exit 0: no agent is live. None was found, all finished, or all went silent. A
+  killed session never marks its agents finished, so silence is the only signal it
+  leaves. The `STALL` row keeps a paged agent from being taken over.
+- Exit 64, or the helper is missing → stop.
+
+**Recovery checkpoint.** A run that ends mid-item leaves the row `in progress` with
+no `## Corrections`. Usually the session hit its usage limit. On 2026-10-30 a run hit
+its limit just after it dispatched an implementer. The agent's first request was
+refused, and the next session's loop stopped on the row and wasted its run.
+Recovering automatically means a run started after a limit reset picks up where the
+last one died.
+
+Log `RECOVER <ID>` and run Step 3. `/todo-checkpoint <ID>` judges whatever the
+abandoned run left, whether that is nothing or a complete implementation. Step 4 then
+decides as usual:
+
+- **PASS or WARN**: the abandoned run had finished the work, and the checkpoint
+  commits and retires it.
+- **FAIL**: the checkpoint writes `## Corrections` naming what is missing, and the
+  loop retries at Step 2. This FAIL **does not count** toward `--max-fails`. It judged
+  the abandoned run, not an attempt made by this one. Counting it would leave the
+  default budget of 2 with only one real attempt.
 
 ---
 
@@ -197,9 +232,10 @@ An Agent call that returns its result directly needs no watchdog.
      Something other than the checkpoint moved HEAD.
    - **Commit FAILED** → stop. The checkpoint has already skipped fix-ahead, so the
      next item never runs on an uncommitted tree.
-   - **FAIL** → increment the FAIL count for `<ID>`. At `--max-fails` → stop.
-     Otherwise go to step 2 as a retry. `/todo-next <ID>` picks up the
-     `## Corrections` section the checkpoint wrote.
+   - **FAIL** → increment the FAIL count for `<ID>`, unless this was a recovery
+     checkpoint (see Entry point). At `--max-fails` → stop. Otherwise go to step 2
+     as a retry. `/todo-next <ID>` picks up the `## Corrections` section the
+     checkpoint wrote.
    - **Next-item plan moved an item back to `planned` or `spec'd`** → log a
      `DEMOTED` line. Step 1 will not select it, and it needs the operator's
      `/todo-ready`.
@@ -221,6 +257,8 @@ acting.
 2026-10-21T00:41:40-04:00  STALL   FIX-TMPLBRACE-01  implementer silent 20m
 2026-10-21T07:23:40-04:00  PASS    FIX-TMPLBRACE-01  a1b2c3d  fix: stop substituting the brace-less $NAME form
 2026-10-21T07:58:02-04:00  FAIL    FIX-TMPLSTRICT-01  1/2  C1, C2
+2026-10-21T12:03:35-04:00  RECOVER FEAT-WAITRETRY-01  in progress, no Corrections; agent finished (usage limit)
+2026-10-21T12:09:10-04:00  FAIL    FEAT-WAITRETRY-01  recovery (not counted)  C1
 2026-10-21T08:30:47-04:00  STOP    queue drained; next: FIX-POLICYAMBIG-01 planned → /todo-ready
 ```
 

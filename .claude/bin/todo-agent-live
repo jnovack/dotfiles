@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# todo-agent-live — report whether a Claude Code subagent working on a TODO
+# item may still be running, in any session of the project.
+#
+# Usage: todo-agent-live <scratchpad-dir> <item-id> [stall-seconds]
+#
+# The scratchpad is <tmp>/<project-slug>/<session-id>/scratchpad. Every
+# session's subagents leave ~/.claude/projects/<project-slug>/<session>/
+# subagents/agent-<id>.meta.json beside agent-<id>.jsonl, and the meta file
+# records the Agent call's description, which names the item ("TODO <id> — …"
+# from /todo-next, "Review <id> …" from the reviewers). An agent naming
+# <item-id> is live when its meta is not "finished": true and its transcript
+# was written within stall-seconds (default 1200). One line is printed per
+# matching agent: live, finished, silent or missing.
+#
+# Exit codes: 0 no live agent (none found, all finished, or all silent),
+#             2 at least one live agent, 64 usage.
+#
+# Why: on 2026-10-30 a /todo-loop session hit its usage limit just after it
+# dispatched an implementer. The agent's first request was refused (429), and
+# the item stayed "in progress" with nothing done. The next session's loop
+# could not tell abandoned from running and stopped, wasting the run. The
+# meta file outlives the session that wrote it, so it is the durable signal.
+
+set -u
+
+if [ $# -lt 2 ] || [ $# -gt 3 ]; then
+	echo "usage: todo-agent-live <scratchpad-dir> <item-id> [stall-seconds]" >&2
+	exit 64
+fi
+
+id=$2
+stall=${3:-1200}
+
+# The ID goes into a regex. TODO IDs are letters, digits and dashes; anything
+# else is refused rather than escaped, so a typo cannot widen the match.
+case "$id" in
+'' | *[!A-Za-z0-9-]*)
+	echo "todo-agent-live: item-id must be letters, digits and dashes" >&2
+	exit 64
+	;;
+esac
+case "$stall" in
+'' | *[!0-9]*)
+	echo "todo-agent-live: stall-seconds must be an integer" >&2
+	exit 64
+	;;
+esac
+
+session_dir=$(dirname "${1%/}")
+slug=$(basename "$(dirname "$session_dir")")
+projects="$HOME/.claude/projects/$slug"
+
+mtime() {
+	stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"
+}
+
+# Whole-ID match: FIX-A-01 must not match FIX-A-010 or XFIX-A-01.
+pattern="\"description\" *: *\"([^\"]*[^A-Za-z0-9-])?$id([^A-Za-z0-9-][^\"]*)?\""
+
+now=$(date +%s)
+live=0
+for meta in "$projects"/*/subagents/agent-*.meta.json; do
+	[ -f "$meta" ] || continue
+	grep -Eq "$pattern" "$meta" || continue
+	transcript="${meta%.meta.json}.jsonl"
+	# Finished first: a finished agent's transcript is silent too.
+	if grep -Eq '"finished" *: *true' "$meta"; then
+		echo "finished: $transcript"
+	elif [ ! -e "$transcript" ]; then
+		echo "missing: $transcript"
+	else
+		age=$((now - $(mtime "$transcript")))
+		if [ "$age" -lt "$stall" ]; then
+			echo "live: written ${age}s ago: $transcript"
+			live=1
+		else
+			echo "silent: no write for ${age}s: $transcript"
+		fi
+	fi
+done
+
+if [ "$live" -eq 1 ]; then
+	exit 2
+fi
+exit 0

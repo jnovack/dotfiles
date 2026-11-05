@@ -56,11 +56,23 @@ must learn that, not at 3am.
 
 ### 4 — Update .local/TODO.md
 
-Verify its hard dependencies and external prerequisites first. If any are
-unmet, missing or cyclic, retain `planned`, report the blocker, and stop;
-readiness does not override prerequisites. Otherwise change `planned` to
-`ready`, reassess Priority and Order, and renumber the queue under the shared
-policy. Do not promote unrelated items.
+Verify its hard dependencies and external prerequisites first. `ready` is
+approval of the plan, not a claim that it can run now, so one kind of unmet
+prerequisite does not block it: a **pending** one, which is a TODO item that
+is itself `ready` (or `in progress`/`done`) and sits earlier in the queue.
+Readying a dependent ahead of it is what lets `/todo-loop` run a whole
+dependency chain in one night instead of stopping after the first item.
+Dispatch stays gated: `/todo-next` skips a ready item until its prerequisites
+retire, and `/todo-checkpoint` step 6 re-anchors the dependent's plan when
+each prerequisite retires, dropping it back to `planned` if that changes
+approach, scope, Acceptance Criteria or Constraints.
+
+Any other unmet prerequisite still blocks. If one is missing, cyclic,
+external, or an item that is not yet `ready` or is ordered after this one,
+retain `planned`, report the blocker, and stop; readiness does not override
+it. Otherwise change `planned` to `ready`, reassess Priority and Order, and
+renumber the queue under the shared policy. Do not promote unrelated items,
+and never promote the pending prerequisite itself.
 
 ### 5 — Report
 
@@ -70,6 +82,7 @@ Model:    <model>
 Effort:   <Light|Medium|Heavy>
 Priority: <P0|P1|P2|P3>
 Order:    <N> — <priority/dependency reason>
+Pending:  <prerequisite IDs it waits on, ahead of it in the queue, or "none">
 Overview: <first sentence of plan overview>
 Placement: <N reuse/extend; copies kept: <list, or "none">>
 Unattended: yes

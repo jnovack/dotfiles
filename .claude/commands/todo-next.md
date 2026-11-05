@@ -102,9 +102,10 @@ Construct a prompt with these four parts:
 On a retry, add:
 
 > A previous attempt failed its checkpoint. The plan below carries a `## Corrections`
-> section: those items are mandatory scope and the reason this run exists. The rest of
-> the plan is already implemented — verify it against the tree rather than redoing it,
-> and do not revert working code to re-execute a step.
+> section: those items are mandatory scope and the reason this run exists. The earlier
+> attempt may have implemented much of the plan or none of it (an abandoned run is
+> recovered through the same path). Verify each step against the tree, do what is
+> missing, and do not revert working code to re-execute a step.
 
 Include the shared guide's Priority and order section verbatim in this
 context so the implementer receives the policy used to maintain the queue.

@@ -1,4 +1,5 @@
-"""Tests for agent-watchdog and claude-permission-mode, run as real processes.
+"""Tests for agent-watchdog, claude-permission-mode and todo-agent-live, run as
+real processes.
 
 Run: python3 -m unittest discover -s .claude/bin -p 'test_*.py'
 """
@@ -12,6 +13,7 @@ import unittest
 BIN = os.path.dirname(os.path.abspath(__file__))
 WATCHDOG = os.path.join(BIN, "agent-watchdog")
 MODE = os.path.join(BIN, "claude-permission-mode")
+LIVE = os.path.join(BIN, "todo-agent-live")
 
 
 def run(argv, env=None, timeout=10):
@@ -158,6 +160,115 @@ class ClaudePermissionMode(unittest.TestCase):
     def test_usage_error(self):
         code, _, _ = run([MODE], env=self.env)
         self.assertEqual(code, 64)
+
+
+class TodoAgentLive(unittest.TestCase):
+    """Lays out two sessions of one project: the current one (whose scratchpad
+    the loop passes) and an earlier one that dispatched the item's agents."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = os.path.join(self.tmp.name, "home")
+        slug = "-Users-x-repo"
+        self.scratchpad = os.path.join(self.tmp.name, "claude-501", slug, "new-session", "scratchpad")
+        os.makedirs(self.scratchpad)
+        self.subagents = os.path.join(self.home, ".claude", "projects", slug, "old-session", "subagents")
+        os.makedirs(self.subagents)
+        self.env = {**os.environ, "HOME": self.home}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def add_agent(self, name, description, finished, age=0, transcript=True):
+        base = os.path.join(self.subagents, "agent-" + name)
+        with open(base + ".meta.json", "w") as fh:
+            fh.write('{"agentType":"general-purpose","description":"%s","finished":%s}'
+                     % (description, "true" if finished else "false"))
+        if transcript:
+            with open(base + ".jsonl", "w") as fh:
+                fh.write("{}\n")
+            past = time.time() - age
+            os.utime(base + ".jsonl", (past, past))
+
+    def live(self, item="FIX-A-01", stall="300"):
+        return run([LIVE, self.scratchpad, item, stall], env=self.env)
+
+    def test_no_agents_is_not_live(self):
+        code, out, _ = self.live()
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_usage_limit_abandon_is_not_live(self):
+        # The 2026-10-30 failure: the implementer's first request was refused
+        # and the agent finished, leaving the item "in progress". Reporting it
+        # live would stop the next run for nothing.
+        self.add_agent("a1", "TODO FIX-A-01 — do a thing", finished=True)
+        code, out, _ = self.live()
+        self.assertEqual(code, 0)
+        self.assertIn("finished", out)
+
+    def test_recently_written_unfinished_agent_is_live(self):
+        # Another session is still driving the item; recovering it here would
+        # race that agent's writes to the tree.
+        self.add_agent("a1", "TODO FIX-A-01 — do a thing", finished=False, age=10)
+        code, out, _ = self.live()
+        self.assertEqual(code, 2)
+        self.assertIn("live", out)
+
+    def test_silent_unfinished_agent_is_not_live(self):
+        # A killed session never sets finished; silence is the only signal.
+        self.add_agent("a1", "TODO FIX-A-01 — do a thing", finished=False, age=600)
+        code, out, _ = self.live()
+        self.assertEqual(code, 0)
+        self.assertIn("silent", out)
+
+    def test_unfinished_agent_without_transcript_is_not_live(self):
+        self.add_agent("a1", "TODO FIX-A-01 — do a thing", finished=False, transcript=False)
+        code, out, _ = self.live()
+        self.assertEqual(code, 0)
+        self.assertIn("missing", out)
+
+    def test_reviewer_description_matches(self):
+        self.add_agent("r1", "Review FIX-A-01 change set", finished=False, age=10)
+        code, _, _ = self.live()
+        self.assertEqual(code, 2)
+
+    def test_other_items_are_ignored(self):
+        # A live agent on a different item, or on an ID that merely contains
+        # this one, says nothing about this item.
+        for name, description in (
+            ("b1", "TODO FIX-B-01 — other"),
+            ("b2", "TODO FIX-A-010 — longer id"),
+            ("b3", "TODO XFIX-A-01 — prefixed id"),
+        ):
+            self.add_agent(name, description, finished=False, age=10)
+        code, out, _ = self.live()
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_one_live_agent_among_finished_is_live(self):
+        self.add_agent("a1", "TODO FIX-A-01 — first try", finished=True)
+        self.add_agent("a2", "TODO FIX-A-01 — retry", finished=False, age=10)
+        code, _, _ = self.live()
+        self.assertEqual(code, 2)
+
+    def test_default_stall_is_twenty_minutes(self):
+        self.add_agent("a1", "TODO FIX-A-01 — do a thing", finished=False, age=600)
+        code, _, _ = run([LIVE, self.scratchpad, "FIX-A-01"], env=self.env)
+        self.assertEqual(code, 2)
+
+    def test_usage_errors(self):
+        for argv in (
+            [],
+            [self.scratchpad],
+            [self.scratchpad, "FIX-A-01", "x"],
+            [self.scratchpad, "FIX.A*", "300"],
+            [self.scratchpad, "", "300"],
+            [self.scratchpad, "FIX-A-01", "300", "extra"],
+        ):
+            with self.subTest(argv=argv):
+                code, _, _ = run([LIVE, *argv], env=self.env)
+                self.assertEqual(code, 64)
 
 
 if __name__ == "__main__":

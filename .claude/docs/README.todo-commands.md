@@ -36,7 +36,8 @@ status field, so there is nothing to drift out of sync.
 `in progress` covers two different situations, told apart by whether the plan file
 carries a `## Corrections` section. With one, the item failed a checkpoint and
 `/todo-next <id>` will re-run it against those corrections. Without one, the item is
-either still running or was abandoned mid-flight.
+either still running or was abandoned mid-flight. `/todo-loop` tells the two apart with
+`~/.claude/bin/todo-agent-live` and checkpoints an abandoned item automatically.
 
 ## File layout
 
@@ -272,6 +273,12 @@ after you have read the plan and are satisfied with it. Its report lists every c
 is approved deliberately rather than unseen. It also shows the `plan-loop-check` verdict: `Unattended: NO` does not
 block `ready`, but it tells you `/todo-loop` will stop before this item.
 
+You can ready an item whose prerequisites have not landed yet, as long as each one is itself `ready` (or further along)
+and earlier in the queue. This lets one `/todo-loop` run work through a whole dependency chain. The item still will
+not dispatch until its prerequisites retire, and each prerequisite's checkpoint re-anchors its plan, dropping it back
+to `planned` when the change touches approach, scope, Acceptance Criteria or Constraints. Any other unmet
+prerequisite (missing, external, cyclic, not ready, or ordered later) still keeps it `planned`.
+
 ### `/todo-next [id]`
 
 Runs the given eligible `ready` item, or the eligible `ready` item with the smallest `Order` if no ID is provided.
@@ -395,6 +402,12 @@ had ended its turn to wait for a completion notice that never came. So:
   watchdog exits 2. The loop then logs a `STALL` line and sends a push
   notification. A stall does not stop the loop: once someone answers the
   prompt, the agent's completion notice resumes it.
+- **An item abandoned by an earlier run is recovered, not a stop.** A session
+  that hits its usage limit mid-item leaves the row `in progress`. The next run
+  checks with `~/.claude/bin/todo-agent-live` that no agent in any session is
+  still writing for that item. It then runs `/todo-checkpoint` on whatever was
+  left, which either commits the work or writes `## Corrections` for a retry.
+  That recovery FAIL does not count toward `--max-fails`.
 - Every event is appended to `.local/TODO-LOOP.log`. Every stop names its
   evidence, leaves the tree untouched and sends a notification.
 - **Every plan it will touch passes `plan-loop-check`**, at preflight and again
