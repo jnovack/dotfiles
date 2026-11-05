@@ -1,1 +1,4 @@
 .local/
+__pycache__/
+code/android/src/templates/.gradle/
+code/android/src/templates/build/
