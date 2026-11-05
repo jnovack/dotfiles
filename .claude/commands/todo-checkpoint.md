@@ -13,7 +13,8 @@ place without executing it.
 **Never commit, stash, reset, discard, or delete user work**, and never `git checkout` a
 path. The item's work is normally uncommitted, and the tree often also carries other
 items' or a refactor's uncommitted work and unrelated operator edits. Restore a probe by
-editing back.
+editing back. The one commit allowed is the guarded `git autocommit` in step 5, on PASS
+or WARN.
 
 Before any successful tracker update or default queue selection, read and apply
 [Priority and order](../docs/README.todo-commands.md#priority-and-order).
@@ -151,8 +152,9 @@ expensive failure to eat. Instruct it to:
 - classify every finding as **in scope** or **out of scope**, giving the reason for the
   latter (see item 2 of the adjudication below), and never park an in-scope gap as a
   "residual";
-- **report only — never edit code.** The reviewer has no authority to change the tree;
-  adjudication is yours;
+- **report only — never edit code, and never run a git command that writes**
+  (`add`, `commit`, `autocommit`, `stash`, `checkout`, `reset`). The reviewer has no
+  authority to change the tree or the index; adjudication and the commit are yours;
 - write findings to `.local/REVIEW.md` in the format `/review` produces, and return a
   count by severity.
 
@@ -215,7 +217,8 @@ polishing comments nobody will read.
 
 If the repository uses a commit-message handoff file, update it to cover the fixes
 applied here. The commit is the permanent record, and a fix made at checkpoint that the
-message does not mention is a fix no future reader can account for.
+message does not mention is a fix no future reader can account for. Step 5 rewrites the
+file for this item alone on PASS or WARN, and that rewrite keeps these fixes in its body.
 
 Any code you changed here is part of the change set from this point on. Steps 3 and 4
 judge the tree as it now stands, not as the executing agent left it.
@@ -364,6 +367,18 @@ past, and the operator does not revisit completed items.
    instructs it, which is the exception the global "Commit handoff" rule
    allows. Each passing item becomes its own commit, so todos can be chained
    with each `/todo-next` building on a committed tree.
+   - **Guard first.** `git autocommit` runs `git add -A`, so it commits
+     everything in the tree, not just this item. Run
+     `git check-ignore -q .local/TODO.md` and `git status --porcelain`.
+     Skip the commit and report it as a blocker when `.local/` is not
+     ignored, or when any path in the status is not this item's work as
+     step 2 attributed it. This command also runs by hand, outside
+     `/todo-loop`'s clean-tree entry check, and a tree carrying another
+     item's or the operator's edits would land in this item's commit.
+   - If the status is empty, there is nothing to commit: skip this step,
+     report `NOTHING TO COMMIT`, and still fix ahead. Decide this before
+     running the alias, because an empty commit exits nonzero and would
+     read as a failed commit.
    - Overwrite `.local/COMMIT-MSG.txt` so it describes **this item only**:
      a Conventional Commits subject, then a short *why* body that includes
      any release note or consumer note the plan's DoD requires. Do not
@@ -372,12 +387,15 @@ past, and the operator does not revisit completed items.
    - Run `git autocommit` (`git add -A`, commit with the message file, then
      delete it). Do not substitute `git add` or `git commit`; they are
      denied.
-   - If there is nothing to commit, skip this step and say so in the
-     report.
    - If it fails, for example because a hook rejects the commit, do not
      retry and do not try other git commands. Report the failure as a
      blocker and stop after step 7. Do not fix ahead, so a chain halts on an
-     uncommitted tree rather than piling the next item onto it.
+     uncommitted tree rather than piling the next item onto it. The item is
+     already retired, so `/todo-checkpoint <id>` cannot be re-run on it. The
+     alias deletes `.local/COMMIT-MSG.txt` only after a successful commit,
+     so the message stays in place: tell the operator to fix the cause,
+     then run `git autocommit` themselves. A skipped guard leaves the item
+     in the same state, recovered the same way.
    - Never commit on FAIL. Failed work stays uncommitted for the retry.
 
 **Other rows may cite this ID** — items routinely reference each other for context or
@@ -391,9 +409,10 @@ priority escalation; leave dependents blocked and do not execute them.
 
 ### 6 — Fix ahead: audit and repair the next item's plan
 
-Run this only when the result is PASS or WARN and the step 5 commit did not fail.
-Skip it on FAIL (the item goes back to `/todo-next` and the tree is not settled),
-on a failed commit, and when there is no target. Say which in the report.
+Run this only when the result is PASS or WARN and the step 5 commit succeeded or
+had nothing to commit. Skip it on FAIL (the item goes back to `/todo-next` and the
+tree is not settled), on a failed commit or one its guard skipped, and when there is
+no target. Say which in the report.
 
 **Targets:** recompute from the reassessed queue: the eligible `ready` item
 with the smallest `Order` after retirement, plus any
@@ -455,7 +474,7 @@ after the run costs a failed checkpoint.
  Docs             PASS / FAIL / WARN — [note]
  Technical debt   PASS / FAIL — [note]
  <one line per optional item, if any>
- Commit           <short sha> / NOTHING TO COMMIT / FAILED — [subject | error] (PASS/WARN only)
+ Commit           <short sha> / NOTHING TO COMMIT / SKIPPED / FAILED — [subject | unattributed paths | error] (PASS/WARN only)
  Next-item plan   REPAIRED / NO CHANGES / SKIPPED — [ids; N corrections; status changes | reason skipped]
 ───────────────────────────────────────
  Overall:  PASS — item is complete

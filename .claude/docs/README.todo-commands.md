@@ -369,8 +369,18 @@ item becomes one commit, which is what makes chaining work:
 committed tree.
 
 - A `FAIL` never commits.
-- A failed commit is reported as a blocker, and fix-ahead is skipped, so a
-  chain stops rather than stacking the next item onto uncommitted work.
+- Because the alias runs `git add -A`, the checkpoint first checks that
+  `.local/` is ignored and that every dirty path is this item's work. If
+  anything else is in the tree it skips the commit and reports a blocker.
+  This matters when you run `/todo-checkpoint` by hand, outside
+  `/todo-loop`'s clean-tree check.
+- A clean tree reports `NOTHING TO COMMIT` (the work was already
+  committed) and still fixes ahead.
+- A failed or skipped commit is reported as a blocker, and fix-ahead is
+  skipped, so a chain stops rather than stacking the next item onto
+  uncommitted work. The item is already retired and
+  `.local/COMMIT-MSG.txt` is left in place: fix the cause, then run
+  `git autocommit` yourself.
 
 After a pass it reassesses priorities/dependencies and renumbers the remaining queue, then **fixes ahead**: it audits the spec and plan of the item `/todo-next` will
 run next, plus any planned or ready item that depends on the one just retired, against the

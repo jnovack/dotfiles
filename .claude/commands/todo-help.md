@@ -132,7 +132,10 @@ COMMANDS
     On FAIL the item rolls back to in progress and a ## Corrections
     section is written into the plan for the retry to pick up.
     On PASS the row is REMOVED from .local/TODO.md and the spec/plan
-    move to .local/completed/. Reassess/renumber the queue, then repair the next
+    move to .local/completed/. A PASS or WARN then commits the item
+    with git autocommit, unless the tree also holds work that is not
+    this item's (blocker) or is already clean (NOTHING TO COMMIT); a
+    FAIL never commits. Reassess/renumber the queue, then repair the next
     ready item's plan (and dependents') against the tree, without
     running it; a change beyond mechanical fixes drops that item back
     to planned for re-approval.
