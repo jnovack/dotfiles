@@ -418,8 +418,9 @@ Read the following before starting:
 
 1. `AGENTS.md` — code standards and conventions.
 2. The §Intent, §Hard Constraints, §Definition of Done and §Design Map sections
-   reproduced below — they are complete as given. **Do not open
-   `.local/REFACTOR.<TITLE>.md`.**
+   reproduced below — they are complete as given. Do not reread the full
+   `.local/REFACTOR.<TITLE>.md`. Narrow section reads and edits for required
+   bookkeeping and Design Map placement/follow-ups are permitted.
 3. Files you will modify: [repeat the Files to modify list as readable prose].
 
 [If the phase adds code the §Design Map's Placement table covers, name those rows
@@ -491,8 +492,9 @@ Read the following before starting:
 
 1. `AGENTS.md` — code standards and conventions.
 2. The §Intent, §Hard Constraints, §Definition of Done and §Design Map sections
-   reproduced below — they are complete as given. **Do not open
-   `.local/REFACTOR.<TITLE>.md`.**
+   reproduced below — they are complete as given. Do not reread the full
+   `.local/REFACTOR.<TITLE>.md`. Narrow section reads and edits for required
+   bookkeeping and Design Map placement/follow-ups are permitted.
 3. The refactor's whole change set: `git diff <Phase 1 Baseline>` plus untracked
    files.
 
@@ -581,7 +583,7 @@ Append one row for this refactor:
 ```
 
 - **Status** is `planning` until the first phase starts (`/refactor-next` bumps
-  it to `active`), `blocked` after a failed checkpoint, and the row is **removed**
+  it to `active`), `blocked` after a failed checkpoint or an implementer-reported blocker, and the row is **removed**
   entirely when the final phase passes its checkpoint.
 - **Phases** is `<completed> / <total>`; `<M>` is the phase count.
 

@@ -40,7 +40,11 @@ Everywhere below, `REFACTOR.<kebab>.md` is the resolved tracking file — never 
 
 ### 1 — Identify the phase being validated
 
-If a phase number was given (see step 0), validate that phase.
+If a phase number was given (see step 0), validate that phase. Even then, read the
+`## Session Log` and find the latest row for **that** phase whose Status is `Complete`
+or `Partial` (skip `Review` and `Checkpoint failed` rows, which are bookkeeping, but
+not a newer `Partial` attempt). If it is `Partial`, apply the stop below before any
+review or completion repair: an explicit number must not bypass it.
 
 Otherwise read `.local/REFACTOR.<kebab>.md` `## Session Log` and find the most recent row whose
 Status is `Complete` or `Partial`. Rows carrying any other Status (`Review`,
@@ -74,12 +78,18 @@ green test run means the last thing that touched the code was never tested.
 writes it after reviewing and adjudicating the phase, so the bulk of the defects are
 normally already gone by the time you get here.
 
-- **It holds a SHA** — review only what changed since it: `git diff <reviewed>` plus
+Validate the marker before choosing a branch:
+`git rev-parse --verify --quiet --end-of-options "<value>^{commit}"`. A value that is
+`—`, absent, `dirty`, or for which that command fails (a pruned or mistyped SHA) is
+invalid, and a SHA-shaped but unresolved value must never enter the delta branch.
+
+- **It is a valid commit** — review only what changed since it: `git diff <reviewed>` plus
   untracked files. That covers operator hand-edits and anything you adjudicated in an
   earlier checkpoint round. **If that delta is empty, skip the review** and mark the row
   `N/A — reviewed at <sha>, no changes since`. Re-reviewing an unchanged tree buys
   nothing and costs an Opus pass.
-- **It is absent or `dirty`** — run the full review over the phase's whole change set.
+- **It is `—`, absent, `dirty`, or fails that validation** — run the full
+  review over the phase's whole change set.
   Absent means the phase predates this workflow, ran under Codex, or was done by hand.
 
 Skip regardless when the phase produced no changes at all, and say so in the report rather
@@ -98,9 +108,11 @@ straight to adjudication with the findings already there.
 When you do spawn, it must be a **new** subagent — never the one that implemented the
 phase, and never one asked to re-check its own earlier findings.
 
-Otherwise gather the phase's change set exactly as step 4 does — `**Baseline:**` from the
-phase header, `git diff <baseline>`, plus any untracked files in `git status --porcelain`
-that this phase plausibly created — and spawn **one `general-purpose` subagent on
+Otherwise gather the change set for the scope selected above. For a full review, gather
+it exactly as step 4 does — `**Baseline:**` from the phase header, `git diff <baseline>`,
+plus any untracked files in `git status --porcelain` that this phase plausibly created.
+For a delta review, gather `git diff <reviewed>` plus untracked files instead; do not
+reset it to the baseline. Then spawn **one `general-purpose` subagent on
 `model: opus`, in the foreground**, instructing it to:
 
 - review **only** that change set, reading the changed files in full plus whatever
@@ -234,7 +246,10 @@ working code.
 
 **Fidelity** — for each `### Step N.x` marked `Complete`, is there something in the change
 set that implements it? A step marked `Complete` with nothing behind it is a false
-completion claim: FAIL, and name the step. Note the converse too — substantive changes in
+completion claim: FAIL, and name the step. The exception is a phase-authorized
+exclusion: a step satisfied by a verified terminal-state variant (see step 5) with a
+recorded per-step disposition in the Session Log Notes needs no code. A missing or
+invalid disposition, or an unsupported exclusion, stays FAIL. Note the converse too — substantive changes in
 the diff that no step asked for.
 
 **Hard Constraints** — check the change set against every item in `.local/REFACTOR.<kebab>.md`
@@ -244,6 +259,22 @@ down precisely because the failures they describe are ones the test suite does n
 ### 5 — Check each Definition of Done criterion
 
 Read the phase's `### Definition of Done` checklist from `.local/REFACTOR.<kebab>.md`.
+When the phase has more than one heading beginning with `Definition of Done`
+(terminal-state variants), check the variant named in its latest execution Session Log
+Notes. Notes that name no variant, on a run that excluded no step, mean the base path:
+check the plain `Definition of Done` checklist. Only a successful skip or exclusion must
+name its variant, so demanding a name on every run would fail a fully implemented phase.
+The named variant replaces the other phase checklists, including a base checklist that is an
+alternative; shared Definition of Done and Hard Constraints still apply and cannot be
+waived. A step excluded by that variant is satisfied by its recorded disposition (the
+step and the phase-defined reason): do not require code the selected path forbids.
+Confirm the selected path follows from conditions the phase already states, as decided
+before the excluded step would have run; if an exclusion names no variant, the variant
+is ambiguous or not determinable, or a disposition is missing or unsupported, that
+cannot PASS. Never accept
+an exclusion invented to excuse a failure. The Phase Map schema is unchanged; a
+successful variant is recorded as `Complete`. A blocked or partial result is never one,
+and step 1 already refuses a `Partial` row.
 For each checklist item, assess PASS or FAIL with a brief note. A ticked box is a claim,
 not evidence:
 
@@ -276,7 +307,8 @@ affected packages, `docs/openapi.yaml` (API behavior). FAIL if a relevant doc wa
 and no tests were touched, report WARN (not FAIL — existing coverage may be sufficient,
 but flag it).
 
-**ADRs** — If any phase DoD item explicitly requires an ADR, verify the file exists in
+**ADRs** — If any shared or selected-variant DoD item, or a shared constraint, explicitly
+requires an ADR, verify the file exists in
 `docs/decisions/`. FAIL if required and missing. N/A if not required.
 
 ### 6 — Record the outcome
@@ -284,7 +316,8 @@ but flag it).
 Decide the overall result from steps 2–5 — PASS, FAIL or WARN, as defined by the report
 in step 8 — and update the tracking file to match. Tick a DoD box only for an item
 verified in this run, and mark a Step Index or Phase Map row `Complete` only when the
-implementation genuinely satisfies it.
+implementation genuinely satisfies it, or a verified authorized exclusion with its
+recorded disposition does. Repairs never turn blocked or partial work into completion.
 
 **On FAIL** — the phase is not complete, and the tracking file must say so.
 

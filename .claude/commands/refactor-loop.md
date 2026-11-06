@@ -76,9 +76,14 @@ Run once, before the first cycle:
 | --- | --- |
 | Every phase up to `--through` is `Complete`, the `--through` phase has a `Phase N — checkpoint` PASS/WARN row in the Session Log, and the tree is clean | Stop: nothing to do |
 | No phase `Complete` yet | Step 6 |
-| A phase `In progress` with a `### Corrections` section | Run `/refactor-next <kebab>` (it executes the Corrections), then step 2. The FAIL count starts at 0: it counts only failures observed inside this loop, never one inherited from before it started |
+| A phase `In progress` with a `### Corrections` section | Run `/refactor-next <kebab>` (see §Around every `/refactor-next`; it executes the Corrections), then step 2. The FAIL count starts at 0: it counts only failures observed inside this loop, never one inherited from before it started |
 | The newest `Complete` phase already has a checkpoint PASS/WARN row, the tree is clean, and the next phase is `Not started` | Step 6 — its handoff was already committed |
 | Anything else | Step 2 |
+
+At entry, a phase whose latest execution row (ignoring `Review` and
+`Checkpoint failed` rows) is `Partial` is an unresolved implementer blocker or
+partial run: stop, even when the phase has Corrections. Only an ordinary checkpoint
+failure with Corrections keeps the retry in the table above.
 
 ---
 
@@ -93,8 +98,8 @@ Run once, before the first cycle:
 3. **On FAIL** — no Codex, no commit: the phase has not passed, and committing it
    would freeze unvalidated work into the next phase's baseline. Increment the FAIL
    count for `PHASE`. If it has reached `--max-fails`, stop. Otherwise run
-   `/refactor-next <kebab>` (it executes the `### Corrections` section), then go to
-   step 2.
+   `/refactor-next <kebab>` (see §Around every `/refactor-next`; it executes the
+   `### Corrections` section), then go to step 2.
 
 4. **On PASS or WARN** — reset the FAIL count. If the checkpoint retired the
    refactor, the tracking file now lives at
@@ -138,12 +143,39 @@ Run once, before the first cycle:
    - It is past `--through` → stop: limit reached.
    - None eligible (dependencies incomplete) → stop: blocked.
 
-   Run `/refactor-next <kebab>` with the Skill tool, then go to step 2. If the phase's
+   Run `/refactor-next <kebab>` with the Skill tool (see §Around every
+   `/refactor-next`), then go to step 2. If the phase's
    Model is `Codex`, `/refactor-next` writes `.local/CODEX-PROMPT.<kebab>.md` instead
    of spawning an agent: run it yourself with the same `codex exec` shape as step 4
    (`-s workspace-write -o <sp>/codex-last.txt`, the prompt file piped as `-`,
    `run_in_background`), apply step 5's exit, scope and test checks to it, and do not
-   commit before step 2's checkpoint has passed.
+   commit before step 2's checkpoint has passed. Writing the prompt file is not phase
+   execution: also run the §Around every `/refactor-next` return check after `codex exec`
+   returns, before the checkpoint or any commit.
+
+### Around every `/refactor-next`
+
+Every `/refactor-next <kebab>` this loop runs (Entry point, step 3 and step 6) is
+wrapped by these two checks.
+
+- **Before: Blocking Questions.** Extract the phase block that `/refactor-next` will
+  select (same selection and legacy marker fallback), by its markers
+  (`sed -n '/phase:N:start/,/phase:N:end/p'`), and check the output is non-empty. If it
+  has a heading whose text is `Blocking Questions` (any level, outside fenced code
+  blocks), and any question under it has no answer or resolution recorded beneath it →
+  stop, quoting the question. Never ask it: `/refactor-next` run directly would ask, and
+  this loop cannot. A phase with no such heading is unaffected.
+- **After: blocked or partial execution.** Inspect the actual run's report, the latest
+  execution Session Log row for that phase (ignoring `Review`, `Checkpoint failed` and
+  older attempt rows, so a successful retry supersedes an old `Partial` row) and the
+  index. A blocked or partial result stops before checkpoint, handoff, commit or
+  another phase, even when `codex exec` exited 0. Prompt-file generation alone is not
+  an execution result; check again after the Codex run itself.
+- **After: no execution.** `/refactor-next` also stops before launching anything:
+  missing prompt content, a Phase Map/Step Index inconsistency, no eligible phase. That
+  leaves no new execution row for the target phase, so the check above sees the previous
+  phase's `Complete` row. If no execution row for the target phase appeared during this
+  run, stop. Continuing would re-checkpoint and re-commit the previous phase instead.
 
 ---
 
@@ -151,7 +183,8 @@ Run once, before the first cycle:
 
 Stop on any of: `--through` reached; `--max-fails` consecutive FAILs of one phase;
 Codex nonzero exit, blocker or scope violation; tests red after the handoff; a
-failed commit; next phase blocked on an unmet dependency;
+failed commit; an unanswered Blocking Question; a blocked, partial or unexecuted
+`/refactor-next` result; next phase blocked on an unmet dependency;
 `codex` missing or its flags changed; a preflight failure; the refactor retired; or
 any step that would need an action this file does not list. Never improvise past a
 stop.

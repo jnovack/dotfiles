@@ -57,10 +57,26 @@ that file — never the index.
 4. Consistency check: if the Phase Map and the phase's `### Step Index` disagree
    (Phase Map says `Complete` but steps are open, or every step is `Complete`
    but the Phase Map row is not), flag the inconsistency and stop — do not run
-   anything until the operator resolves which is true.
+   anything until the operator resolves which is true. One exception: the row is
+   `In progress`, every step is `Complete`, and the latest execution row for that
+   phase in the Session Log is `Partial` (ignore `Review` and `Checkpoint failed`
+   rows). That is a pending validation retry, not an inconsistency: inspect the
+   completed results, preserve the original **Baseline**, rerun the tests and the
+   applicable Definition of Done, and finish the bookkeeping without
+   reimplementing completed steps. Any other unexplained disagreement still
+   stops. Existing Corrections stay mandatory on a retry.
 5. Note the phase's **Model** from the Phase Map row.
-6. Record the baseline commit — see below.
-7. Construct the prompt and run by model — see below.
+6. If the phase block contains a heading whose text is `Blocking Questions`
+   (any level, outside fenced code blocks), check each question under it before
+   spawning. A question is answered when an answer or resolution is recorded
+   beneath it. Ask the unanswered ones in the orchestrator, then record each
+   answer under its question as `**Answer (YYYY-MM-DD):** <answer>`. Stop if a
+   required answer is still missing. If a new blocking question arises during
+   a retry, keep the completed steps as they are. A phase with no such heading
+   skips this step. `/refactor-loop` runs this check itself before invoking
+   this command, and stops rather than asking.
+7. Record the baseline commit — see below.
+8. Construct the prompt and run by model — see below.
 
 If no eligible phase exists (all complete, or all remaining are blocked by incomplete deps):
 report the state and stop. Do not run anything.
@@ -106,7 +122,11 @@ the other three and note the gap in your report rather than inventing a map.
 Introduce them with:
 
 > The following sections are reproduced in full from `.local/REFACTOR.<kebab>.md`.
-> They are complete as given — **do not open that file.**
+> They are complete as given — do not reread the full tracking file. Narrow
+> section reads and edits for required bookkeeping (Step Index, Phase Map,
+> Session Log) and for the Design Map placement and follow-up updates are
+> permitted. This overrides any instruction in the reproduced preamble that
+> forbids opening that file.
 
 The Design Map is the only view a phase agent gets of the project beyond its own files.
 Without it, the agent places code by looking at its neighbors, which is how a refactor
@@ -119,15 +139,35 @@ biggest lever on how much context a phase agent has left for its actual work. Th
 applies to any other `.local/` document the preamble leans on: quote the passage, never
 the section number.
 
+Include the complete `## Test Command` section here too. It is never inside a
+shared marker, so extract it separately: its heading and all content up to,
+but excluding, the next level-2-or-higher heading outside a fenced code block,
+or to end of file. A `# comment` line inside a fenced command block is not a
+heading; ending there truncates the commands. At end of file do not drop the
+last line, or a command is lost. If the file has no `## Test Command` section,
+stop and report it: never infer a test command. Keep every command and
+conditional validation rule. The agent must receive them without opening the
+full tracking file.
+
 ### Part 1 — Standard Preamble
 
 Copy verbatim from the phase's `### Standard Preamble` section.
 
 ### Part 2 — Phase assignment
 
-Copy verbatim: the phase header line, the **Files to modify** line, the `### Step Index`
-table, every `### Step N.x` section in order (full content, all code blocks), and the
-phase's `### Corrections` section if it has one.
+Copy verbatim: the phase header and all its metadata (including continued
+**Files to modify** lines and any ADR requirement), the `### Step Index`
+table, every `### Step N.x` section in order (full content, all code blocks),
+the phase's `### Corrections` section if present, and every heading inside the
+phase markers whose text begins with `Definition of Done` (at any level), with
+its full content. More than one such heading means the phase has
+terminal-state variants; copy all of them. If the phase has a `Blocking
+Questions` section, copy it with its recorded answers, so an answer given to the
+orchestrator reaches the implementer. Find sections by Markdown boundaries (the
+next heading of the same or higher level, or the phase end marker), ignoring
+heading-looking text inside fenced code blocks. Verify each required part is
+present before launching the agent. Missing required content is a stop; never
+infer requirements or tests to fill the gap.
 
 ### Part 3 — Closing instructions
 
@@ -135,10 +175,22 @@ Append exactly as written, with `.local/REFACTOR.<kebab>.md` substituted for the
 selected refactor's real tracking-file name so the subagent never has to resolve it:
 
 > You are executing a complete refactor phase. Work through each step in the Step Index
-> in order. Skip any step already marked `Complete` in the Step Index — verify its
-> result exists in the code rather than redoing it. For each remaining step, complete
-> the implementation described in its section, then mark it `Complete` in the
-> `### Step Index` table in `.local/REFACTOR.<kebab>.md`.
+> in order. If the phase has more than one `Definition of Done` heading
+> (terminal-state variants), first decide which variant applies, from the
+> conditions the phase already states, before running any step that variant
+> excludes. If you cannot determine it, stop through the partial path below,
+> naming the unresolved variant in the `Partial` row; never choose an
+> exclusion to excuse a failure. Skip any step already marked `Complete` in the
+> Step Index — verify its result exists in the code, or its explicit
+> terminal-state exclusion is recorded in the Session Log Notes, rather than
+> redoing it. For each remaining step, complete the implementation described in
+> its section, then mark it `Complete` in the `### Step Index` table in
+> `.local/REFACTOR.<kebab>.md`.
+>
+> If you must stop early (blocker, interruption, failing tests), do the partial
+> bookkeeping before you return: keep finished steps `Complete`, leave the rest
+> open, set this phase's Phase Map row to `In progress`, and append a `Partial`
+> Session Log row naming the blocker. Never mark unfinished work `Complete`.
 >
 > If a `### Corrections` section is present, a previous run of this phase failed its
 > checkpoint. Every item in it is mandatory scope on this run and must be fixed —
@@ -162,12 +214,25 @@ selected refactor's real tracking-file name so the subagent never has to resolve
 >
 > After all steps are done:
 >
-> 1. Run the test command from `.local/REFACTOR.<kebab>.md` §Test Command.
->    Do not mark the phase complete if tests fail — report the failure and stop.
-> 2. Mark the phase `Complete` in `## Phase Map` in `.local/REFACTOR.<kebab>.md`.
+> 1. Run the §Test Command reproduced in this prompt.
+>    If tests fail, do not mark the phase complete: take the partial path above
+>    (Phase Map `In progress`, `Partial` row), report the failure, and stop.
+> 2. Satisfy the Definition of Done. When the phase has terminal-state variants,
+>    the selected variant's checklist replaces the other phase checklists;
+>    the shared Definition of Done and Hard Constraints still apply and cannot
+>    be waived. Record a successful skip or exclusion as literal `Complete` in
+>    the Phase Map and Session Log, naming the variant and each excluded
+>    step's disposition (the step and the phase-defined reason) in the Session
+>    Log Notes only, and write those Notes before relying on the `Complete`
+>    mark. Mark an excluded step `Complete` only as satisfied by that
+>    disposition; do not claim its implementation exists. Claim success only
+>    after tests and the applicable Definition of Done pass. For a blocked or
+>    partial result, preserve truthful step states and do not mark the phase
+>    complete.
 > 3. Append one row to `## Session Log`:
 >    `| YYYY-MM-DD | Phase N — [name] | [model] | Complete | [one-line note] |`
->    Use `Partial` if any step was left incomplete, and explain why in the note.
+>    Use `Partial` for blocked or partial execution, explaining why. A
+>    successful skip/exclusion uses `Complete` with its disposition in Notes.
 > 4. Create or update `.local/COMMIT-MSG.txt` — one running file describing the
 >    **entire** uncommitted set, Conventional Commits form, body explaining the *why*.
 >    Update the existing file rather than adding a second; change its top line to
@@ -227,23 +292,49 @@ Do not mark anything complete. Wait for the user to return.
 
 ## After the subagent returns (Haiku / Sonnet / Opus)
 
-**First, verify the bookkeeping — do not take the synopsis as evidence.** A subagent
+**First, classify the result before filling bookkeeping.** A result is blocked
+or partial when the agent reported a blocker, was interrupted, left steps
+unfinished, or the tests or the applicable Definition of Done fail, including
+the orchestrator's own test rerun below failing after every step was done. A
+missing or non-synopsis response is not proof of completion: inspect the real
+step results and validation.
+
+For a blocked or partial result:
+
+- Keep verified completed steps `Complete`; leave unfinished steps open.
+- Set the phase's Phase Map row to `In progress`.
+- Write a `Partial` Session Log row with the blocker or validation failure.
+  Check for an existing row for this attempt first, so the agent's own `Partial`
+  row is not duplicated. The log is append-only: if the agent logged `Complete`
+  but a rerun fails, append a later `Partial` row so the latest execution row
+  for the phase is not successful.
+- Set the index Status to `blocked` when blocked; otherwise retain it. Keep the
+  Phases count equal to the completed rows in the Phase Map.
+- Report the blocker or unfinished validation. Skip the successful-completion
+  review, the new `**Reviewed:**` marker and the `active` status bump. Nothing
+  is marked `Complete` without verified implementation or an authorized
+  exclusion.
+- An explicit refactor argument is required to resume a `blocked` index row.
+
+**For successful completion, verify the bookkeeping — do not take the synopsis as evidence.** A subagent
 can finish the code correctly and still skip every closing item it was given, so check
 all four directly:
 
 ```bash
 grep -n '^| N |' .local/REFACTOR.<kebab>.md          # Phase Map row says Complete
-sed -n '/<!-- phase:N:start -->/,/<!-- phase:N:end -->/p' .local/REFACTOR.<kebab>.md | grep -A6 'Step Index'
+sed -n '/phase:N:start/,/phase:N:end/p' .local/REFACTOR.<kebab>.md | sed -n '/^### Step Index$/,/^### Step /p'
 grep -n "Phase N" .local/REFACTOR.<kebab>.md | head  # a Session Log row exists
 ls -la .local/COMMIT-MSG.txt
 ```
 
 A returned message that is **not** a synopsis — a lint aside, a note about what it is
 "about to do" — means the closing sequence was cut short; assume none of the four
-landed and check every one. Fill in whatever is missing yourself rather than re-running
-the phase; the code is already done and a re-run risks undoing it.
+landed and check every one. Only when the checks establish that the phase really
+succeeded, fill in any missing completion bookkeeping yourself rather than
+re-running the phase. Otherwise take the blocked or partial path above.
 
-Re-run the phase's test command yourself too. If its proof is one expensive integration
+Re-run the phase's test command yourself too. If it fails, take the blocked or
+partial path above. If its proof is one expensive integration
 target, confirm it was not a cached result — a `(cached)` package line reports an
 earlier run's timings and says nothing about this phase's edit.
 
@@ -293,8 +384,9 @@ Use `git rev-parse HEAD` when the tree is clean, `git stash create` when it is d
 ### Update the index
 
 In `.local/REFACTOR.md`, edit this refactor's row: set Status to `active` (from
-`planning`, if this was the first phase), and update the Phases column to
-`<completed> / <total>` from the current `## Phase Map`.
+`planning`, if this was the first phase, or from `blocked` after a successful
+explicit retry), and update the Phases column to `<completed> / <total>` from the
+current `## Phase Map`.
 
 Report to the user:
 
@@ -312,8 +404,12 @@ Do not automatically invoke the next phase. Wait for `/refactor-next` to be call
 
 ## Error handling
 
-- **Subagent fails or returns partial work**: leave affected steps `Not started`, report
-  what went wrong, suggest retry or manual investigation.
+- **Subagent fails, is blocked, or returns partial work**: classify it as
+  described in "After the subagent returns". Keep steps the agent finished
+  `Complete`, leave the rest open, set the Phase Map to `In progress`, write the
+  `Partial` row, set the index `blocked` when blocked, and report. An explicit
+  retry may rerun validation when all steps are done. Never mark unfinished work
+  `Complete`.
 - **Phase has no Step Index**: flag the inconsistency, do not run anything.
 - **Dependency phases incomplete**: name which phases are blocking, stop.
 - **All phases complete**: report done, state next action (PR, deploy, etc.).

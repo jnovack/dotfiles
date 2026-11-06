@@ -25,7 +25,7 @@ PLAN.md → /refactor-init → REFACTOR.<kebab>.md + index row
 | --- | --- |
 | `planning` | `/refactor-init` has written the tracking file and the index row; no phase has started |
 | `active` | at least one phase has started |
-| `blocked` | a phase failed its checkpoint; `/refactor-next` retries with the `### Corrections` section |
+| `blocked` | a phase failed its checkpoint (`/refactor-next` retries with the `### Corrections` section), or its implementer reported a blocker (resolve it first); resume with an explicit `/refactor-next <kebab>` |
 | _(row removed)_ | the final phase passed; the tracking file is now `.local/completed/REFACTOR.<kebab>.completed.md` |
 
 Per-phase status inside the tracking file is still `Not started` / `In progress` / `Complete`.
@@ -62,8 +62,9 @@ Per-phase status inside the tracking file is still `Not started` / `In progress`
 | cardsphere-wants | active | 3 / 5 | #wants page + POST /api/check-wants |
 ```
 
-Maintained by the skills. `/refactor-init` adds the row, `/refactor-next` bumps `Status`/`Phases`,
-`/refactor-checkpoint` sets `blocked` on failure and **removes the row** when the last phase passes. Do not edit it by
+Maintained by the skills. `/refactor-init` adds the row, `/refactor-next` bumps `Status`/`Phases` and sets `blocked`
+on an implementer-reported blocker, `/refactor-checkpoint` sets `blocked` on failure and **removes the row** when the
+last phase passes. Do not edit it by
 hand.
 
 ## `.local/REFACTOR.<kebab>.md` structure
@@ -187,8 +188,9 @@ Runs the next incomplete phase whose dependencies are all complete. One phase pe
 Records the phase's baseline commit, constructs a prompt from the shared sections (including the Design Map), the
 Standard Preamble, phase steps, and closing instructions, then spawns a subagent at the assigned model.
 
-**Claude models (Haiku / Sonnet / Opus):** foreground subagent. When it returns, verifies the bookkeeping, re-runs the
-phase's tests, then spawns a **second, separate** Opus subagent to review what the first one wrote, adjudicates the
+**Claude models (Haiku / Sonnet / Opus):** foreground subagent. When it returns, it first classifies the result: blocked
+or partial work stays open (Phase Map `In progress`, a `Partial` Session Log row, index `blocked` when blocked) and skips
+the review. Otherwise it verifies the bookkeeping, re-runs the phase's tests, then spawns a **second, separate** Opus subagent to review what the first one wrote, adjudicates the
 findings, records a `**Reviewed:**` SHA in the phase header, and bumps the index row. Reports the synopsis and review
 outcome, and reminds you to run `/refactor-checkpoint` before the next phase.
 
@@ -258,7 +260,8 @@ step. The kebab title resolves as in `/refactor-next`.
 - `--through N` — last phase it may run. Default: every phase except the final one, which needs the operator.
 - `--max-fails K` — consecutive checkpoint FAILs of one phase before it stops. Default `2`.
 
-It stops on the limit, the fail cap, a Codex failure or out-of-scope edit, red tests, a failed commit, a phase blocked
+It stops on the limit, the fail cap, a Codex failure or out-of-scope edit, red tests, a failed commit, an unanswered
+Blocking Question in the next phase, a blocked, partial or unexecuted `/refactor-next` result (Claude or Codex), a phase blocked
 on dependencies, or a missing `codex` binary, and ends with a report plus any TODO IDs filed.
 Invoking it grants `git autocommit` at that one step only; it never pushes, deploys, executes Playwright or writes to a
 live service. To fire it once later, use `CronCreate` (one-shot, session-only, fires only while the REPL is idle) with

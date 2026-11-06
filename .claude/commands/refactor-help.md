@@ -34,8 +34,10 @@ LIFECYCLE
   planning   /refactor-init has written the tracking file and the
              index row. No phase has run yet.
   active     At least one phase has started.
-  blocked    A phase failed its checkpoint. /refactor-next picks up
-             the ### Corrections section and retries.
+  blocked    A phase failed its checkpoint (/refactor-next retries
+             with ### Corrections) or its implementer reported a
+             blocker (resolve it first). Resume with an explicit
+             /refactor-next <kebab>.
   retired    The final phase passed its checkpoint. The index row is
              removed and the tracking file moves to
              .local/completed/REFACTOR.<kebab>.completed.md.
@@ -91,9 +93,13 @@ COMMANDS
     Runs the next eligible phase via a subagent at the phase's model.
     No arg → the single active/planning refactor; a kebab title picks
     one when several are live. Records the baseline, runs the phase
-    (Design Map in the prompt; reuse before adding; recorded placement
-    edits outside the file list allowed), reviews it in a second Opus
-    subagent, adjudicates, records the reviewed SHA, bumps the index row.
+    (Design Map, Test Command and the phase's Definition of Done in the
+    prompt; reuse before adding; recorded placement edits outside the
+    file list allowed). Classifies the result first: blocked or partial
+    work stays open (Phase Map In progress, Partial log row, no review).
+    Otherwise reviews it in a second Opus subagent, adjudicates, records
+    the reviewed SHA, bumps the index row. A successful skip is recorded
+    as Complete with its dispositions in the Session Log Notes.
     Next: /refactor-checkpoint
 
   /refactor-checkpoint [<refactor>] [phase]
@@ -113,8 +119,10 @@ COMMANDS
     git autocommit → /refactor-next. A FAIL re-runs /refactor-next on
     the Corrections with no Codex and no commit. --through defaults to
     every phase but the final one. Stops on the limit, --max-fails
-    FAILs of one phase, Codex failure, red tests, a blocked or Codex
-    phase. Never pushes or deploys. Fire once via CronCreate with
+    FAILs of one phase, Codex failure, red tests, an unanswered
+    Blocking Question, a blocked, partial or unexecuted /refactor-next
+    result, a
+    blocked or Codex phase. Never pushes or deploys. Fire once via CronCreate with
     "/refactor-loop <kebab> --through <N>".
 
   /refactor-help
