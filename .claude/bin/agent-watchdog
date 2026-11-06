@@ -4,9 +4,12 @@
 #
 # Usage: agent-watchdog <task-output-file> [stall-seconds] [poll-seconds]
 #
-#   task-output-file  <session>/tasks/<agentId>.output, the path the agent's
-#                     completion notice names. It symlinks to the agent's live
-#                     transcript, which is appended on every tool call.
+#   task-output-file  The `output_file` named on the Agent launch acknowledgement,
+#                     passed as one argument. Do not derive it from the scratchpad:
+#                     after /clear the task path can stay under the launch session
+#                     while the scratchpad moves, so a derived path can be missing
+#                     (exit 66). It symlinks to the agent's live transcript, which
+#                     is appended on every tool call and is followed here.
 #   stall-seconds     transcript silence that counts as stalled (default 1200)
 #   poll-seconds      check interval (default 60)
 #

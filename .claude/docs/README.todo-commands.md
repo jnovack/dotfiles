@@ -419,11 +419,14 @@ had ended its turn to wait for a completion notice that never came. So:
   `plan`. It also stops on other `CronCreate` jobs in the session, and on a dirty
   tree that is not the work of the single in-flight item.
 - **Every background agent gets a watchdog.** `~/.claude/bin/agent-watchdog`
-  watches the agent's transcript (`<session>/tasks/<agentId>.output`). If the
-  transcript is silent for `--stall-minutes` while the agent is unfinished, the
-  watchdog exits 2. The loop then logs a `STALL` line and sends a push
-  notification. A stall does not stop the loop: once someone answers the
-  prompt, the agent's completion notice resumes it.
+  watches the agent's transcript. Its path is the `output_file` named on that
+  Agent launch's acknowledgement. It is not derived from the scratchpad, because
+  after `/clear` the task path can stay under the launch session while the
+  scratchpad moves. If the transcript is silent for `--stall-minutes` while the
+  agent is unfinished, the watchdog exits 2. The loop then logs a `STALL` line
+  and sends a push notification. A stall does not stop the loop: once someone
+  answers the prompt, the agent's completion notice resumes it. A launch with no
+  `output_file` logs the reason, sends one notification and waits unwatched.
 - **An item abandoned by an earlier run is recovered, not a stop.** A session
   that hits its usage limit mid-item leaves the row `in progress`. The next run
   checks with `~/.claude/bin/todo-agent-live` that no agent in any session is

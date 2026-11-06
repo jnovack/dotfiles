@@ -40,8 +40,9 @@ touch now passes `~/.claude/bin/plan-loop-check` before the loop relies on it, a
   at the keyboard rather than at 3am.
 
 `<sp>` below is the session scratchpad directory from the system prompt. No
-scratchpad listed → stop: both the mode check and the watchdog derive their paths
-from it.
+scratchpad listed → stop: the permission-mode and liveness checks take it as their
+argument. The watchdog does not use it; it arms on the path each Agent launch
+returns.
 
 ---
 
@@ -172,33 +173,60 @@ decides as usual:
 reviewer. When an Agent call returns a launch acknowledgement instead of a result,
 the agent is running in the background. Every time that happens:
 
-1. **Arm the watchdog** with `run_in_background`, and keep its task ID:
+1. **Arm the watchdog** for this launch with `run_in_background`. First clear
+   this launch's task ID, so a launch never inherits the previous agent's ID.
+   Then take the nonempty path on the launch acknowledgement's `output_file:`
+   line and pass it as one shell-quoted argument:
 
    ```bash
-   ~/.claude/bin/agent-watchdog <sp>/../tasks/<agentId>.output <M*60>
+   ~/.claude/bin/agent-watchdog "<output_file>" <M*60>
    ```
 
-   `<agentId>` comes from the launch result. The `tasks/` directory is the
-   scratchpad's sibling, and it is the same path the completion notice names.
+   The angle brackets are placeholders, not shell syntax. Quoting preserves the
+   path value. Do not include the `output_file:` label, the newline, surrounding
+   prose or the warning that follows the path. Keep the returned task ID with this
+   launch only.
+
+   Never derive the path from `<sp>`, the current session, the `agentId` or an
+   earlier launch, and never search other session directories. The returned path
+   is authoritative, because the observed layout breaks any derived one. On
+   2026-11-05, after `/clear` (session `7b57720e`), the agent's task path stayed
+   under the process's first session (`7cbf2f0f`), while the scratchpad and
+   transcript moved to the new session. The derived `<sp>/../tasks/<agentId>.output`
+   did not exist there, so the helper exited 66 and the agent ran unwatched. Do not
+   read or tail the output file; the acknowledgement says the same. The helper follows the
+   symlink, reads the completion metadata beside its target and checks transcript
+   age itself.
+
+   If the acknowledgement has no `output_file:` line, or the line is empty, do not
+   launch the helper, and do not guess a path or invent a task ID. Log the missing
+   field with the item and agent role, notify once for this launch, and continue at
+   step 2 unwatched. This launch has no task ID.
 2. Append a `WAIT` line to the log, then end the turn. Start nothing else.
-3. **Resume on whichever arrives first:**
-   - **Agent completion notice.** `TaskStop` the watchdog, then continue the
-     running skill exactly where its Agent call left off. For example, `/todo-next`
-     continues at "After the subagent returns".
-   - **Watchdog exit 0 (finished).** The completion notice is due or already
-     handled. If it was handled, ignore the exit. Otherwise end the turn and wait
-     for it.
+3. **Resume on whichever arrives first.** `TaskStop` applies only to a watchdog
+   this launch armed whose exit has not yet arrived.
+   - **Agent completion notice.** If this launch has a watchdog task ID and its
+     exit has not arrived, `TaskStop` that ID. Otherwise make no stop call: a
+     direct result, a missing-field launch and an exited watchdog have nothing to
+     stop. Then continue the running skill exactly where its Agent call left off.
+     For example, `/todo-next` continues at "After the subagent returns".
+   - **Watchdog exit 0 (finished).** The helper has exited, so there is nothing to
+     stop. The completion notice is due or already handled. If it was handled,
+     ignore the exit. Otherwise end the turn and wait for it.
    - **Watchdog exit 2 (stalled).** The agent has written nothing for `M` minutes,
      almost always because a permission prompt or an API error is waiting on a
      human. Append a `STALL` line and send `PushNotification`, for example
      `todo-loop: <ID> implementer silent 20m — likely a permission prompt`. Then end
-     the turn without re-arming the watchdog. Do not stop the loop and do not
-     touch the tree. The agent is still alive, and when the operator answers it,
-     its completion notice resumes the loop. Send one notification per stall.
+     the turn without re-arming the watchdog and without a `TaskStop` for it. Do
+     not stop the loop and do not touch the tree. The agent is still alive, and
+     when the operator answers it, its completion notice resumes the loop. Send one
+     notification per stall.
    - **Watchdog exit 64 or 66** (bad arguments, or no transcript). Log the exit,
-     notify once, and keep waiting for the completion notice, unwatched.
+     notify once, and keep waiting for the completion notice, unwatched. The helper
+     has exited, so make no stop call for it. This does not mean the agent stopped.
 
-An Agent call that returns its result directly needs no watchdog.
+An Agent call that returns its result directly needs no watchdog and records no
+task ID.
 
 ---
 
@@ -292,7 +320,8 @@ To stop:
    failing criterion, the denied command.
 2. Leave the tree exactly as it is. Do not revert, stash, reset or clean anything,
    because the operator needs the evidence.
-3. `TaskStop` any watchdog still running.
+3. `TaskStop` any watchdog still running: one that a launch armed and whose exit
+   has not arrived. With none recorded, or each already exited, make no stop call.
 4. File every deferred item and open decision in `.local/TODO.md` with the
    `todo-add` skill.
 5. Send `PushNotification` with one line, for example
