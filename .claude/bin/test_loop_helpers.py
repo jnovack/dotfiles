@@ -157,6 +157,30 @@ class ClaudePermissionMode(unittest.TestCase):
         self.write_transcript(['{"type":"user","mode":"auto"}'])
         self.assertEqual(self.mode(), "unknown")
 
+    def test_slash_prompt_without_field_keeps_newest_recorded_mode(self):
+        # A task notification records auto; the slash prompt after it carries
+        # no field. The newest *recorded* mode is still auto.
+        self.write_transcript([
+            '{"type":"user","permissionMode":"auto","message":"<task-notification>"}',
+            '{"type":"user","message":"/todo-loop"}',
+        ])
+        self.assertEqual(self.mode(), "auto")
+
+    def test_slash_only_session_is_unknown(self):
+        self.write_transcript([
+            '{"type":"user","message":"/todo-loop"}',
+            '{"type":"assistant"}',
+        ])
+        self.assertEqual(self.mode(), "unknown")
+
+    def test_peer_handback_changes_auto_to_default(self):
+        self.write_transcript([
+            '{"type":"user","permissionMode":"auto","message":"go"}',
+            '{"type":"assistant"}',
+            '{"type":"user","permissionMode":"default","message":"<hand-back>"}',
+        ])
+        self.assertEqual(self.mode(), "default")
+
     def test_usage_error(self):
         code, _, _ = run([MODE], env=self.env)
         self.assertEqual(code, 64)

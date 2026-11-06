@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# claude-permission-mode — print the permission mode a Claude Code session ran
-# its most recent prompt under, or "unknown".
+# claude-permission-mode — print the permission mode from the newest
+# mode-bearing record of the current session transcript, or "unknown".
 #
 # Usage: claude-permission-mode <scratchpad-dir>
 #
 # The scratchpad is <tmp>/<project-slug>/<session-id>/scratchpad, and the
 # session transcript is ~/.claude/projects/<project-slug>/<session-id>.jsonl.
-# Each user or scheduled prompt records the mode in effect when it arrived, so
-# a cron-fired run sees the mode it will actually execute under. A mode change
-# made after that prompt is not visible until the next one.
+# The result is the latest *recorded* mode, taken from a record of any kind
+# (plain prompts, task notifications, peer hand-backs). Not every record
+# carries the field: slash-command prompts have been seen without it, so the
+# result can be stale or "unknown". A mode change (Shift+Tab) may not itself be
+# recorded, so it can become visible only once a later record carries the field.
+# This is not a live query of the UI.
 #
 # Why: unattended loops stall on the first permission prompt nobody is there
 # to answer (seen 2026-10-21 under acceptEdits). Checking the mode up front

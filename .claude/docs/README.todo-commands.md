@@ -416,7 +416,13 @@ had ended its turn to wait for a completion notice that never came. So:
 
 - **Preflight** reads the session's permission mode with
   `~/.claude/bin/claude-permission-mode` and refuses `default`, `acceptEdits` and
-  `plan`. It also stops on other `CronCreate` jobs in the session, and on a dirty
+  `plan`. The helper reports the newest mode recorded in the transcript, not the
+  live mode; a slash-command-only session has been seen to record none and reads `unknown`, which
+  warns once per run and continues. The loop rechecks at every finished-agent
+  completion and direct Agent result, and stops on a prompting mode there
+  (`permission mode <mode> at resume`), preserving the item's actual `done` or
+  `in progress` status. For a still-running agent the mode is diagnostic only.
+  It also stops on other `CronCreate` jobs in the session, and on a dirty
   tree that is not the work of the single in-flight item.
 - **Every background agent gets a watchdog.** `~/.claude/bin/agent-watchdog`
   watches the agent's transcript. Its path is the `output_file` named on that

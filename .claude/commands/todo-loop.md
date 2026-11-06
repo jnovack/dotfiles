@@ -79,8 +79,16 @@ Run once, before the first cycle. Any failure is a stop (with `--check`, a repor
    - `default`, `acceptEdits` or `plan` → stop. Name the mode and tell the operator
      to restart the session in auto mode. These modes prompt for any command
      outside the allowlist, and an unattended prompt is a stall.
-   - `unknown` (the transcript format changed) → log a `WARN` line and continue;
-     the watchdog is the backstop.
+   - `unknown` (no mode-bearing record found) → log a `WARN` line and continue; the
+     watchdog is the backstop. The observed cause is a session whose only prompt was a
+     slash command, which has been seen to record no mode; a changed transcript format or a missing
+     transcript gives the same result. The helper reports the newest *recorded*
+     mode, not the live Shift+Tab state, so it can be stale. It is rechecked at each
+     agent completion (see Waiting on background agents). A first agent can stall
+     before any completion arrives, so the watchdog stays required.
+     **Warning budget:** at most one unknown `WARN` per loop run, this one included.
+     Later unknown results continue silently, except as mode detail in a stall or
+     error notification.
    - Helper missing or not executable → stop.
 2. **Helpers.** `~/.claude/bin/agent-watchdog`, `~/.claude/bin/plan-loop-check` and
    `~/.claude/bin/todo-agent-live` exist and are executable.
@@ -208,11 +216,15 @@ the agent is running in the background. Every time that happens:
    - **Agent completion notice.** If this launch has a watchdog task ID and its
      exit has not arrived, `TaskStop` that ID. Otherwise make no stop call: a
      direct result, a missing-field launch and an exited watchdog have nothing to
-     stop. Then continue the running skill exactly where its Agent call left off.
-     For example, `/todo-next` continues at "After the subagent returns".
+     stop. Then run the **completion mode check** (below) and, if it passes,
+     continue the running skill exactly where its Agent call left off. For
+     example, `/todo-next` continues at "After the subagent returns". A genuine
+     completion is handled once: a later duplicate or late notice for the same
+     launch is not another continuation, mode check or `WARN`.
    - **Watchdog exit 0 (finished).** The helper has exited, so there is nothing to
      stop. The completion notice is due or already handled. If it was handled,
-     ignore the exit. Otherwise end the turn and wait for it.
+     ignore the exit. Otherwise end the turn and wait for it; the mode check runs
+     on the notice, not here, so one completion never checks or notifies twice.
    - **Watchdog exit 2 (stalled).** The agent has written nothing for `M` minutes,
      almost always because a permission prompt or an API error is waiting on a
      human. Append a `STALL` line and send `PushNotification`, for example
@@ -225,8 +237,38 @@ the agent is running in the background. Every time that happens:
      notify once, and keep waiting for the completion notice, unwatched. The helper
      has exited, so make no stop call for it. This does not mean the agent stopped.
 
-An Agent call that returns its result directly needs no watchdog and records no
-task ID.
+**Completion mode check.** Before continuing a skill after a *finished* agent, run
+`~/.claude/bin/claude-permission-mode <sp>` (the real scratchpad argument; never
+fall back to another session or guess a mode).
+
+- `auto`, `bypassPermissions` or `dontAsk` → continue.
+- `default`, `acceptEdits` or `plan` → stop with reason
+  `permission mode <mode> at resume`, and tell the operator to restart the session in
+  auto mode. The stop's watchdog cleanup applies only to a watchdog still running
+  (never an unset or stale task ID), and the completed agent is never stopped.
+- `unknown` → continue. Log an unknown-mode `WARN` only if the run has not yet
+  logged one (check the log tail; the preflight unknown `WARN` counts, other `WARN`
+  lines do not).
+- Helper missing, not executable or failing, or any other value → stop, naming it.
+  A failed lookup is not a pass.
+
+A mode stop preserves the actual tracker status and tree. A completed implementer
+may already have written `done`, and a partial attempt may remain `in progress`;
+do not force either into the other, and do not roll back work. The Entry point
+table resumes the item: `done` goes to checkpoint, and `in progress` goes through
+its existing Corrections, liveness and recovery rules.
+
+**Running agents.** For watchdog exit 2, 64 or 66, and for the missing-field
+degraded wait, no completed agent is continuing. Run the helper only for
+diagnostics and add the mode (or `mode unavailable`) to the existing `STALL` or
+error log line and notification. Do **not** stop on a prompting mode (the agent is
+still alive), keep the single notification, do not re-arm, and keep waiting for
+the completion notice. Do not synthesize a watchdog exit when no helper started.
+
+An Agent call that returns its result directly needs no watchdog, records no task
+ID and has no `WAIT` cycle. It takes the same completion mode check, after every
+direct Agent return within either running TODO skill and before that skill's
+post-Agent continuation, not only a top-level Skill return.
 
 ---
 
@@ -286,10 +328,11 @@ is the first thing the operator reads, so on every resume read its tail before
 acting.
 
 ```text
-2026-10-21T00:21:08-04:00  BEGIN   mode=auto max-items=- max-fails=2 stall=20m entry=step1
+2026-10-21T00:21:08-04:00  BEGIN   mode=unknown max-items=- max-fails=2 stall=20m entry=step1
+2026-10-21T00:21:09-04:00  WARN    permission mode unknown (no mode-bearing record); continuing
 2026-10-21T00:21:12-04:00  START   FIX-TMPLBRACE-01  sonnet
 2026-10-21T00:21:33-04:00  WAIT    FIX-TMPLBRACE-01  implementer
-2026-10-21T00:41:40-04:00  STALL   FIX-TMPLBRACE-01  implementer silent 20m
+2026-10-21T00:41:40-04:00  STALL   FIX-TMPLBRACE-01  implementer silent 20m  mode=default
 2026-10-21T07:23:40-04:00  PASS    FIX-TMPLBRACE-01  a1b2c3d  fix: stop substituting the brace-less $NAME form
 2026-10-21T07:58:02-04:00  FAIL    FIX-TMPLSTRICT-01  1/2  C1, C2
 2026-10-21T12:03:35-04:00  RECOVER FEAT-WAITRETRY-01  in progress, no Corrections; agent finished (usage limit)
@@ -309,6 +352,9 @@ Stop on any of the following:
 - An item whose model is external, or a `/todo-next` blocker.
 - An item whose plan fails `plan-loop-check`.
 - A preflight failure, or an entry-point state the table sends to stop.
+- A prompting permission mode (`default`, `acceptEdits`, `plan`) at an agent
+  completion (`permission mode <mode> at resume`), or a mode helper that is
+  missing or failing there.
 - A denied tool call.
 - Any step that needs an action this file does not list.
 
