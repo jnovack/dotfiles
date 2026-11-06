@@ -225,6 +225,28 @@ tokens to retrieve one ~4k phase — and every later phase's steps land in a con
 that should only hold the current one. Renumbering or reordering phases means moving
 the markers with them.
 
+Each phase header also carries `**Unattended:** yes` or `**Unattended:** no — <reason>`,
+and each phase has a `### Commands` subsection. `/refactor-loop` gates every phase with
+`~/.claude/bin/plan-loop-check --phase N`, which requires both, so write them from the
+phase's real needs rather than a template default:
+
+- **Commands** lists the exact shell commands the phase's steps, its applicable
+  Definition of Done and its checkpoint validation need, including the shared Test
+  Command and its conditional validation rules. Every line is self-contained, names its
+  working directory, and uses only commands the permission settings allow (for scratch
+  copies use `cp -R` into a fresh `/tmp/<kebab>-phase-<N>/` child, never `rsync`, never
+  a copy of the whole live repository, never a reused dirty probe).
+- **Unattended** is decided per phase by its position and needs. The **actual last
+  phase** defaults to `no — final phase needs the operator`. The cohesion phase is
+  often penultimate (Step 2c inserts it before the final validation/ADR/release phase)
+  and then uses the same evidence-based decision as any other phase; only when it is
+  appended as the last phase does it get the final-phase default. A phase that needs
+  an operator step, a live service or a command the permission settings deny or
+  prompt for is `no` with that reason. Never guess a command or write a silent `yes`.
+- `--through` selects a range of phases; it does not override `no`. Existing tracking
+  files are not bulk-migrated: a legacy phase fails the gate with a message naming
+  what to add.
+
 **Do not add a `**Status:**` line to a phase header or a step section.** Phase state
 belongs only in the `## Phase Map` row and step state only in the `### Step Index`
 table. Duplicating it in prose creates a field nothing reads and agents forget to
@@ -234,7 +256,10 @@ update, which then reads as a real inconsistency to the next `/refactor-next`.
 
 ### Schema
 
-```text
+<!-- The outer fence is four backticks so the inner ```bash fences in the
+     ### Commands subsections do not terminate the schema early. -->
+
+````text
 # Refactor: [Title]
 
 <!-- Generated from [plan source] by /refactor-init on YYYY-MM-DD -->
@@ -403,6 +428,10 @@ One phase per `/refactor-next` invocation. The orchestrator does not chain phase
 **Model:** Sonnet
 **Baseline:** —
 **Reviewed:** —
+**Unattended:** yes
+<!-- yes, or: no — <reason>. The actual LAST phase gets "no — final phase needs the
+     operator". Any other phase: yes only if every command it needs is listed in
+     ### Commands and permitted; otherwise no with the reason. -->
 **Files to modify:** `path/to/file.go`, `path/to/other.go`
 
 ### Standard Preamble
@@ -451,6 +480,21 @@ and helper notes. Do not paraphrase or summarize — copy exactly.]
 
 [Verbatim content.]
 
+### Commands
+
+<!-- Every shell command this phase needs, as self-contained lines: the steps' commands,
+     the applicable Definition of Done and checkpoint validation commands, and the shared
+     Test Command with its conditional validation rules. Name the working directory
+     (`cd <dir> && ...`). Scratch work goes in a fresh `/tmp/<kebab>-phase-<N>/` child;
+     never copy a whole live repository or reuse a dirty probe. The unattended loop
+     gates on this list, so a needed command left out here stops the run. -->
+
+```bash
+[exact test command, e.g. go test ./...]
+[exact command from step 1.a]
+[exact command from the Definition of Done]
+```
+
 ### Definition of Done
 
 [Checklist items from PLAN.md's "Phase N is complete when:" section, formatted as
@@ -482,6 +526,10 @@ a markdown checklist. Add any items surfaced during Step 3 review.]
 **Model:** Opus
 **Baseline:** —
 **Reviewed:** —
+**Unattended:** yes
+<!-- A cohesion phase placed before the final phase uses the ordinary yes/no decision.
+     Only when it is appended as the actual last phase: "no — final phase needs the
+     operator". -->
 **Files to modify:** any file this refactor changed (`git diff <Phase 1 Baseline>`
 plus the refactor's untracked files), plus the shared destination of each
 consolidation, recorded in §Design Map
@@ -544,6 +592,13 @@ instead of doing it.
 Update the §Design Map Placement table and single-sources list to match the code, and
 list every applied and declined consolidation in the Session Log row.
 
+### Commands
+
+```bash
+[exact commands for steps K.a-K.d: read-only searches, `git diff <Phase 1 Baseline>`]
+[exact Test Command, run after each consolidation]
+```
+
 ### Definition of Done
 
 - [ ] Every K.a inventory item sits where §Design Map says, or the table now records
@@ -554,7 +609,7 @@ list every applied and declined consolidation in the Session Log row.
 - [ ] `[Test Command]` passes.
 
 <!-- phase:K:end -->
-```
+````
 
 ---
 

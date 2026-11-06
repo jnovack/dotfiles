@@ -85,14 +85,52 @@ hand.
 
 ## Phase 1 — [Title]        (marker-delimited)
   **Baseline:** / **Reviewed:**   <- commit SHAs the checkpoint diffs and delta-reviews against
+  **Unattended:** yes | no — <reason>   <- may /refactor-loop run this phase?
   Standard Preamble
   Step Index        <- status table for each sub-step
   Step 1.a ...
+  ### Commands      <- exact shell commands the steps, DoD and checkpoint validation need
   ### Corrections   <- written by a failed checkpoint; mandatory scope on the retry
   Definition of Done
 
 ## Phase K — Cohesion pass  <- added by /refactor-init before the final validation/ADR phase
 ```
+
+## Unattended phases and the phase gate
+
+`/refactor-loop` runs with no operator, so a phase that reaches a denied or prompting command stops the loop mid-run.
+Each phase therefore declares whether it may run unattended and lists the commands it needs:
+
+````text
+**Unattended:** yes
+...
+### Commands
+
+```bash
+go test ./...
+git diff --check
+```
+````
+
+- `**Unattended:**` is `yes` or `no — <reason>`, in the phase header, once.
+- `### Commands` lists every shell command the phase's steps, its applicable Definition of Done and its checkpoint
+  validation need, including the shared Test Command and its conditional validation rules. Lines are self-contained, name
+  their working directory, and scratch work goes under `/tmp/<kebab>-phase-<N>/` in a fresh directory. The section runs to
+  the next heading of level 1 to 3; level 4 and deeper headings stay inside it.
+- The **actual last phase** defaults to `no — final phase needs the operator`. A cohesion phase is last only when it is
+  appended last; `/refactor-init` normally places it before the final validation or release phase, where it gets the
+  ordinary evidence-based yes or no.
+
+`~/.claude/bin/plan-loop-check --phase N .local/REFACTOR.<kebab>.md` checks one phase (the block between its
+`<!-- phase:N:start -->` and `<!-- phase:N:end -->` markers, outside code fences). It fails on ambiguous or missing
+markers, a missing, duplicate, `no` or invalid `**Unattended:**` field, a missing, duplicate or empty `### Commands`,
+and any shell command in any fence of the phase (steps, Corrections and Notes included) that a Bash deny or ask rule
+matches. Neighbouring phases are never read. It is a policy lint only: a PASS does not authorize a denied or live
+operation, and it cannot tell whether the prose steps name every command they need.
+
+**No migration.** Existing tracking files are not rewritten. A legacy phase without the field or the section fails
+the gate with a message naming what to add; add it yourself, or run that phase by hand with `/refactor-next`. The
+same route handles a phase marked `no`: the loop will not run it, and `--through` does not override the field.
 
 ## Keeping the project cohesive
 
@@ -186,7 +224,10 @@ Runs the next incomplete phase whose dependencies are all complete. One phase pe
 - **A kebab title** — that refactor.
 
 Records the phase's baseline commit, constructs a prompt from the shared sections (including the Design Map), the
-Standard Preamble, phase steps, and closing instructions, then spawns a subagent at the assigned model.
+Standard Preamble, phase steps, and closing instructions, then spawns a subagent at the assigned model. The prompt
+carries the phase's full header (including **Unattended:**) and its `### Commands`, and tells the implementer to run
+commands as listed: a needed command that is missing from the list, or one that is denied, is a blocker (partial path),
+not something to improvise around. The Codex prompt gets the same content and rule.
 
 **Claude models (Haiku / Sonnet / Opus):** foreground subagent. When it returns, it first classifies the result: blocked
 or partial work stays open (Phase Map `In progress`, a `Partial` Session Log row, index `blocked` when blocked) and skips
@@ -238,7 +279,10 @@ On **WARN**: phase can advance; flags what to revisit.
 On **PASS**:
 
 - **more phases remain** — Step Index and Phase Map are confirmed `Complete`, the index `Phases` count is bumped, the
-  next phase's plan is audited and repaired (it stays `Not started`), and you are told to run `/refactor-next`.
+  next phase's plan is audited and repaired (it stays `Not started`), and you are told to run `/refactor-next`. The
+  audit also reconciles the next phase's `### Commands` with its steps, DoD and Test Command, then reports the
+  `plan-loop-check --phase` output. If operator work or unavailable validation prevents unattended execution it records
+  `no — <reason>`; that is a legitimate plan outcome, not a checkpoint failure.
 - **this was the last phase** — the refactor is **retired**: the index row is removed, and
   `.local/REFACTOR.<kebab>.md` (plus any `.RUNNOTES.md`) moves to `.local/completed/REFACTOR.<kebab>.completed.md`. If
   any phase's DoD required an ADR, you are reminded to run `/adr`.
@@ -260,8 +304,21 @@ step. The kebab title resolves as in `/refactor-next`.
 - `--through N` — last phase it may run. Default: every phase except the final one, which needs the operator.
 - `--max-fails K` — consecutive checkpoint FAILs of one phase before it stops. Default `2`.
 
+For a Codex phase at step 6, prompt generation is pending execution: the loop
+runs that prompt before applying its execution-return guards or checkpointing.
+A Corrections entry or FAIL retry that returns only a manual Codex prompt
+stops with its path for the operator; it does not checkpoint the previous run.
+
+Every launch is gated with `plan-loop-check --phase N`. Preflight checks the entry phase (even one already `Complete`
+and awaiting its checkpoint) and each incomplete phase through `--through`: a failing first phase stops the run, a later
+failure is reported and the loop finishes the earlier safe phases. It is rerun before the checkpoint of the target
+phase and before **every** `/refactor-next`: the Corrections entry row, the FAIL retry and the next phase, Codex
+phases included, since Corrections, operator edits or a handoff's plan repairs can change commands after preflight. A
+failure stops with the checker's `FAIL` lines; the loop never edits a plan to get past its own gate. A missing checker
+also stops it.
+
 It stops on the limit, the fail cap, a Codex failure or out-of-scope edit, red tests, a failed commit, an unanswered
-Blocking Question in the next phase, a blocked, partial or unexecuted `/refactor-next` result (Claude or Codex), a phase blocked
+Blocking Question in the next phase, a phase failing the gate above, a blocked, partial or unexecuted `/refactor-next` result (Claude or Codex), a phase blocked
 on dependencies, or a missing `codex` binary, and ends with a report plus any TODO IDs filed.
 Invoking it grants `git autocommit` at that one step only; it never pushes, deploys, executes Playwright or writes to a
 live service. To fire it once later, use `CronCreate` (one-shot, session-only, fires only while the REPL is idle) with

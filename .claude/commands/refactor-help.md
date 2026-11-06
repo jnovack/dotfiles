@@ -71,6 +71,32 @@ PER-PHASE STATE (inside .local/REFACTOR.<kebab>.md)
   ### Step Index row   Not started | In progress | Complete
   **Baseline:** <sha>  commit the phase started from (checkpoint diffs this)
   **Reviewed:** <sha>  commit reviewed up to (checkpoint reviews only the delta)
+  **Unattended:** yes | no — <reason>   header field: may /refactor-loop run it?
+  ### Commands         exact shell commands the phase's steps, DoD and
+                       checkpoint validation need (incl. the Test Command)
+
+UNATTENDED SAFETY  (plan-loop-check --phase N)
+──────────────────
+  ~/.claude/bin/plan-loop-check --phase N .local/REFACTOR.<kebab>.md
+  checks one phase: its **Unattended:** field is yes, its ### Commands
+  lists at least one command, and every shell fence in the phase clears
+  the Bash deny and ask rules. A PASS is a policy lint, not permission for
+  a denied or live operation.
+  - /refactor-loop gates the entry phase and each phase through --through
+    at preflight, the checkpoint target before each checkpoint, and the
+    phase before EVERY /refactor-next (Corrections entry, FAIL retry,
+    next phase, Codex phases too). Failure stops the loop with the FAIL
+    lines; the loop never repairs a plan to pass its own gate.
+  - New tracking files get both fields. Existing files are NOT migrated:
+    a legacy phase fails with a message naming what to add. Add the
+    fields yourself, or run the phase manually with /refactor-next.
+  - The actual last phase defaults to "no — final phase needs the
+    operator" (a cohesion phase is last only when appended last).
+    --through never overrides a "no".
+  - /refactor-next pastes ### Commands into the Claude and Codex prompts;
+    a needed command the list omits is a blocker, not improvised.
+  - /refactor-checkpoint fixes ahead: reconciles the next phase's Commands
+    or records a reasoned "no" (not a checkpoint failure).
 
 COMMANDS
 ────────
@@ -121,8 +147,10 @@ COMMANDS
     every phase but the final one. Stops on the limit, --max-fails
     FAILs of one phase, Codex failure, red tests, an unanswered
     Blocking Question, a blocked, partial or unexecuted /refactor-next
-    result, a
-    blocked or Codex phase. Never pushes or deploys. Fire once via CronCreate with
+    result, a phase failing plan-loop-check --phase, or an unmet
+    dependency. Step 6 executes a Codex prompt before checking its result;
+    a manual Codex prompt returned by a Corrections retry stops for the
+    operator. Never pushes or deploys. Fire once via CronCreate with
     "/refactor-loop <kebab> --through <N>".
 
   /refactor-help

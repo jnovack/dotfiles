@@ -88,7 +88,11 @@ Run once, before the first cycle. Any failure is a stop (with `--check`, a repor
      before any completion arrives, so the watchdog stays required.
      **Warning budget:** at most one unknown `WARN` per loop run, this one included.
      Later unknown results continue silently, except as mode detail in a stall or
-     error notification.
+     error notification. Reset the budget at the run's `BEGIN`; after compaction
+     restore it from this run's log records, as described by the completion check.
+     For an actual run, write its `BEGIN` before its first unknown `WARN`. With
+     `--check`, print the diagnostic only: do not append `BEGIN` or `WARN` or
+     change the log; the preflight-only check remains read-only.
    - Helper missing or not executable → stop.
 2. **Helpers.** `~/.claude/bin/agent-watchdog`, `~/.claude/bin/plan-loop-check` and
    `~/.claude/bin/todo-agent-live` exist and are executable.
@@ -187,11 +191,13 @@ the agent is running in the background. Every time that happens:
    line and pass it as one shell-quoted argument:
 
    ```bash
-   ~/.claude/bin/agent-watchdog "<output_file>" <M*60>
+   ~/.claude/bin/agent-watchdog '<output_file>' <M*60>
    ```
 
-   The angle brackets are placeholders, not shell syntax. Quoting preserves the
-   path value. Do not include the `output_file:` label, the newline, surrounding
+   The angle brackets are placeholders, not shell syntax. Use literal shell
+   quoting for the actual path, escaping embedded single quotes if needed, so
+   spaces, dollar signs and backticks remain data. Do not include the
+   `output_file:` label, the newline, surrounding
    prose or the warning that follows the path. Keep the returned task ID with this
    launch only.
 
@@ -207,14 +213,22 @@ the agent is running in the background. Every time that happens:
    age itself.
 
    If the acknowledgement has no `output_file:` line, or the line is empty, do not
-   launch the helper, and do not guess a path or invent a task ID. Log the missing
+   launch the helper, and do not guess a path or invent a task ID. Apply the
+   **Running agents** diagnostics below before logging or notifying. Log the missing
    field with the item and agent role, notify once for this launch, and continue at
    step 2 unwatched. This launch has no task ID.
 2. Append a `WAIT` line to the log, then end the turn. Start nothing else.
-3. **Resume on whichever arrives first.** `TaskStop` applies only to a watchdog
-   this launch armed whose exit has not yet arrived.
+3. **Resume on whichever arrives first.** Match the event to its launch record
+   first. Ignore an already-handled completion before any `TaskStop`, mode check
+   or continuation. A late watchdog exit for an already-completed launch or an
+   explicitly stopped watchdog only updates that launch's exit record: ignore
+   it without another diagnostic, notification or continuation. `TaskStop`
+   applies only to a watchdog this launch armed that
+   has neither exited nor already been stopped. A successful `TaskStop` disarms
+   its task ID immediately; do not wait for a later exit notice to disarm it.
    - **Agent completion notice.** If this launch has a watchdog task ID and its
-     exit has not arrived, `TaskStop` that ID. Otherwise make no stop call: a
+     exit has not arrived and it has not already been stopped, `TaskStop` that ID
+     and disarm it. Otherwise make no stop call: a
      direct result, a missing-field launch and an exited watchdog have nothing to
      stop. Then run the **completion mode check** (below) and, if it passes,
      continue the running skill exactly where its Agent call left off. For
@@ -227,13 +241,15 @@ the agent is running in the background. Every time that happens:
      on the notice, not here, so one completion never checks or notifies twice.
    - **Watchdog exit 2 (stalled).** The agent has written nothing for `M` minutes,
      almost always because a permission prompt or an API error is waiting on a
-     human. Append a `STALL` line and send `PushNotification`, for example
+     human. Apply the **Running agents** diagnostics below, then append a
+     `STALL` line and send `PushNotification` with that mode detail, for example
      `todo-loop: <ID> implementer silent 20m — likely a permission prompt`. Then end
      the turn without re-arming the watchdog and without a `TaskStop` for it. Do
      not stop the loop and do not touch the tree. The agent is still alive, and
      when the operator answers it, its completion notice resumes the loop. Send one
      notification per stall.
-   - **Watchdog exit 64 or 66** (bad arguments, or no transcript). Log the exit,
+   - **Watchdog exit 64 or 66** (bad arguments, or no transcript). Apply the
+     **Running agents** diagnostics below, then log the exit with that detail,
      notify once, and keep waiting for the completion notice, unwatched. The helper
      has exited, so make no stop call for it. This does not mean the agent stopped.
 
@@ -246,9 +262,11 @@ fall back to another session or guess a mode).
   `permission mode <mode> at resume`, and tell the operator to restart the session in
   auto mode. The stop's watchdog cleanup applies only to a watchdog still running
   (never an unset or stale task ID), and the completed agent is never stopped.
-- `unknown` → continue. Log an unknown-mode `WARN` only if the run has not yet
-  logged one (check the log tail; the preflight unknown `WARN` counts, other `WARN`
-  lines do not).
+- `unknown` → continue. Log an unknown-mode `WARN` only if this run has not yet
+  logged one. Keep that fact in run state; after compaction, inspect records since
+  the most recent `BEGIN` in `.local/TODO-LOOP.log`, not just a fixed-size tail.
+  The preflight unknown `WARN` counts. Other `WARN` kinds and unknown warnings
+  before this run's `BEGIN` do not consume its budget.
 - Helper missing, not executable or failing, or any other value → stop, naming it.
   A failed lookup is not a pass.
 
@@ -366,8 +384,9 @@ To stop:
    failing criterion, the denied command.
 2. Leave the tree exactly as it is. Do not revert, stash, reset or clean anything,
    because the operator needs the evidence.
-3. `TaskStop` any watchdog still running: one that a launch armed and whose exit
-   has not arrived. With none recorded, or each already exited, make no stop call.
+3. `TaskStop` any watchdog still running: one that a launch armed and that has
+   neither exited nor already been stopped. Disarm its ID when stopped. With
+   none recorded, or each already exited/stopped, make no stop call.
 4. File every deferred item and open decision in `.local/TODO.md` with the
    `todo-add` skill.
 5. Send `PushNotification` with one line, for example

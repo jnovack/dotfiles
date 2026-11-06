@@ -57,14 +57,15 @@ that file — never the index.
 4. Consistency check: if the Phase Map and the phase's `### Step Index` disagree
    (Phase Map says `Complete` but steps are open, or every step is `Complete`
    but the Phase Map row is not), flag the inconsistency and stop — do not run
-   anything until the operator resolves which is true. One exception: the row is
-   `In progress`, every step is `Complete`, and the latest execution row for that
-   phase in the Session Log is `Partial` (ignore `Review` and `Checkpoint failed`
-   rows). That is a pending validation retry, not an inconsistency: inspect the
-   completed results, preserve the original **Baseline**, rerun the tests and the
-   applicable Definition of Done, and finish the bookkeeping without
-   reimplementing completed steps. Any other unexplained disagreement still
-   stops. Existing Corrections stay mandatory on a retry.
+   anything until the operator resolves which is true. An `In progress` row with
+   every step `Complete` is an explained retry when either the latest execution
+   row for that phase is `Partial` (ignore `Review` and `Checkpoint failed` rows),
+   or its latest checkpoint failed and its mandatory `### Corrections` remain.
+   A phase-wide validation failure need not reopen a completed implementation
+   step. Inspect completed results, preserve the original **Baseline**, apply
+   every Correction even when its step is marked `Complete`, rerun tests and the
+   applicable Definition of Done, and finish bookkeeping without reimplementing
+   already-correct work. Any other unexplained disagreement still stops.
 5. Note the phase's **Model** from the Phase Map row.
 6. If the phase block contains a heading whose text is `Blocking Questions`
    (any level, outside fenced code blocks), check each question under it before
@@ -156,8 +157,12 @@ Copy verbatim from the phase's `### Standard Preamble` section.
 ### Part 2 — Phase assignment
 
 Copy verbatim: the phase header and all its metadata (including continued
-**Files to modify** lines and any ADR requirement), the `### Step Index`
-table, every `### Step N.x` section in order (full content, all code blocks),
+**Files to modify** lines, the **Unattended:** field and any ADR requirement), the
+`### Step Index` table, the phase's `### Commands` subsection (its heading and
+everything up to the next heading of level 3 or higher priority, nested
+lower-level headings included; it is the exact command inventory the
+implementer runs from, so the agent is never sent to the tracking file for it),
+every `### Step N.x` section in order (full content, all code blocks),
 the phase's `### Corrections` section if present, and every heading inside the
 phase markers whose text begins with `Definition of Done` (at any level), with
 its full content. More than one such heading means the phase has
@@ -167,7 +172,11 @@ orchestrator reaches the implementer. Find sections by Markdown boundaries (the
 next heading of the same or higher level, or the phase end marker), ignoring
 heading-looking text inside fenced code blocks. Verify each required part is
 present before launching the agent. Missing required content is a stop; never
-infer requirements or tests to fill the gap.
+infer requirements or tests to fill the gap. The one exception is a legacy phase
+written before `### Commands` existed: paste what exists, note in your report that
+the phase has no command inventory, and omit the run-as-listed paragraph from
+Part 3 rather than inventing a list (`/refactor-loop` refuses such a phase before
+it reaches this command; a manual run is the operator's decision).
 
 ### Part 3 — Closing instructions
 
@@ -183,11 +192,17 @@ selected refactor's real tracking-file name so the subagent never has to resolve
 > exclusion to excuse a failure. Skip any step already marked `Complete` in the
 > Step Index — verify its result exists in the code, or its explicit
 > terminal-state exclusion is recorded in the Session Log Notes, rather than
-> redoing it. For each remaining step, complete the implementation described in
-> its section, then mark it `Complete` in the `### Step Index` table in
-> `.local/REFACTOR.<kebab>.md`.
+> redoing it. For a remaining step excluded by the selected variant, do not
+> execute its implementation. First record the selected variant and all newly
+> excluded steps' authorized dispositions in one `Partial` progress row's
+> Session Log Notes, then mark those satisfied Step Index rows `Complete`.
+> Keep the Phase Map `In progress`: that progress row records satisfied
+> exclusions, not a successful phase. A retry can now verify those dispositions
+> even if later work stops. For each other remaining step, complete the
+> implementation described in its section, then mark it `Complete` in the
+> `### Step Index` table in `.local/REFACTOR.<kebab>.md`.
 >
-> If you must stop early (blocker, interruption, failing tests), do the partial
+> If you must stop early (blocker, interruption, failing tests or unmet DoD), do the partial
 > bookkeeping before you return: keep finished steps `Complete`, leave the rest
 > open, set this phase's Phase Map row to `In progress`, and append a `Partial`
 > Session Log row naming the blocker. Never mark unfinished work `Complete`.
@@ -197,6 +212,17 @@ selected refactor's real tracking-file name so the subagent never has to resolve
 > including where it contradicts a Step Index row already marked `Complete`. Those
 > marks are precisely what failed validation; treat the corrections as authoritative
 > over them. Do not delete the section: the checkpoint removes it once it passes.
+>
+> **Run shell commands as the phase's `### Commands` section lists them.** Do not swap
+> a listed command for another tool. A step written in prose maps to a line in that
+> section, so use the line. If a step, the Definition of Done or the Test Command needs
+> a command the section does not list, that is a blocker: do not invent an equivalent.
+> Take the partial path below and name the missing command in the `Partial` row. If a
+> command is denied or the permission system refuses it, do not retry it in another
+> form or through another tool. Stop through the same partial path and report the
+> exact denied command as a blocker. A denial is the operator's policy, and you may
+> not route around it. Unfinished steps stay open and the phase is never marked
+> `Complete`.
 >
 > **Place code for the project, not just the phase.** Before you add a function, type,
 > constant, file or hand-maintained list entry, check the §Design Map Placement table,
@@ -212,7 +238,7 @@ selected refactor's real tracking-file name so the subagent never has to resolve
 > the Design Map. If the right consolidation is bigger than this phase can absorb, make
 > the local change and add the consolidation to §Design Map Follow-ups.
 >
-> After all steps are done:
+> After all implementation steps and authorized exclusions are satisfied:
 >
 > 1. Run the §Test Command reproduced in this prompt.
 >    If tests fail, do not mark the phase complete: take the partial path above
@@ -220,19 +246,20 @@ selected refactor's real tracking-file name so the subagent never has to resolve
 > 2. Satisfy the Definition of Done. When the phase has terminal-state variants,
 >    the selected variant's checklist replaces the other phase checklists;
 >    the shared Definition of Done and Hard Constraints still apply and cannot
->    be waived. Record a successful skip or exclusion as literal `Complete` in
->    the Phase Map and Session Log, naming the variant and each excluded
->    step's disposition (the step and the phase-defined reason) in the Session
->    Log Notes only, and write those Notes before relying on the `Complete`
->    mark. Mark an excluded step `Complete` only as satisfied by that
->    disposition; do not claim its implementation exists. Claim success only
->    after tests and the applicable Definition of Done pass. For a blocked or
->    partial result, preserve truthful step states and do not mark the phase
->    complete.
+>    be waived. Verify each excluded step is satisfied by the selected path's
+>    authorized disposition, not by implementation that path forbids. Claim
+>    success only after tests and the applicable Definition of Done pass;
+>    otherwise take the partial path above and keep the phase open.
 > 3. Append one row to `## Session Log`:
 >    `| YYYY-MM-DD | Phase N — [name] | [model] | Complete | [one-line note] |`
->    Use `Partial` for blocked or partial execution, explaining why. A
->    successful skip/exclusion uses `Complete` with its disposition in Notes.
+>    For a successful skip/exclusion, name the selected variant and each
+>    excluded step's disposition (step and phase-defined reason) in these Notes
+>    only, carrying the verified dispositions forward from any progress row.
+>    Confirm every Step Index row is satisfied and `Complete`, without claiming
+>    excluded implementation exists. Then mark the phase `Complete` in
+>    `## Phase Map` for every successful path, including a normal run with no
+>    variants or exclusions. A blocked or partial run uses the partial path
+>    above, never this successful closing sequence.
 > 4. Create or update `.local/COMMIT-MSG.txt` — one running file describing the
 >    **entire** uncommitted set, Conventional Commits form, body explaining the *why*.
 >    Update the existing file rather than adding a second; change its top line to
@@ -268,7 +295,9 @@ Run in the **foreground** so the synopsis returns before you report to the user.
 
 Codex cannot be auto-spawned. Ensure `.local/.gitignore` exists (containing `*` and
 `!.gitignore`), then write the full constructed prompt to
-`.local/CODEX-PROMPT.<kebab>.md` for the user to paste into their Codex session.
+`.local/CODEX-PROMPT.<kebab>.md` for the user to paste into their Codex session. It
+is the same constructed prompt, so it carries the `### Commands` subsection, the
+header metadata and the run-as-listed rule exactly as the Claude prompt does.
 Then output:
 
 ```text

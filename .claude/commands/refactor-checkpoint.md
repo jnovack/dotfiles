@@ -85,9 +85,12 @@ invalid, and a SHA-shaped but unresolved value must never enter the delta branch
 
 - **It is a valid commit** — review only what changed since it: `git diff <reviewed>` plus
   untracked files. That covers operator hand-edits and anything you adjudicated in an
-  earlier checkpoint round. **If that delta is empty, skip the review** and mark the row
+  earlier checkpoint round. **Only when the diff succeeds and is empty, with no
+  phase-attributed untracked files, skip the review** and mark the row
   `N/A — reviewed at <sha>, no changes since`. Re-reviewing an unchanged tree buys
-  nothing and costs an Opus pass.
+  nothing and costs an Opus pass. If the diff fails after commit validation,
+  fall back to the full phase review and report the reason; an error is not
+  an empty delta.
 - **It is `—`, absent, `dirty`, or fails that validation** — run the full
   review over the phase's whole change set.
   Absent means the phase predates this workflow, ran under Codex, or was done by hand.
@@ -258,12 +261,18 @@ down precisely because the failures they describe are ones the test suite does n
 
 ### 5 — Check each Definition of Done criterion
 
-Read the phase's `### Definition of Done` checklist from `.local/REFACTOR.<kebab>.md`.
+Read the phase's Definition of Done sections from `.local/REFACTOR.<kebab>.md`:
+headings at any level whose text begins with `Definition of Done`, outside
+fenced code blocks. Each section ends at the next same-or-higher-level heading
+or the phase end marker. A heading-looking line in a fenced example is not a
+checklist or a terminal-state variant.
 When the phase has more than one heading beginning with `Definition of Done`
 (terminal-state variants), check the variant named in its latest execution Session Log
-Notes. Notes that name no variant, on a run that excluded no step, mean the base path:
-check the plain `Definition of Done` checklist. Only a successful skip or exclusion must
-name its variant, so demanding a name on every run would fail a fully implemented phase.
+Notes. Notes that name no variant, on a run that excluded no step, may use the
+plain `Definition of Done` base checklist only when it exists and the phase's
+conditions permit that path. Otherwise require an unambiguous selected variant;
+do not silently validate a missing base checklist. A fully implemented base-path
+run need not invent an exclusion or variant name.
 The named variant replaces the other phase checklists, including a base checklist that is an
 alternative; shared Definition of Done and Hard Constraints still apply and cannot be
 waived. A step excluded by that variant is satisfied by its recorded disposition (the
@@ -307,8 +316,8 @@ affected packages, `docs/openapi.yaml` (API behavior). FAIL if a relevant doc wa
 and no tests were touched, report WARN (not FAIL — existing coverage may be sufficient,
 but flag it).
 
-**ADRs** — If any shared or selected-variant DoD item, or a shared constraint, explicitly
-requires an ADR, verify the file exists in
+**ADRs** — If any shared or applicable phase DoD item (the base checklist or the
+selected variant), or a shared constraint, explicitly requires an ADR, verify the file exists in
 `docs/decisions/`. FAIL if required and missing. N/A if not required.
 
 ### 6 — Record the outcome
@@ -435,10 +444,32 @@ costs a plan edit, while correcting it after the run costs a failed checkpoint.
    `Not started`, leave `**Baseline:**` and `**Reviewed:**` unset, and change no source,
    test, doc or config file on its behalf. The reverse holds too: do not pull next-phase
    work back into the phase you just validated.
-5. **Run non-mutating consistency checks** over the revised plan and tree where useful:
+5. **Verify the next phase's unattended contract.** `/refactor-loop` gates every
+   phase with `~/.claude/bin/plan-loop-check --phase N+1 .local/REFACTOR.<kebab>.md`
+   before launching it, so reconcile the phase's `### Commands` subsection with what
+   it will actually run: inventory the commands from its steps, its applicable
+   Definition of Done items and the current shared `## Test Command` section
+   (conditional validation rules included). Then:
+   - add a missing `**Unattended:**` field or `### Commands` subsection (legacy
+     phases lack them), taking every command from the authoritative step, DoD or
+     Test Command text, never guessed;
+   - replace a denied or prompting command only with a **behavior-equivalent**
+     permitted one, and change the matching step or DoD text with it; if no
+     equivalent exists, do not weaken or waive the validation;
+   - when operator work, a live service or unavailable validation prevents unattended
+     execution, record `**Unattended:** no — <reason>`. That is a legitimate plan
+     outcome: it does not fail the completed phase's checkpoint, does not
+     authorize executing the successor and is not a defect to repair. Never reset an
+     intentional `no` merely to make the gate pass. The actual last phase defaults
+     to `no — final phase needs the operator`.
+
+   Then run the gate on the phase and report its actual output (`PASS`, or the `FAIL`
+   lines, including a deliberate `no`) in the **Next-phase plan** details. This is
+   a read-only policy lint: a PASS does not authorize a denied or live operation.
+6. **Run non-mutating consistency checks** over the revised plan and tree where useful:
    phase statuses, `git status --short` unchanged apart from your step 2–5 fixes, and
    `git diff --check`.
-6. **Append a Session Log row**, as terse decision lines:
+7. **Append a Session Log row**, as terse decision lines:
    `| YYYY-MM-DD | Phase N+1 — plan audit | [model] | Review | [corrections made]; Phase N+1 remains Not started |`.
    If the audit finds nothing to correct, record that instead.
 
@@ -484,7 +515,9 @@ verify:
   or recorded as out of scope (with the scope reason).
 - **Validation** — the exact commands run and their results, including every
   "not run: <reason>".
-- **Next-phase plan corrections** — what step 7 changed, or why it was skipped.
+- **Next-phase plan corrections** — what step 7 changed, or why it was skipped, plus
+  the final `plan-loop-check --phase N+1` output (a reasoned `no` is reported as
+  such, not as a failure).
 - **Confirmation that the next phase was not executed.**
 - **Blockers and residual risks** — out-of-scope findings and anything left for the
   operator to decide.

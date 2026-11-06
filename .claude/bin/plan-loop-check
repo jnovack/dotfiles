@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
 """plan-loop-check — report whether todo plans can run unattended under /todo-loop.
 
-Usage: plan-loop-check [--settings FILE]... PLAN...
+Usage: plan-loop-check [--settings FILE]... [--phase N] PLAN...
+
+With --phase N each PLAN is a refactor tracking file and only phase N is checked
+(one positive integer, given once). The phase is the block between the standalone
+`<!-- phase:N:start -->` / `<!-- phase:N:end -->` markers outside code fences; it
+needs one `**Unattended:** yes|no — <reason>` field in its header and one
+`### Commands` subsection (ends at the next level 1-3 heading) listing at least
+one shell command. Every shell fence in the block is policy-checked, not only
+Commands. Missing, duplicate or nested markers fail. Output ids are `<kebab>#<N>`
+(REFACTOR.<kebab>.md or .completed.md). Without --phase, behavior is as below.
 
 A plan is loop-safe when its frontmatter declares `unattended: yes`, it has a
 `## Commands` section listing at least one command, and every command in any
@@ -36,7 +45,7 @@ SHELL_FENCES = {"bash", "sh", "shell", "zsh"}
 
 
 def usage():
-    print("usage: plan-loop-check [--settings FILE]... PLAN...", file=sys.stderr)
+    print("usage: plan-loop-check [--settings FILE]... [--phase N] PLAN...", file=sys.stderr)
     sys.exit(64)
 
 
@@ -197,18 +206,23 @@ def frontmatter(text):
     return fields
 
 
-def shell_lines(text):
-    """Yield (in_commands_section, logical_line) for every shell fence."""
-    section, fence, buf = None, None, ""
-    for raw in text.splitlines():
+def shell_events(lines):
+    """Walk Markdown lines once, tracking code fences, and yield
+    ("text", index, line) for each line outside a fence (fence delimiters
+    excluded) and ("cmd", index, logical_line) for each logical line of every
+    shell fence, with backslash continuations joined and comments dropped.
+    Both modes share this walk so fences, continuations and comments mean the
+    same thing in a plan file and in a refactor phase."""
+    fence, buf = None, ""
+    for i, raw in enumerate(lines):
         line = raw.rstrip("\r")
         stripped = line.strip()
         if fence is None:
-            if line.startswith("## "):
-                section = line[3:].strip()
             m = re.match(r"^\s*(```+|~~~+)\s*([A-Za-z0-9_+-]*)", line)
             if m:
                 fence = (m.group(1), m.group(2).lower())
+            else:
+                yield "text", i, line
             continue
         if stripped.startswith(fence[0]) and stripped.strip("`~") == "":
             fence = None
@@ -221,7 +235,45 @@ def shell_lines(text):
         logical = (buf + stripped).strip()
         buf = ""
         if logical and not logical.startswith("#"):
-            yield section == "Commands", logical
+            yield "cmd", i, logical
+
+
+def shell_lines(text):
+    """Yield (in_commands_section, logical_line) for every shell fence."""
+    section = None
+    for kind, _, line in shell_events(text.splitlines()):
+        if kind == "text":
+            if line.startswith("## "):
+                section = line[3:].strip()
+        else:
+            yield section == "Commands", line
+
+
+def unattended_problems(declared):
+    """Judge an `unattended` value (plan frontmatter or phase header field)."""
+    word = re.match(r"[A-Za-z]*", declared).group(0).lower()
+    reason = declared[len(word):].strip(" \t:—–-")
+    if word == "no":
+        return ["declared `unattended: no`" + (" — " + reason if reason else " with no reason")]
+    if word != "yes":
+        return ["`unattended: %s` must be `yes` or `no — <reason>`" % declared]
+    return []
+
+
+def policy_problems(logical, rules, seen):
+    """Deny/ask findings for one logical shell line; `seen` dedupes per file."""
+    problems = []
+    for command in split_commands(logical):
+        for kind, pattern, source in rules:
+            if any(rule_matches(pattern, v) for v in variants(command)):
+                key = (kind, pattern, command)
+                if key in seen:
+                    break
+                seen.add(key)
+                verb = "denied" if kind == "deny" else "prompts (ask rule)"
+                problems.append("%s by Bash(%s) in %s: %s" % (verb, pattern, source, command))
+                break
+    return problems
 
 
 def check_plan(path, rules):
@@ -241,29 +293,14 @@ def check_plan(path, rules):
         problems.append("no `unattended:` in frontmatter; the plan predates loop-safety "
                         "(add it and a ## Commands section, or re-run /todo-plan)")
     else:
-        word = re.match(r"[A-Za-z]*", declared).group(0).lower()
-        reason = declared[len(word):].strip(" \t:—–-")
-        if word == "no":
-            problems.append("declared `unattended: no`" + (" — " + reason if reason else
-                            " with no reason"))
-        elif word != "yes":
-            problems.append("`unattended: %s` must be `yes` or `no — <reason>`" % declared)
+        problems.extend(unattended_problems(declared))
 
     has_section = re.search(r"^## Commands[ \t]*$", text, re.M) is not None
     listed = 0
     seen = set()
     for in_section, logical in shell_lines(text):
         listed += in_section
-        for command in split_commands(logical):
-            for kind, pattern, source in rules:
-                if any(rule_matches(pattern, v) for v in variants(command)):
-                    key = (kind, pattern, command)
-                    if key in seen:
-                        break
-                    seen.add(key)
-                    verb = "denied" if kind == "deny" else "prompts (ask rule)"
-                    problems.append("%s by Bash(%s) in %s: %s" % (verb, pattern, source, command))
-                    break
+        problems.extend(policy_problems(logical, rules, seen))
     if not has_section:
         problems.append("no `## Commands` section naming the exact shell commands to run")
     elif listed == 0:
@@ -271,15 +308,138 @@ def check_plan(path, rules):
     return plan_id, problems
 
 
+MARKER = re.compile(r"^\s*<!--\s*phase:([0-9]+):(start|end)\s*-->\s*$")
+HEADING = re.compile(r"^(#{1,6})[ \t]+(.*?)[ \t]*$")
+FIELD = re.compile(r"^\*\*Unattended:\*\*[ \t]*(.*?)[ \t]*$")
+
+
+def phase_id(path, n):
+    """`<kebab>#<N>` from REFACTOR.<kebab>.md or REFACTOR.<kebab>.completed.md;
+    any other filename reports its stem."""
+    name = os.path.basename(path)
+    if name.startswith("REFACTOR."):
+        name = name[len("REFACTOR."):]
+    for suffix in (".completed.md", ".md"):
+        if name.endswith(suffix) and len(name) > len(suffix):
+            name = name[:-len(suffix)]
+            break
+    else:
+        name = os.path.splitext(name)[0] or name
+    return "%s#%d" % (name, n)
+
+
+def phase_block(lines, n):
+    """Return (block_lines, None) for the one start/end marker pair of phase n
+    on standalone lines outside fences, or (None, problem). Anything ambiguous
+    fails: taking the first convenient block would check the wrong phase."""
+    want = str(n)
+    starts, ends, others = [], [], []
+    for kind, i, line in shell_events(lines):
+        m = MARKER.match(line) if kind == "text" else None
+        if not m:
+            continue
+        if m.group(1) == want:
+            (starts if m.group(2) == "start" else ends).append(i)
+        else:
+            others.append(i)
+    if len(starts) > 1 or len(ends) > 1:
+        return None, "phase %d has duplicate start/end markers" % n
+    if not starts and not ends:
+        return None, "no `<!-- phase:%d:start -->`/`end` markers found for phase %d" % (n, n)
+    if not starts or not ends:
+        return None, "phase %d has an unmatched %s marker" % (n, "end" if ends else "start")
+    if ends[0] < starts[0]:
+        return None, "phase %d end marker comes before its start marker" % n
+    if any(starts[0] < o < ends[0] for o in others):
+        return None, "phase %d markers enclose another phase's marker (nested blocks)" % n
+    return lines[starts[0] + 1:ends[0]], None
+
+
+def check_phase(path, n, rules):
+    plan_id = phase_id(path, n)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read().replace("\r\n", "\n")
+    except OSError as err:
+        return plan_id, ["cannot read plan: %s" % err.strerror]
+    block, problem = phase_block(text.splitlines(), n)
+    if problem:
+        return plan_id, [problem]
+
+    problems, seen = [], set()
+    fields = []               # (index, value) of every **Unattended:** outside fences
+    first_sub = None          # first heading of level 3 or deeper: ends the phase header
+    commands = []             # heading indexes of real `### Commands`
+    boundaries = []           # indexes of level 1-3 headings, which end a section
+    cmds = []                 # (index, logical) for every shell fence line in the block
+    for kind, i, line in shell_events(block):
+        if kind == "cmd":
+            cmds.append((i, line))
+            continue
+        h = HEADING.match(line)
+        if h:
+            level = len(h.group(1))
+            if level >= 3 and first_sub is None:
+                first_sub = i
+            if level <= 3:
+                boundaries.append(i)
+            if level == 3 and h.group(2) == "Commands":
+                commands.append(i)
+            continue
+        f = FIELD.match(line)
+        if f:
+            fields.append((i, f.group(1)))
+
+    guidance = ("(add `**Unattended:** yes` or `no — <reason>` to the phase header and a "
+                "`### Commands` subsection naming the exact shell commands; "
+                "legacy phases are never migrated automatically)")
+    if not fields:
+        problems.append("no `**Unattended:**` field in the phase header; the phase predates "
+                        "loop-safety " + guidance)
+    elif len(fields) > 1:
+        problems.append("more than one `**Unattended:**` field in the phase block")
+    elif first_sub is not None and fields[0][0] > first_sub:
+        problems.append("`**Unattended:**` must be in the phase header, before its subsections")
+    else:
+        problems.extend(unattended_problems(fields[0][1]))
+
+    start = end = None
+    if len(commands) > 1:
+        problems.append("more than one `### Commands` section in the phase block")
+    elif commands:
+        start = commands[0]
+        end = min([b for b in boundaries if b > start], default=len(block))
+
+    listed = 0
+    for i, logical in cmds:
+        if start is not None and start < i < end:
+            listed += 1
+        problems.extend(policy_problems(logical, rules, seen))
+    if not commands:
+        problems.append("no `### Commands` subsection naming the exact shell commands to run "
+                        + guidance)
+    elif len(commands) == 1 and listed == 0:
+        problems.append("`### Commands` lists no commands in a bash fence")
+    return plan_id, problems
+
+
 def main(argv):
     settings, plans, i = [], [], 0
     explicit = False
+    phase = None
     while i < len(argv):
         if argv[i] == "--settings":
             if i + 1 >= len(argv):
                 usage()
             settings.append(argv[i + 1])
             explicit = True
+            i += 2
+        elif argv[i] == "--phase":
+            # One positive decimal integer, given once; anything else is a usage error.
+            if phase is not None or i + 1 >= len(argv) or \
+                    not re.fullmatch(r"[0-9]+", argv[i + 1]) or int(argv[i + 1]) < 1:
+                usage()
+            phase = int(argv[i + 1])
             i += 2
         elif argv[i].startswith("-"):
             usage()
@@ -299,7 +459,10 @@ def main(argv):
 
     failed = False
     for path in plans:
-        plan_id, problems = check_plan(path, rules)
+        if phase is None:
+            plan_id, problems = check_plan(path, rules)
+        else:
+            plan_id, problems = check_phase(path, phase, rules)
         if not problems:
             print("PASS  %s" % plan_id)
         for problem in problems:
