@@ -175,8 +175,10 @@ What each hook enforces:
   failures. It gets 60 s because its `npx` fallback is slow on first use.
 - `graph-first-gate.py`: makes Claude query the knowledge graph before text
   search; `check` gates the search, `mark` records a graph call.
-- `rm-memory-guard.py`: denies a delete of anything a memory file references
-  and hands the matching memory lines back, so Claude must ask before retrying.
+- `rm-memory-guard.py`: denies a delete of a file that memory for the same
+  repo, or memory naming that repo, references. It hands the matching lines
+  back, so Claude must ask before retrying. Regenerated `.local/` review
+  reports are exempt.
 - `cron-auto-mode-gate.py`: refuses `CronCreate` unless the session is in
   `auto` or `bypassPermissions` mode; a payload with no mode is refused.
 - `followup-todo-gate.py`: blocks a final response that defers work without a
