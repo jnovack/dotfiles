@@ -144,11 +144,14 @@ COMMANDS
     $refactor-handoff (background) → own test run + scope check →
     git autocommit → /refactor-next. A FAIL re-runs /refactor-next on
     the Corrections with no Codex and no commit. --through defaults to
-    every phase but the final one. Stops on the limit, --max-fails
-    FAILs of one phase, Codex failure, red tests, an unanswered
-    Blocking Question, a blocked, partial or unexecuted /refactor-next
-    result, a phase failing plan-loop-check --phase, or an unmet
-    dependency. Step 6 executes a Codex prompt before checking its result;
+    every phase but the final one. Each checkpoint and /refactor-next
+    runs in a fresh Opus subagent that returns a LOOP-RESULT line,
+    verified against new Session Log rows before the loop acts on it.
+    Stops on the limit, --max-fails FAILs of one phase, Codex failure,
+    red tests, an unanswered Blocking Question, a blocked, partial or
+    unexecuted /refactor-next result, a bad or unverified LOOP-RESULT,
+    a phase failing plan-loop-check --phase, or an unmet dependency.
+    Step 6 executes a Codex prompt before checking its result;
     a manual Codex prompt returned by a Corrections retry stops for the
     operator. Never pushes or deploys. Fire once via CronCreate with
     "/refactor-loop <kebab> --through <N>".

@@ -293,12 +293,12 @@ Runs the checkpoint → handoff → commit → next-phase cycle unattended, so p
 step. The kebab title resolves as in `/refactor-next`.
 
 ```text
-/refactor-checkpoint <kebab>
-  FAIL       → /refactor-next <kebab> (executes ### Corrections); no Codex, no commit; back to checkpoint
+/refactor-checkpoint <kebab>        (fresh Opus subagent)
+  FAIL       → /refactor-next <kebab> (fresh Opus subagent) (executes ### Corrections); no Codex, no commit; back to checkpoint
   PASS/WARN  → codex exec -s workspace-write '$refactor-handoff PHASE=<n> NEXT_PHASE=<n+1> ...' (background)
              → verify exit status, diff scope and the Test Command itself
              → git autocommit (only if .local/COMMIT-MSG.txt exists)
-             → /refactor-next <kebab>; back to checkpoint
+             → /refactor-next <kebab> (fresh Opus subagent); back to checkpoint
 ```
 
 - `--through N` — last phase it may run. Default: every phase except the final one, which needs the operator.
@@ -308,6 +308,11 @@ For a Codex phase at step 6, prompt generation is pending execution: the loop
 runs that prompt before applying its execution-return guards or checkpointing.
 A Corrections entry or FAIL retry that returns only a manual Codex prompt
 stops with its path for the operator; it does not checkpoint the previous run.
+
+Each checkpoint and `/refactor-next` runs in a fresh `general-purpose` Opus subagent that returns a `LOOP-RESULT`
+line. The loop confirms it against new Session Log evidence before acting (prompt generation is verified by its fresh
+file), and keeps the gates, Codex handoff, commit and FAIL count itself. This keeps a long run's context from growing
+by about 55KB of command text per cycle.
 
 Every launch is gated with `plan-loop-check --phase N`. Preflight checks the entry phase (even one already `Complete`
 and awaiting its checkpoint) and each incomplete phase through `--through`: a failing first phase stops the run, a later
