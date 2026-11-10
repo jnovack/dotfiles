@@ -67,6 +67,128 @@ linked to it. `~/.claude/CLAUDE.md` is not linked because
 `claude-templates assemble` generates it. `.claude/docs` and `.claude/templates`
 are not linked because nothing loads them from `~/.claude`.
 
+Hooks the repo does not ship live in `~/.claude/hooks.local/`, which `sync.sh`
+never touches. That covers machine- or employer-specific hooks, such as an
+Azure CLI gate whose test cases name real resources. Reference them from
+`settings.json` as `$HOME/.claude/hooks.local/<file>`. They cannot live in
+`~/.claude/hooks`: the repo is public, and `~/.claude/hooks` is a link into it,
+so anything placed there lands in the checkout.
+
+The repo hooks run only once `settings.json` wires them. These are the `hooks`
+entries to merge into `~/.claude/settings.json` with `/update-config`, next to
+any entries already there:
+
+```json
+{
+  "PreToolUse": [
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$HOME/.claude/hooks/rm-memory-guard.py\"",
+          "timeout": 10
+        }
+      ]
+    },
+    {
+      "matcher": "Grep|Glob|Bash",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$HOME/.claude/hooks/graph-first-gate.py\" check",
+          "timeout": 10
+        }
+      ]
+    },
+    {
+      "matcher": "CronCreate",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$HOME/.claude/hooks/cron-auto-mode-gate.py\"",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "matcher": "Write|Edit",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$HOME/.claude/hooks/markdown-lint-gate.py\"",
+          "timeout": 60
+        }
+      ]
+    },
+    {
+      "matcher": "mcp__code-review-graph__.*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$HOME/.claude/hooks/graph-first-gate.py\" mark",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$HOME/.claude/hooks/followup-todo-gate.py\"",
+          "timeout": 10
+        },
+        {
+          "type": "command",
+          "command": "python3 \"$HOME/.claude/hooks/intent-capture-nudge.py\"",
+          "timeout": 10
+        },
+        {
+          "type": "command",
+          "command": "\"$HOME/.claude/hooks/tmux-bell.sh\"",
+          "timeout": 5
+        }
+      ]
+    }
+  ],
+  "Notification": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"$HOME/.claude/hooks/tmux-bell.sh\"",
+          "timeout": 5
+        }
+      ]
+    }
+  ]
+}
+```
+
+What each hook enforces:
+
+- `markdown-lint-gate.py`: lints each `.md` file Claude writes and reports
+  failures. It gets 60 s because its `npx` fallback is slow on first use.
+- `graph-first-gate.py`: makes Claude query the knowledge graph before text
+  search; `check` gates the search, `mark` records a graph call.
+- `rm-memory-guard.py`: denies a delete of anything a memory file references
+  and hands the matching memory lines back, so Claude must ask before retrying.
+- `cron-auto-mode-gate.py`: refuses `CronCreate` unless the session is in
+  `auto` or `bypassPermissions` mode; a payload with no mode is refused.
+- `followup-todo-gate.py`: blocks a final response that defers work without a
+  TODO ID.
+- `intent-capture-nudge.py`: nudges intent capture when a session left source
+  changes.
+- `tmux-bell.sh`: rings the terminal bell so tmux flags the pane when Claude
+  is waiting for you.
+
+Hooks start firing in the next session, or after `/hooks`, not reliably in the
+session that edits `settings.json`.
+
 `sync.sh` never edits `~/.claude/settings.json`. The loop helpers need four
 machine-local allow rules, which you add on each new machine from an attended
 Claude Code session with the `update-config` skill (`/update-config`), once
