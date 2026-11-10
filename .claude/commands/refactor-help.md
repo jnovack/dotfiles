@@ -141,7 +141,7 @@ COMMANDS
 
   /refactor-loop [<refactor>] [--through N] [--max-fails 2]
     Unattended driver. Cycles /refactor-checkpoint → Codex
-    $refactor-handoff (background) → own test run + scope check →
+    $refactor-handoff (haiku subagent) → own test run + scope check →
     git autocommit → /refactor-next. A FAIL re-runs /refactor-next on
     the Corrections with no Codex and no commit. --through defaults to
     every phase but the final one. Each checkpoint and /refactor-next

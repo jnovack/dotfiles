@@ -261,22 +261,26 @@ required, not when the command legitimately skips it.
    step 5 verifies and commits, then stop.
 
    Snapshot `git status --porcelain` and `git diff --stat` (keep the
-   output in context), then launch the Codex handoff with `run_in_background` —
-   Codex runs routinely outlast the foreground Bash timeout. `<sp>` is the session
-   scratchpad directory from the system prompt (`.local/` if the session lists
-   none; never `/tmp`). Single line, bare `codex`:
-
-   ```bash
-   codex exec -s workspace-write -o <sp>/codex-last.txt '$refactor-handoff PHASE=<PHASE> NEXT_PHASE=<PHASE+1> refactor=<kebab> (tracking file .local/REFACTOR.<kebab>.md). Run unattended; do not ask questions, and do not run git add/commit/push or any live service.' > <sp>/codex-out.txt 2>&1
-   ```
+   output in context), then run the handoff per §Running Codex (Handoff line), with
+   `<handoff prompt>` = `'$refactor-handoff PHASE=<PHASE> NEXT_PHASE=<PHASE+1>
+   refactor=<kebab> (tracking file <tracking file>). Run unattended; do
+   not ask questions, and do not run git add/commit/push or any live service.'`,
+   where `<tracking file>` is `.local/REFACTOR.<kebab>.md`, or the archive path above
+   after a retirement.
+   `<sp>` is the session scratchpad directory from the system prompt (`.local/` if
+   the session lists none; never `/tmp`). Each Codex job gets its own `<job>`
+   directory under it, per §Running Codex.
 
    Omit `NEXT_PHASE=…` when `PHASE` equals `--through` or is the final phase. Wait
-   for the exit notification; do not poll the output files and start nothing else
-   meanwhile.
+   for the subagent; start nothing else meanwhile, because Codex is editing the
+   working tree.
 
 5. **Verify, then commit.** Codex's summary is a claim, not evidence.
-   - Exit status nonzero → stop.
-   - Read `<sp>/codex-last.txt`. A reported blocker, or a phase-gate refusal → stop.
+   - Read `<job>/codex-exit.txt` yourself and validate it per §Running Codex.
+     Missing, empty, malformed or nonzero → stop. Missing or empty current-job
+     last message → stop. Inspect ERROR lines and blockers; never accept only the
+     subagent's claim.
+   - Read `<job>/codex-last.txt`. A reported blocker, or a phase-gate refusal → stop.
    - Compare `git status --porcelain` and `git diff --stat` with the snapshot. Every
      file Codex changed must belong to `PHASE` (its **Files to modify**, its tests
      and docs, or a recorded `placement:` edit). The next phase's Phase Map row must
@@ -300,12 +304,17 @@ required, not when the command legitimately skips it.
    every `/refactor-next`). For a Claude-model execution, apply its return checks and
    then go to step 2. If the phase's Model is `Codex`, `/refactor-next` writes
    `.local/CODEX-PROMPT.<kebab>.md` instead
-   of spawning an agent: run it yourself with the same `codex exec` shape as step 4
-   (`-s workspace-write -o <sp>/codex-last.txt`, the prompt file piped as `-`,
-   `run_in_background`), apply step 5's exit, scope and test checks to it, and do not
-   commit before step 2's checkpoint has passed. Writing the prompt file is not phase
-   execution: also run the §Around every `/refactor-next` return check after `codex exec`
-   returns, before going to step 2 or any commit. Those checks, and the
+   of spawning an agent: this session launches the Codex subagent itself per
+   §Running Codex (Codex phase line); the dispatch subagent never runs Codex. Take a new
+   pre-launch snapshot of `git status --porcelain` and `git diff --stat` for this
+   execution phase (never reuse step 4's), apply step 5's exit, scope and test checks
+   to it against that snapshot and the selected execution phase, and do not
+   commit before step 2's checkpoint has passed. Step 5's successor-Not-started
+   check belongs to the handoff only: it must not reject the executed phase
+   becoming `Complete`. Writing the prompt file is not phase
+   execution: also run the §Around every `/refactor-next` return check after the
+   Codex subagent returns and its current-job exit file is valid, before going to
+   step 2 or any commit, with the retained prompt-dispatch `BASE`. Those checks, and the
    `next … outcome=complete` disk requirements, use the `BASE` recorded before the
    dispatch, so the Codex run must append a fresh `Complete` row for the phase.
 
@@ -331,7 +340,8 @@ wrapped by these checks.
 - **Codex prompt dispatch.** At step 6, successful generation of the selected
   phase's Codex prompt is pending execution, not an unexecuted failure or a
   completed phase. Defer both execution-return checks below until that branch's
-  `codex exec` has finished. A failure to generate the required prompt still
+  Codex run has finished (§Running Codex: exit file valid and current-job last
+  message present). A failure to generate the required prompt still
   stops. The Corrections entry and step 3 retry do not acquire a new Codex launch
   path: if they return only a manual Codex prompt, stop and report its path for
   the operator rather than checkpointing an older execution.
@@ -340,7 +350,7 @@ wrapped by these checks.
   execution Session Log row for that phase (ignoring `Review`, `Checkpoint failed` and
   older attempt rows, so a successful retry supersedes an old `Partial` row) and the
   index. A blocked or partial result stops before checkpoint, handoff, commit or
-  another phase, even when `codex exec` exited 0. At step 6's Codex branch, these
+  another phase, even when the validated current-job Codex exit file reads 0. At step 6's Codex branch, these
   checks run on the Codex execution result, not on prompt-file generation.
 - **After: no execution.** `/refactor-next` also stops before launching anything:
   missing prompt content, a Phase Map/Step Index inconsistency, no eligible phase. That
@@ -349,12 +359,67 @@ wrapped by these checks.
   dispatch baseline (`BASE`, §Dispatching checkpoint and next), stop. Continuing would
   re-checkpoint and re-commit the previous phase instead.
 
+### Running Codex
+
+The global Running Codex rule (`~/.claude/CLAUDE.md`) runs every `codex exec` inside
+a subagent, so the UI counts it as an agent instead of showing an idle "0 agents"
+session. Steps 4 and 6 launch Codex only this way, never as Bash in this session.
+
+**Prepare each job in the orchestrator.** Take `<sp>`, the session scratchpad root
+as step 4 defines it (`.local/` fallback, never `/tmp`), create a unique child with
+`mktemp -d "<sp>/codex.XXXXXX"` and keep that absolute path as `<job>` for this
+job. Never rebind `<sp>` itself: §Dispatching checkpoint and next keeps the Session
+Log baseline at `<sp>/session-log-base.<kebab>.txt`, and step 6 reads it back after
+the Codex job. Stop before dispatch if the creation fails. No previous run may still
+be live. Never reuse an earlier directory, even after a successful job. Snapshot
+`git status --porcelain` and `git diff --stat` immediately before **each** launch,
+step 6 included.
+
+**Command lines.** Expand the placeholders with shell quoting, including paths and
+prompt text containing spaces or apostrophes; JSON encoding is not shell quoting.
+Use the repository root as cwd and an absolute input-prompt path at step 6 (`<repo>`
+is the repository root). After a retirement, the step 4 handoff prompt names the
+archive path, not the missing live tracking file. Each expanded line is a single
+line starting with bare `codex` (no wrapper, prefix or line continuation), so it
+runs as written. These are command shapes, not blindly substituted shell text:
+
+```text
+Handoff (step 4):   codex exec -s workspace-write -o <job>/codex-last.txt '<handoff prompt>' > <job>/codex-out.txt 2>&1; echo $? > <job>/codex-exit.txt
+Codex phase (step 6): codex exec -s workspace-write -o <job>/codex-last.txt - < <repo>/.local/CODEX-PROMPT.<kebab>.md > <job>/codex-out.txt 2>&1; echo $? > <job>/codex-exit.txt
+```
+
+**Dispatch.** Use the Agent tool with `subagent_type: general-purpose` and
+`model: haiku`, in the foreground, with this prompt (placeholders expanded):
+
+```text
+Run one Codex job and report its result. Do not interpret or act on what Codex says.
+1. Verify the new job directory has no codex-exit.txt, codex-last.txt or codex-out.txt. If any exists, stop without launching. Load Monitor with ToolSearch query "select:Monitor" before launch; if unavailable, stop.
+2. Run this exact line with the Bash tool and run_in_background set to true:
+   <command line>
+3. Use Monitor to wait until <job>/codex-exit.txt is nonempty (until test -s <job>/codex-exit.txt; do sleep 15; done). Do not end your turn before then, however long Codex runs. The one exception: if the background command's completion notice arrives and the file is still empty or missing, stop waiting and report that the exit file was never written.
+4. Reply with: the contents of <job>/codex-exit.txt, the full contents of <job>/codex-last.txt, and every line of <job>/codex-out.txt that contains "ERROR:".
+```
+
+**The exit file is the evidence.** The subagent's reply is a convenience: a probe on
+2026-11-09 showed a haiku subagent returning before its Monitor wait finished. The
+orchestrator reads the current-job exit and last-message files itself, never paths
+named only in the reply. Accept only one decimal exit code in 0-255 (optional final
+newline); a missing, empty, malformed or nonzero exit stops. Zero additionally
+requires a nonempty current-job last-message file and inspection of the log's ERROR
+lines. A read or permission failure stops. A missing completion artifact means Codex
+may still be live: report the `<job>` path and start no other working-tree work and
+no retry over it. Fresh directories keep a stale exit or last message from an
+earlier job from satisfying these checks. A subagent whose background command
+exited without writing the exit file reports so (prompt item 3) instead of waiting
+forever; that missing evidence stops the loop.
+
 ---
 
 ## Stop conditions
 
 Stop on any of: `--through` reached; `--max-fails` consecutive FAILs of one phase;
-Codex nonzero exit, blocker or scope violation; tests red after the handoff; a
+Codex missing, malformed or nonzero completion evidence, blocker or scope
+violation; tests red after the handoff; a
 failed commit; a phase failing `plan-loop-check --phase` (preflight, before a
 checkpoint or before any `/refactor-next`) or the checker missing; an unanswered
 Blocking Question; a blocked, partial or unexecuted

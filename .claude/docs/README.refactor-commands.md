@@ -295,8 +295,8 @@ step. The kebab title resolves as in `/refactor-next`.
 ```text
 /refactor-checkpoint <kebab>        (fresh Opus subagent)
   FAIL       → /refactor-next <kebab> (fresh Opus subagent) (executes ### Corrections); no Codex, no commit; back to checkpoint
-  PASS/WARN  → codex exec -s workspace-write '$refactor-handoff PHASE=<n> NEXT_PHASE=<n+1> ...' (background)
-             → verify exit status, diff scope and the Test Command itself
+  PASS/WARN  → codex exec -s workspace-write '$refactor-handoff PHASE=<n> NEXT_PHASE=<n+1> ...' (haiku subagent)
+             → verify the exit file, diff scope and the Test Command itself
              → git autocommit (only if .local/COMMIT-MSG.txt exists)
              → /refactor-next <kebab> (fresh Opus subagent); back to checkpoint
 ```
