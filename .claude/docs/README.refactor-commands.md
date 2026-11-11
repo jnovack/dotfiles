@@ -322,7 +322,12 @@ phases included, since Corrections, operator edits or a handoff's plan repairs c
 failure stops with the checker's `FAIL` lines; the loop never edits a plan to get past its own gate. A missing checker
 also stops it.
 
-It stops on the limit, the fail cap, a Codex failure or out-of-scope edit, red tests, a failed commit, an unanswered
+When Codex is out of usage (plan limit, quota, credits or a 429 past its retries, classified by
+`~/.claude/bin/codex-job-status`) and left the tree untouched, the loop fails open instead of stopping: it skips that
+and every later handoff (the checkpoint already reviewed the phase), runs Codex phases with a Sonnet stand-in on the
+same prompt, and files a TODO per unreviewed phase.
+
+It stops on the limit, the fail cap, any other Codex failure or out-of-scope edit, red tests, a failed commit, an unanswered
 Blocking Question in the next phase, a phase failing the gate above, a blocked, partial or unexecuted `/refactor-next` result (Claude or Codex), a phase blocked
 on dependencies, or a missing `codex` binary, and ends with a report plus any TODO IDs filed.
 Invoking it grants `git autocommit` at that one step only; it never pushes, deploys, executes Playwright or writes to a

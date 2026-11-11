@@ -147,8 +147,10 @@ COMMANDS
     every phase but the final one. Each checkpoint and /refactor-next
     runs in a fresh Opus subagent that returns a LOOP-RESULT line,
     verified against new Session Log rows before the loop acts on it.
-    Stops on the limit, --max-fails FAILs of one phase, Codex failure,
-    red tests, an unanswered Blocking Question, a blocked, partial or
+    Codex out of usage fails open: handoffs are skipped (TODO filed)
+    and Codex phases run with a Sonnet stand-in on the same prompt.
+    Stops on the limit, --max-fails FAILs of one phase, any other Codex
+    failure, red tests, an unanswered Blocking Question, a blocked, partial or
     unexecuted /refactor-next result, a bad or unverified LOOP-RESULT,
     a phase failing plan-loop-check --phase, or an unmet dependency.
     Step 6 executes a Codex prompt before checking its result;

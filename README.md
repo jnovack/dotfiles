@@ -191,7 +191,7 @@ What each hook enforces:
 Hooks start firing in the next session, or after `/hooks`, not reliably in the
 session that edits `settings.json`.
 
-`sync.sh` never edits `~/.claude/settings.json`. The loop helpers need four
+`sync.sh` never edits `~/.claude/settings.json`. The loop helpers need five
 machine-local allow rules, which you add on each new machine from an attended
 Claude Code session with the `update-config` skill (`/update-config`), once
 each, preserving every other setting:
@@ -201,11 +201,12 @@ Bash(~/.claude/bin/agent-watchdog *)
 Bash(~/.claude/bin/todo-agent-live *)
 Bash(~/.claude/bin/claude-permission-mode *)
 Bash(~/.claude/bin/plan-loop-check *)
+Bash(~/.claude/bin/codex-job-status *)
 ```
 
 These rules match the literal `~/.claude/bin/<helper>` invocation prefix the
-todo commands use. They do not cover other spellings of the path, and they do
-not change what the helpers or hooks do.
+todo and refactor loop commands use. They do not cover other spellings of the
+path, and they do not change what the helpers or hooks do.
 
 ## Codex Skills
 

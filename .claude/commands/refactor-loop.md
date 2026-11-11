@@ -260,6 +260,9 @@ required, not when the command legitimately skips it.
    file below and omit `NEXT_PHASE` (there is no successor). Codex still runs, then
    step 5 verifies and commits, then stop.
 
+   If Codex is already marked out of usage for this run (§When Codex is out of
+   usage), skip the handoff and go to step 5.
+
    Snapshot `git status --porcelain` and `git diff --stat` (keep the
    output in context), then run the handoff per §Running Codex (Handoff line), with
    `<handoff prompt>` = `'$refactor-handoff PHASE=<PHASE> NEXT_PHASE=<PHASE+1>
@@ -276,10 +279,10 @@ required, not when the command legitimately skips it.
    working tree.
 
 5. **Verify, then commit.** Codex's summary is a claim, not evidence.
-   - Read `<job>/codex-exit.txt` yourself and validate it per §Running Codex.
-     Missing, empty, malformed or nonzero → stop. Missing or empty current-job
-     last message → stop. Inspect ERROR lines and blockers; never accept only the
-     subagent's claim.
+   - Classify the job yourself per §Running Codex (`codex-job-status <job>`).
+     `failed` → stop. `unavailable` → §When Codex is out of usage, which skips the
+     next bullet. `ok` → inspect ERROR lines and blockers; never accept only the
+     subagent's claim. When the handoff was skipped, skip this bullet and the next.
    - Read `<job>/codex-last.txt`. A reported blocker, or a phase-gate refusal → stop.
    - Compare `git status --porcelain` and `git diff --stat` with the snapshot. Every
      file Codex changed must belong to `PHASE` (its **Files to modify**, its tests
@@ -305,7 +308,8 @@ required, not when the command legitimately skips it.
    then go to step 2. If the phase's Model is `Codex`, `/refactor-next` writes
    `.local/CODEX-PROMPT.<kebab>.md` instead
    of spawning an agent: this session launches the Codex subagent itself per
-   §Running Codex (Codex phase line); the dispatch subagent never runs Codex. Take a new
+   §Running Codex (Codex phase line), or the Claude stand-in when Codex is out of
+   usage (§When Codex is out of usage); the dispatch subagent never runs Codex. Take a new
    pre-launch snapshot of `git status --porcelain` and `git diff --stat` for this
    execution phase (never reuse step 4's), apply step 5's exit, scope and test checks
    to it against that snapshot and the selected execution phase, and do not
@@ -402,24 +406,77 @@ Run one Codex job and report its result. Do not interpret or act on what Codex s
 
 **The exit file is the evidence.** The subagent's reply is a convenience: a probe on
 2026-11-09 showed a haiku subagent returning before its Monitor wait finished. The
-orchestrator reads the current-job exit and last-message files itself, never paths
-named only in the reply. Accept only one decimal exit code in 0-255 (optional final
-newline); a missing, empty, malformed or nonzero exit stops. Zero additionally
-requires a nonempty current-job last-message file and inspection of the log's ERROR
-lines. A read or permission failure stops. A missing completion artifact means Codex
+orchestrator classifies the current-job files itself, never paths named only in the
+reply, with one line from the repo root:
+
+```bash
+~/.claude/bin/codex-job-status <job>
+```
+
+It prints `ok` (exit 0), `failed: <reason>` (exit 1) or `unavailable: <ERROR line>`
+(exit 2). It accepts only one decimal exit code in 0-255 (optional final newline);
+`ok` also requires a nonempty last-message file, and the orchestrator still inspects
+the log's ERROR lines. `failed` stops; `unavailable` follows §When Codex is out of
+usage. A read or permission failure stops. A missing completion artifact means Codex
 may still be live: report the `<job>` path and start no other working-tree work and
 no retry over it. Fresh directories keep a stale exit or last message from an
 earlier job from satisfying these checks. A subagent whose background command
 exited without writing the exit file reports so (prompt item 3) instead of waiting
 forever; that missing evidence stops the loop.
 
+### When Codex is out of usage
+
+A Codex account out of usage (plan limit, API quota, credits, or HTTP 429 past
+Codex's own retries) says nothing about the phase, and stopping on it wasted the
+rest of an unattended run. The loop fails open on that one case and keeps every
+other Codex failure a stop:
+
+1. **Qualify.** Both must hold: `codex-job-status <job>` prints `unavailable: …`,
+   and `git status --porcelain` and `git diff --stat` equal the pre-launch
+   snapshot. A changed tree means Codex hit the limit mid-edit; that is partial
+   work, so stop as for any other Codex failure.
+2. **Latch.** Mark Codex out of usage for the rest of this run and launch no
+   further Codex job: usage does not come back mid-run. Keep the `unavailable:`
+   line for the report.
+3. **Handoff (step 4).** Skip it and continue with step 5 without its two Codex
+   bullets: the scope check, the Test Command and the commit all still run. The
+   checkpoint that just passed already reviewed the phase in an Opus subagent and
+   repaired the next phase's plan; the handoff is a second review, not a gate.
+   Before ending, file one TODO per skipped handoff via `todo-add`: "Phase `<N>`
+   of `<kebab>` committed without the Codex `$refactor-handoff` review (Codex out
+   of usage); review commit `<sha>`."
+4. **Codex phase (step 6).** Run the same prompt with a Claude stand-in. Take a
+   fresh pre-launch snapshot, then dispatch the Agent tool with
+   `subagent_type: general-purpose` and `model: sonnet`, in the foreground, with
+   this prompt (placeholders expanded):
+
+   ```text
+   Read <repo>/.local/CODEX-PROMPT.<kebab>.md and carry out that phase exactly as it instructs, including its Step Index, Phase Map and Session Log bookkeeping. It was written for Codex; Codex is out of usage, so you run it instead.
+   - You run inside /refactor-loop with no operator. Never ask a question; if the phase would need an answer, record it as the prompt says to record a blocker, and stop.
+   - Do not run git add, git commit, git autocommit, git push, codex, or anything against a live service.
+   - Return at most ten summary lines, including blockers; omit raw diffs.
+   ```
+
+   The stand-in's return takes the place of a valid exit file; every other check
+   step 6 applies to a Codex run applies unchanged: step 5's scope and test checks
+   against the new snapshot, then §Around every `/refactor-next` with the retained
+   `BASE`, which needs a fresh `Complete` execution row for the phase. The prompt
+   file is the same constructed prompt `/refactor-next` gives a Claude implementer,
+   so the plan's commands and gates are unchanged. Sonnet, because `/refactor-init`
+   assigns Codex only to fully specified mechanical phases.
+
+The Corrections entry and step 3 retry still stop on a manual Codex prompt; this
+section adds no Codex launch path there. A missing `codex` binary or changed flags
+remain preflight stops: those are setup faults, not usage.
+
 ---
 
 ## Stop conditions
 
 Stop on any of: `--through` reached; `--max-fails` consecutive FAILs of one phase;
-Codex missing, malformed or nonzero completion evidence, blocker or scope
-violation; tests red after the handoff; a
+Codex missing, malformed or nonzero completion evidence (except Codex out of
+usage with an unchanged tree, §When Codex is out of usage), blocker or scope
+violation; tests red after the handoff or a Codex phase; a
 failed commit; a phase failing `plan-loop-check --phase` (preflight, before a
 checkpoint or before any `/refactor-next`) or the checker missing; an unanswered
 Blocking Question; a blocked, partial or unexecuted
@@ -442,6 +499,8 @@ the `todo-add` skill, then report:
  Phases completed this run   <list, with commit SHAs>
  Last checkpoint             Phase N — PASS / WARN / FAIL
  Stop reason                 <condition, with the evidence>
+ Codex out of usage          no / yes — <unavailable: line>; handoffs skipped
+                             for phases <list>; phases <list> run by Sonnet
  Tree                        clean / dirty — <what is uncommitted>
  TODO IDs filed              <ids, or none>
  Next                        <command for the operator>

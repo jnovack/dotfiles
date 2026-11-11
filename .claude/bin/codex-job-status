@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# codex-job-status — classify one finished `codex exec` job from its files.
+#
+# Usage: codex-job-status <job-dir>
+#
+# <job-dir> is the per-job directory /refactor-loop creates (§Running Codex),
+# holding codex-exit.txt (the exit code), codex-last.txt (the -o last
+# message) and codex-out.txt (stdout+stderr). One line is printed:
+#
+#   ok                      exit 0 and a nonempty last message
+#   unavailable: <line>     nonzero exit and an ERROR: line saying the account
+#                           is out of usage, quota or credits (or rate limited
+#                           past Codex's own retries)
+#   failed: <reason>        anything else: missing, empty or malformed exit
+#                           file, other nonzero exit, empty last message
+#
+# Exit codes: 0 ok, 1 failed, 2 unavailable, 64 usage.
+#
+# Why: reported 2026-11-11, /refactor-loop stopped dead when Codex ran out of tokens,
+# because every nonzero Codex exit was a stop. Out-of-quota is not a defect in
+# the phase, so the loop fails open on it (skips the handoff review, or runs a
+# Codex phase with a Claude implementer instead). Every other failure still
+# stops, so the match is deliberately narrow: only ERROR: lines, only quota
+# wording Codex itself prints (taken from codex-cli 0.164.0), and only with a
+# nonzero exit. Widening it would let a real Codex failure be skipped.
+# The caller must still confirm Codex left the working tree unchanged: a run
+# that hit the limit mid-edit is partial work, not "unavailable".
+
+set -u
+
+if [ $# -ne 1 ]; then
+	echo "usage: codex-job-status <job-dir>" >&2
+	exit 64
+fi
+
+job=$1
+exit_file=$job/codex-exit.txt
+last_file=$job/codex-last.txt
+out_file=$job/codex-out.txt
+
+if [ ! -r "$exit_file" ]; then
+	echo "failed: $exit_file missing or unreadable (Codex may still be running)"
+	exit 1
+fi
+
+# One decimal code 0-255 with an optional final newline; anything else is
+# malformed evidence, not a code.
+code=$(cat "$exit_file")
+case "$code" in
+'' | *[!0-9]*)
+	echo "failed: malformed exit file: '$code'"
+	exit 1
+	;;
+esac
+if [ "${#code}" -gt 3 ] || [ "$code" -gt 255 ]; then
+	echo "failed: malformed exit file: '$code'"
+	exit 1
+fi
+
+if [ "$code" -eq 0 ]; then
+	if [ -s "$last_file" ]; then
+		echo "ok"
+		exit 0
+	fi
+	echo "failed: exit 0 but $last_file missing or empty"
+	exit 1
+fi
+
+# Codex's own wording for an exhausted plan or API key:
+#   "You've hit your usage limit…", "Usage limit reached…",
+#   "Quota exceeded. Check your plan and billing details.",
+#   "…Add credits to continue using Codex.", *_credits_depleted,
+#   usage_limit_reached, and "exceeded retry limit, last status: 429…".
+quota='usage limit|usage_limit_reached|check your plan and billing|add credits to continue|credits_depleted|last status: 429'
+if [ -r "$out_file" ]; then
+	line=$(grep -F 'ERROR:' "$out_file" | grep -i -E -m 1 "$quota")
+	if [ -n "$line" ]; then
+		echo "unavailable: $line"
+		exit 2
+	fi
+fi
+
+echo "failed: codex exited $code"
+exit 1
