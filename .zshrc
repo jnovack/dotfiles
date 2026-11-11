@@ -141,7 +141,12 @@ fi
 [[ -f ~/.p10k.local.zsh ]] && source ~/.p10k.local.zsh
 [[ -f ~/.iterm2_shell_integration.zsh ]] && source ~/.iterm2_shell_integration.zsh
 
-export GPG_TTY="$(tty)"
+# $TTY, not $(tty): Powerlevel10k instant prompt (top of this file) redirects
+# stdin while zshrc loads, so `tty` prints the literal "not a tty". pinentry-mac
+# ignores GPG_TTY, so the console never notices, but pinentry-curses over SSH
+# tries to open a file named "not a tty" and signing fails with "No such file
+# or directory". zsh sets $TTY from the real terminal at startup.
+export GPG_TTY="$TTY"
 if command -v gpgconf >/dev/null 2>&1; then
   gpgconf --launch gpg-agent >/dev/null 2>&1 || true
 fi

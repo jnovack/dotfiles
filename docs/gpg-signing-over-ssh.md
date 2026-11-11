@@ -12,8 +12,8 @@ its `pinentry-program` is fixed for all of them. So the fix has two halves:
 
 | Half | Does |
 | --- | --- |
-| A pinentry dispatcher | Lets one agent serve a GUI dialog to the desktop and a terminal prompt over SSH |
-| A login-time preset | Loads the passphrase into the agent at console login, so SSH never needs a pinentry at all |
+| A pinentry dispatcher | GUI dialog at the desktop, terminal prompt over SSH |
+| A login-time preset | Primes the agent at console login; SSH never prompts |
 
 The preset is what makes signing silent. The dispatcher is the fallback for when
 it doesn't run, so the failure mode is a prompt you can answer rather than one
@@ -84,7 +84,7 @@ This repo's canonical `.zshrc` already does this — if `~/.zshrc` is the synced
 symlink, skip to step 4. Otherwise add to `~/.zshrc`:
 
 ```sh
-export GPG_TTY=$(tty)
+export GPG_TTY="$TTY"
 
 if [ -n "$SSH_CONNECTION" ]; then
     export PINENTRY_USER_DATA=curses
@@ -94,6 +94,19 @@ fi
 
 `GPG_TTY` is what lets `pinentry-curses` find the terminal to draw on;
 `updatestartuptty` tells an already-running agent about the current one.
+
+Use zsh's `$TTY`, not `$(tty)`. Powerlevel10k's instant prompt redirects stdin
+while `.zshrc` loads, so `$(tty)` stores the literal string `not a tty`. The
+console never notices, because `pinentry-mac` ignores `GPG_TTY`. Over SSH,
+`pinentry-curses` tries to open a file called `not a tty`, and signing fails:
+
+```text
+[GNUPG:] PINENTRY_LAUNCHED 20240 curses 1.3.3 not a tty xterm-256color ...
+gpg: signing failed: No such file or directory
+```
+
+The fourth field after `PINENTRY_LAUNCHED` is the tty the agent was given. If it
+reads `not a tty`, `GPG_TTY` is wrong. Check it with `echo $GPG_TTY`.
 
 ## 4. Write the preset script
 
@@ -232,7 +245,7 @@ applies: you get a `pinentry-curses` box in the terminal instead of silence.
 - **Keygrip, not key ID.** `gpg-preset-passphrase` and `keyinfo` both take the
   keygrip. Passing a fingerprint or long key ID fails silently-ish and leaves the
   cache cold.
-- **This is a real security trade.** The signing passphrase sits in the agent for
-  the full TTL, reloaded automatically at every console login. Anyone with access
-  to your unlocked console can sign as you without knowing the passphrase. That is
-  the price of prompt-free SSH commits.
+- **This is a real security trade.** The signing passphrase sits in the agent
+  for the full TTL, reloaded automatically at every console login. Anyone with
+  access to your unlocked console can sign as you without knowing the
+  passphrase. That is the price of prompt-free SSH commits.
