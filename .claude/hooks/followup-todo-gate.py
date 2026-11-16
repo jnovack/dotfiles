@@ -24,6 +24,14 @@ Design choices (the failure modes a naive change would reintroduce):
   * Ignores fenced code, `>` blockquotes and inline quoted/backticked spans:
     quoting a rule, a summary or a trigger phrase is not deferring work, and
     all three fired in real transcripts.
+  * Skips NEGATED and COMPLETED phrases per match (FIX-FOLLOWUP-01). Two
+    2026-11-10 false blocks: "No follow-up TODO was needed." (nothing deferred)
+    and "marked two of them out of scope, but I fixed them here anyway" (done
+    in-turn). A negator within two words before the phrase, or an "out of
+    scope" phrase followed by a bounded affirmative-completion continuation,
+    is exempt. Negated, uncertain, partial or different-work completions keep
+    blocking, as do unrecognised paraphrases: a false block costs one cycle, a
+    missed deferral is lost for good.
 """
 import json
 import re
@@ -83,13 +91,87 @@ def final_text(data):
     return "\n".join(reversed(parts))
 
 
+# Exemptions (FIX-FOLLOWUP-01). Clause/sentence boundaries are approximate on
+# purpose: when unsure, keep the block rather than lose a real deferral.
+# Dashes and parentheses end a clause too: without them "Nothing breaks — a
+# follow-up is needed" let the leading "Nothing" exempt a real deferral.
+CLAUSE_BOUNDARY = re.compile(r"[.;:!?,\n—–()]")
+SENTENCE_BOUNDARY = re.compile(r"[.;:!?\n]")
+WORD = re.compile(r"[\w'’-]+")
+NEGATORS = frozenset({"no", "nothing", "none", "without", "not", "never"})
+# One verb tuple feeds both the negation guard and the completion grammar, so
+# the two cannot drift apart ("done" is passive-only in the grammar but still
+# counts as completion for the guard).
+_VERBS = ("fixed", "resolved", "addressed", "handled")
+_VERB = "(?:" + "|".join(_VERBS) + ")"
+COMPLETION_WORDS = frozenset(_VERBS + ("done",))
+# A negator that governs one of these verbs negates the reminder, not the
+# deferral: "Do not forget the follow-up" still defers work.
+REMINDER_WORDS = frozenset({"forget", "skip", "miss", "ignore", "overlook"})
+NEGATION_BREAKERS = COMPLETION_WORDS | REMINDER_WORDS
+_LEAD = r",?\s*(?:(?:but|and)\s+)?"
+_END = r"(?:\s+(?:here\s+anyway|here|anyway))?\s*"
+COMPLETION = re.compile(
+    rf"{_LEAD}(?:"
+    rf"(?:I|we)\s+(?:have\s+)?(?:already\s+)?{_VERB}\s+(?:it|them)"
+    rf"|(?:(?:is|are|was|were|has\s+been|have\s+been)\s+)?(?:already\s+)?(?:{_VERB}|done)"
+    rf"){_END}",
+    re.IGNORECASE,
+)
+UNCERTAIN = frozenset(
+    "if unless whether may might could would will should maybe perhaps probably "
+    "possibly apparently seem seems think believe hope".split()
+)
+
+
+def negated(para, match):
+    """True when a negator sits <=2 words before this match, in its clause.
+
+    Incident 2026-11-10: "No follow-up TODO was needed." reported that nothing
+    was deferred yet blocked. Only text BEFORE the match counts ("a follow-up:
+    has no backoff" must block), the match's own words never count ("not
+    tracked" must not exempt itself), and a completion verb between negator and
+    phrase disables the exemption: "not fixed and out of scope" negates the
+    fix, not the deferral. A reminder verb there does the same: "do not forget
+    the follow-up" negates the forgetting.
+    """
+    clause = CLAUSE_BOUNDARY.split(para[: match.start()])[-1]
+    words = [w.lower() for w in WORD.findall(clause)]
+    for k in range(max(0, len(words) - 3), len(words)):
+        if words[k] in NEGATORS and not NEGATION_BREAKERS.intersection(words[k + 1:]):
+            return True
+    return False
+
+
+def completed(para, match):
+    """True when an "out of scope" phrase directly reports the same work done.
+
+    Incident 2026-11-10: "marked two of them out of scope, but I fixed them
+    here anyway" blocked. Operator decision: only a bounded continuation right
+    after the phrase counts (COMPLETION must consume the rest of the sentence).
+    A sentence-wide verb search was rejected: it would exempt "out of scope and
+    not fixed" and fixes of a different issue. Uncertainty markers anywhere in
+    the sentence veto it. Unrecognised paraphrases keep blocking, resolved by
+    the normal one-extra-cycle path; silently losing a deferral is worse.
+    """
+    if match.group(0).lower() != "out of scope":
+        return False
+    start = SENTENCE_BOUNDARY.split(para[: match.start()])[-1]
+    tail = SENTENCE_BOUNDARY.split(para[match.end():])[0]
+    if UNCERTAIN.intersection(w.lower() for w in WORD.findall(start + match.group(0) + tail)):
+        return False
+    return COMPLETION.fullmatch(tail) is not None
+
+
 def untracked(text):
     """Return paragraphs that defer work with no TODO ID in or after them."""
     prose = MENTION.sub("", QUOTE.sub("", FENCE.sub("", text)))
     paras = [p for p in re.split(r"\n\s*\n", prose) if p.strip()]
     hits = []
     for i, para in enumerate(paras):
-        if not DEFERRAL.search(para):
+        # Each match is judged on its own: one exempt phrase must not hide a
+        # second, genuine deferral in the same paragraph.
+        if all(negated(para, m) or completed(para, m) for m in DEFERRAL.finditer(para)):
             continue
         following = paras[i + 1] if i + 1 < len(paras) else ""
         if TODO_ID.search(para) or TODO_ID.search(following):
