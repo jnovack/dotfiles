@@ -42,6 +42,24 @@ Design choices (the failure modes a naive change would reintroduce):
     or a glob); or a `cd`/`pushd` segment, even behind `{`, `then` or `do`, after
     which the target is not relative to the payload `cwd`. The fallback
     over-guards rather than under-guards.
+  * Guards glob targets. `rm .local/PLAN*.md` is an ordinary way to delete the only
+    copy, and a raw `PLAN*.md` never substring-matches a memory line. With a known
+    `cwd`, no prior `cd`/`pushd` and no `$`/backtick in the token, the glob is
+    expanded against `cwd` and each match is checked as a literal target (same
+    repo scoping, same report exemption, `MIN_TOKEN_LEN` per basename). Otherwise,
+    or when nothing matches, the basename pattern is `fnmatch`ed globally against
+    each word of each memory line (a word is split at whitespace, backticks and
+    quotes, then reduced to its basename): over-guards, the safe direction. An
+    unresolved shell expression is never globbed. Lexical guard only: names built
+    dynamically are not guaranteed.
+  * Splits segments with a quote-aware raw scanner (`segments()`), not a regex.
+    A regex split before `shlex` cut `grep -E 'a|rm .local/PLAN.md b'` at the quoted
+    `|`; the fragment's unbalanced quote fell back to whitespace splitting, `rm`
+    became the leader and the hook denied a harmless grep. The scanner keeps quotes
+    raw until real operator boundaries are known and only then tokenizes, because
+    after `shlex` `';'` and `;` are indistinguishable. It is not a shell parser: no
+    substitution traversal, nothing is evaluated. Unbalanced quotes fall back to
+    the old regex split (guarding beats silently allowing).
   * Compares ancestors of both abspath and realpath. Which form Claude Code
     recorded in the project dir name is unknown, and they differ for macOS temp
     dirs (`/var` vs `/private/var`) and symlinked dirs. The repo-root walk uses
@@ -62,6 +80,7 @@ Design choices (the failure modes a naive change would reintroduce):
     fragments would match half of any prose line and train the reader to click
     through.
 """
+import fnmatch
 import glob
 import json
 import os
@@ -126,6 +145,100 @@ def scope_for(token, cwd):
         return None
 
 
+def split_tokens(span):
+    try:
+        return shlex.split(span)
+    except Exception:
+        return span.split()  # e.g. a trailing backslash
+
+
+def segments(command):
+    """Yield one token list per simple command, splitting only on real operators.
+
+    Scans the RAW text so quoted/escaped `;` `|` `&` and newlines stay argument
+    data. `&` belonging to a redirect (`2>&1`, `>&2`, `&>`) is kept. Parentheses
+    stay in the span (`(rm x)`, `$(pwd)/x` are handled by the caller). A `#` at a
+    word start is a comment through its newline, which still ends the command.
+    Backslash-newline is a continuation. Raises ValueError on unbalanced quotes.
+    """
+    spans = []
+    buf = []
+    i = 0
+    n = len(command)
+    while i < n:
+        ch = command[i]
+        if ch == "\\":
+            if command[i + 1:i + 2] != "\n":  # escaped newline: dropped entirely
+                buf.append(command[i:i + 2])
+            i += 2
+        elif ch == "'":
+            end = command.find("'", i + 1)
+            if end < 0:
+                raise ValueError("unbalanced single quote")
+            buf.append(command[i:end + 1])
+            i = end + 1
+        elif ch == '"':
+            buf.append(ch)
+            i += 1
+            while True:
+                if i >= n:
+                    raise ValueError("unbalanced double quote")
+                c = command[i]
+                if c == "\\" and i + 1 < n:
+                    if command[i + 1] != "\n":
+                        buf.append(command[i:i + 2] if command[i + 1] in '$`"\\' else c)
+                        i += 2 if command[i + 1] in '$`"\\' else 1
+                    else:
+                        i += 2
+                    continue
+                buf.append(c)
+                i += 1
+                if c == '"':
+                    break
+        # Compare whole buffered chunks, not their last character: an escape is
+        # buffered as one 2-char chunk, so `a\ #x` keeps `#` as data and `a\>&`
+        # is `a>` then a real `&`. Testing `[-1:]` swallowed the next command.
+        elif ch == "#" and (not buf or (len(buf[-1]) == 1 and buf[-1].isspace())):
+            while i < n and command[i] != "\n":
+                i += 1
+        elif ch in ";|\n" or (
+            ch == "&"
+            and not (buf and buf[-1] in ("<", ">"))
+            and command[i + 1:i + 2] != ">"
+        ):
+            spans.append("".join(buf))
+            buf = []
+            i += 1
+        else:
+            buf.append(ch)
+            i += 1
+    spans.append("".join(buf))
+    return [split_tokens(span) for span in spans]
+
+
+def legacy_segments(command):
+    # Quote-unaware split, kept only for commands the scanner rejects (unbalanced
+    # quotes): the fragments still reach the whitespace fallback and get guarded.
+    return [split_tokens(part) for part in re.split(r"&&|\|\||[;&|\n]", command)]
+
+
+def command_segments(command):
+    try:
+        return segments(command)
+    except Exception:
+        return legacy_segments(command)
+
+
+def memory_words(line):
+    """Basenames of the words in a memory line, for glob-pattern fallback."""
+    words = set()
+    for raw in re.split(r"[\s`'\"]+", line):
+        word = raw.lstrip("([{<").rstrip(".,;:!?)]}>")
+        if word:
+            words.add(os.path.basename(word.rstrip("/")))
+    return words
+
+
 try:
     data = json.load(sys.stdin)
 except Exception:
@@ -135,11 +248,11 @@ command = str(data.get("tool_input", {}).get("command", ""))
 if not command or not re.search(r"(^|[;&|(]|\s)rm(\s|$)", command):
     sys.exit(0)
 
-# Split on shell operators FIRST, then tokenize each segment. shlex.split does
-# not treat `;` `&&` `|` as operators — it returns "b.py;" as a single token — so
-# scanning its output for separator tokens never resets and every word of a
-# chained `echo`/`ls`/`jq` is read as an rm argument. That produced a false
-# positive on the very command installing this hook.
+# Split on shell operators FIRST (outside quotes; see `segments()`), then tokenize
+# each segment. shlex.split does not treat `;` `&&` `|` as operators — it returns
+# "b.py;" as a single token — so scanning its output for separator tokens never
+# resets and every word of a chained `echo`/`ls`/`jq` is read as an rm argument.
+# That produced a false positive on the very command installing this hook.
 PREFIXES = {"sudo", "command", "time", "xargs", "env", "nohup"}
 # Words that can lead a segment before its command: `{ cd B; rm x; }` splits to
 # `{ cd B`, and `if …; then cd B; rm x` to `then cd B`. Skipping only PREFIXES
@@ -152,11 +265,12 @@ except Exception:
     cwd = ""  # deleted process cwd: relative targets then fail scoping -> global
 moved = False  # a cd/pushd segment seen: later targets are not relative to cwd
 candidates = {}  # basename -> [scope, ...]; a list so two repos' same name both count
-for segment in re.split(r"&&|\|\||[;&|\n]", command):
-    try:
-        tokens = shlex.split(segment)
-    except Exception:
-        tokens = segment.split()  # unbalanced quotes from splitting mid-string
+# Glob basename -> True when every use sat under `.local/`. Fallback patterns are
+# matched globally against memory words; a `.local/` one skips report names the
+# literal delete would exempt, or the loops' `rm -f .local/REVIEW*.md` (no report
+# present, nothing to expand) denies on any memory mentioning `REVIEW.md`.
+patterns = {}
+for tokens in command_segments(command):
     index = 0
     word = ""
     while index < len(tokens):
@@ -181,12 +295,33 @@ for segment in re.split(r"&&|\|\||[;&|\n]", command):
             )
         except Exception:
             parent = ""
+        if re.match(r"^(\d*[<>]|&>)", token):
+            continue  # redirect word (`2>&1`, `&>log`), not a delete target
+        if any(char in token for char in "*?["):
+            # Glob: expand only where the result is trustworthy; the literal
+            # basename below is still kept so a quoted name that really contains
+            # glob characters keeps matching.
+            matches = []
+            if cwd and not moved and not any(char in token for char in "$`"):
+                try:
+                    matches = glob.glob(os.path.join(cwd, os.path.expanduser(token.rstrip("/"))))
+                except Exception:
+                    matches = []
+            for match in matches:
+                match_base = os.path.basename(match)
+                match_parent = os.path.basename(os.path.dirname(os.path.abspath(match)))
+                if EXEMPT_REPORT.match(match_base) and match_parent == ".local":
+                    continue
+                if len(match_base) >= MIN_TOKEN_LEN:
+                    candidates.setdefault(match_base, []).append(scope_for(match, cwd))
+            if not matches and len(base) >= MIN_TOKEN_LEN:
+                patterns[base] = patterns.get(base, True) and parent == ".local"
         if EXEMPT_REPORT.match(base) and parent == ".local":
             continue
         if len(base) >= MIN_TOKEN_LEN:
             candidates.setdefault(base, []).append(None if moved else scope_for(token, cwd))
 
-if not candidates:
+if not candidates and not patterns:
     sys.exit(0)
 
 hits = []
@@ -199,6 +334,15 @@ for memory_file in sorted(glob.glob(os.path.expanduser("~/.claude/projects/*/mem
     name = os.path.basename(memory_file)
     project = encode(os.path.basename(os.path.dirname(os.path.dirname(memory_file))))
     for line in lines:
+        if patterns and any(
+            fnmatch.fnmatchcase(word, pattern) and not (local and EXEMPT_REPORT.match(word))
+            for pattern, local in patterns.items()
+            for word in memory_words(line)
+        ):
+            hits.append("  [{}] {}".format(name, line.strip()[:160]))
+            if len(hits) >= MAX_HITS_SHOWN * 4:
+                break
+            continue  # one hit per line
         for candidate, scopes in candidates.items():
             if candidate in line and any(
                 scope is None

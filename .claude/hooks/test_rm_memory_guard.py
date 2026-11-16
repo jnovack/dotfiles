@@ -201,6 +201,202 @@ class RmMemoryGuard(unittest.TestCase):
             with self.subTest(payload=payload):
                 self.assertEqual(self.out(payload), "")
 
+    # --- FIX-MEMGUARD-02: quote-aware segment split -------------------------
+
+    PLAN_MEMORY = "`.local/PLAN.md` is the ONLY copy"
+
+    def touch(self, repo, rel):
+        path = os.path.join(repo, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8"):
+            pass
+
+    def test_separator_inside_quotes_is_not_a_split(self):
+        # A quoted `|`/`;`/newline started a fake segment whose unbalanced quote
+        # fell back to whitespace splitting and read `rm` as a leader.
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        for command in (
+            "grep -E 'foo\\|rm .local/PLAN.md now' notes.txt",
+            'echo "done; rm .local/PLAN.md later" && ls',
+            "printf 'a\nrm .local/PLAN.md b'",
+            "git commit -m 'a && rm .local/PLAN.md b'",
+            "grep -E 'foo|rm .local/PLAN.md'",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(self.denied(rm(command, self.repoa)))
+
+    def test_quoted_or_escaped_punctuation_token_is_data(self):
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        for command in ("echo ';' rm .local/PLAN.md", "echo \\; rm .local/PLAN.md"):
+            with self.subTest(command=command):
+                self.assertFalse(self.denied(rm(command, self.repoa)))
+
+    def test_rm_segment_only_not_following_echo_prose(self):
+        # Recorded in the docstring; had no test.
+        self.memory(self.repoa, "files added during migration")
+        self.assertFalse(self.denied(rm('rm -f x && echo "=== files added ==="', self.repoa)))
+
+    def test_redirects_background_and_group_still_deny(self):
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        for command in (
+            "rm .local/PLAN.md 2>&1",
+            "rm .local/PLAN.md >&2",
+            "rm .local/PLAN.md &>log",
+            "rm .local/PLAN.md &>>log",
+            "rm .local/PLAN.md &",
+            "(rm .local/PLAN.md)",
+            "true && rm .local/PLAN.md",
+            "false || rm .local/PLAN.md",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(self.denied(rm(command, self.repoa)))
+
+    def test_comment_ends_at_newline_not_at_end_of_command(self):
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        self.assertTrue(self.denied(rm("echo ok # comment\nrm .local/PLAN.md", self.repoa)))
+        # Quoted `#` is data, and a comment hides what follows on its own line.
+        self.assertFalse(self.denied(rm("echo ok # rm .local/PLAN.md", self.repoa)))
+
+    def test_escaped_newline_is_a_continuation_not_a_command_boundary(self):
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        self.assertFalse(self.denied(rm("echo ok\\\nrm .local/PLAN.md", self.repoa)))
+
+    def test_double_quote_escape_semantics(self):
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        allow = (
+            'echo "a\\" ; rm .local/PLAN.md b"',  # escaped quote keeps the string open
+            'echo "a\\; rm .local/PLAN.md"',  # backslash before ordinary char inside quotes
+        )
+        deny = (
+            "echo 'a\\'; rm .local/PLAN.md",
+            'echo "a\\q" ; rm .local/PLAN.md',
+            'echo "a\\"" ; rm .local/PLAN.md',
+        )
+        for command in allow:
+            with self.subTest(command=command):
+                self.assertFalse(self.denied(rm(command, self.repoa)))
+        for command in deny:
+            with self.subTest(command=command):
+                self.assertTrue(self.denied(rm(command, self.repoa)))
+
+    def test_unbalanced_quotes_keep_fallback(self):
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        # Malformed rm: guarding is preferred over silently allowing.
+        self.assertTrue(self.denied(rm("rm .local/PLAN.md 'oops", self.repoa)))
+        # Malformed non-rm text: no crash, no output.
+        self.assertEqual(self.out(rm("echo 'oops && ls", self.repoa)), "")
+        self.assertEqual(self.out(rm('echo "oops rm', self.repoa)), "")
+
+    # --- FIX-MEMGUARD-02: glob targets --------------------------------------
+
+    def test_glob_expands_against_cwd_and_denies(self):
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        self.touch(self.repoa, ".local/PLAN.md")
+        for command in ("rm .local/PLAN*.md", "rm .local/PLA?.md", "rm .local/PLAN.[m]d"):
+            with self.subTest(command=command):
+                self.assertTrue(self.denied(rm(command, self.repoa)))
+
+    def test_glob_match_keeps_repo_scoping(self):
+        self.memory(self.repob, self.PLAN_MEMORY)
+        self.touch(self.repoa, ".local/PLAN.md")
+        self.assertFalse(self.denied(rm("rm .local/PLAN*.md", self.repoa)))
+
+    def test_glob_after_cd_falls_back_to_global_pattern(self):
+        self.memory(self.repob, self.PLAN_MEMORY)
+        command = "cd %s && rm .local/PLAN*.md" % self.repob
+        self.assertTrue(self.denied(rm(command, self.repoa)))
+
+    def test_glob_with_expanded_directory_falls_back_to_global_pattern(self):
+        self.memory(self.repob, self.PLAN_MEMORY)
+        for command in (
+            "rm $REPOB/.local/PLAN*.md",
+            "rm $(pwd)/.local/PLAN*.md",
+            "rm `pwd`/.local/PLAN*.md",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(self.denied(rm(command, self.repoa)))
+
+    def test_glob_without_filesystem_match_uses_memory_pattern(self):
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        self.assertTrue(self.denied(rm("rm .local/PLAN*.md", self.repoa)))
+
+    def test_glob_without_memory_match_allows(self):
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        self.touch(self.repoa, ".local/a.tmp")
+        self.assertFalse(self.denied(rm("rm .local/*.tmp", self.repoa)))
+        self.assertFalse(self.denied(rm("rm .local/nothing*.tmp", self.repoa)))
+
+    def test_glob_exempt_report_alone_allows_but_guarded_sibling_denies(self):
+        self.memory(self.repoa, "`.local/REVIEW.md` and `.local/PLAN.md` only copy")
+        self.touch(self.repoa, ".local/REVIEW.md")
+        self.assertFalse(self.denied(rm("rm .local/REVIEW*.md", self.repoa)))
+        self.touch(self.repoa, ".local/PLAN.md")
+        self.assertTrue(self.denied(rm("rm .local/*.md", self.repoa)))
+        # An exempt glob must not hide a guarded literal sibling.
+        self.assertTrue(self.denied(rm("rm .local/REVIEW*.md .local/PLAN.md", self.repoa)))
+
+    def test_glob_min_token_length_applies(self):
+        self.memory(self.repoa, "keep a1 and abcd.txt and `.local/PLAN.md`")
+        # Fallback pattern `a*` is shorter than MIN_TOKEN_LEN: ignored.
+        self.assertFalse(self.denied(rm("rm a*", self.repoa)))
+        # Expansion: the short basename is ignored, PLAN.md is guarded.
+        self.touch(self.repoa, "x/a1")
+        self.assertFalse(self.denied(rm("rm x/*", self.repoa)))
+        self.touch(self.repoa, "x/PLAN.md")
+        self.assertTrue(self.denied(rm("rm x/*", self.repoa)))
+
+    def test_glob_fallback_extracts_words_from_mixed_prose(self):
+        self.memory(
+            self.repob,
+            "see (`docs/PLAN.md`), 'notes/OTHER.md'; and \"x.local/PLAN.md.\" ok",
+        )
+        for command in ("cd /tmp && rm PLAN*.md", "cd /tmp && rm OTH??.md"):
+            with self.subTest(command=command):
+                self.assertTrue(self.denied(rm(command, self.repoa)))
+        self.assertFalse(self.denied(rm("cd /tmp && rm NOPE*.md", self.repoa)))
+
+    def test_multiple_glob_patterns_each_checked(self):
+        self.memory(self.repob, "only copy `.local/PLAN.md`")
+        self.assertTrue(self.denied(rm("cd /tmp && rm zzzz*.md PLAN*.md", self.repoa)))
+
+    def test_quoted_literal_name_with_glob_chars_still_matches(self):
+        self.memory(self.repoa, "keep `.local/odd[1]name.md` safe")
+        self.touch(self.repoa, ".local/odd[1]name.md")
+        self.assertTrue(self.denied(rm("rm '.local/odd[1]name.md'", self.repoa)))
+
+    def test_unmatched_exempt_report_glob_stays_exempt(self):
+        # The loops run `rm -f .local/REVIEW*.md` whether or not a report exists;
+        # an unmatched glob's memory fallback must not deny on `REVIEW.md` there.
+        self.memory(self.repoa, "`.local/REVIEW.md` list and `.local/PLAN.md` only copy")
+        for command in ("rm -f .local/REVIEW*.md", "cd /tmp && rm -f .local/REVIEW*.md"):
+            with self.subTest(command=command):
+                self.assertFalse(self.denied(rm(command, self.repoa)))
+        # The exemption covers only report names under `.local/`.
+        for command in ("rm .local/*.md", "rm docs/REVIEW*.md"):
+            with self.subTest(command=command):
+                self.assertTrue(self.denied(rm(command, self.repoa)))
+        self.memory(self.repoa, "keep `.local/REVIEW_NOTES.md`")
+        self.assertTrue(self.denied(rm("rm .local/REVIEW*.md", self.repoa)))
+
+    def test_escaped_char_before_hash_or_ampersand_is_word_data(self):
+        # `a\ #x` is one word (no comment) and `a\>&` is `a>` then `&`: the later
+        # rm is a real command in both. Testing only the last buffered character
+        # read the escaped space/`>` as bare and swallowed the rm.
+        self.memory(self.repoa, self.PLAN_MEMORY)
+        for command in ("echo a\\ #x; rm .local/PLAN.md", "echo a\\>& rm .local/PLAN.md"):
+            with self.subTest(command=command):
+                self.assertTrue(self.denied(rm(command, self.repoa)))
+
+    def test_redirect_word_is_not_a_delete_target(self):
+        # `2>/dev/null` as a target would make `null` a repo-scoped candidate.
+        self.memory(self.repoa, "noise goes to /dev/null and `build.log`")
+        for command in (
+            "rm -f .local/scratch.md 2>/dev/null",
+            "rm -f .local/scratch.md &>/tmp/build.log",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(self.denied(rm(command, self.repoa)))
+
 
 if __name__ == "__main__":
     unittest.main()
