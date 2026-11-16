@@ -34,7 +34,7 @@ This turns that into a named failure at /todo-plan, /todo-ready and
 /todo-loop --check time, while the operator is still at the keyboard.
 
 The auto-mode classifier can still refuse a command no rule names; that is not
-predictable from settings, and the loop's watchdog and stop rules cover it.
+predictable from settings, and the loop's stop rules cover it.
 """
 import json
 import os

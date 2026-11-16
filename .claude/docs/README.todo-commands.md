@@ -254,7 +254,7 @@ FAIL  DOCS-EXAMPLE-03  declared `unattended: no` — needs the staging cluster
 ```
 
 Exit 0 when every plan passes, 1 when any fails. The auto-mode classifier can still refuse a command no rule names.
-That cannot be predicted from settings, so the loop's watchdog and stop rules remain the backstop.
+That cannot be predicted from settings, so the loop's stop rules remain the backstop.
 
 The model recommendation follows this guide:
 
@@ -418,27 +418,30 @@ had ended its turn to wait for a completion notice that never came. So:
   `~/.claude/bin/claude-permission-mode` and refuses `default`, `acceptEdits` and
   `plan`. The helper reports the newest mode recorded in the transcript, not the
   live mode; a slash-command-only session has been seen to record none and reads `unknown`, which
-  warns once per run and continues. The loop rechecks at every finished-agent
-  completion and direct Agent result, and stops on a prompting mode there
+  warns once per run and continues. The loop rechecks whenever a dispatch
+  returns, and stops on a prompting mode there
   (`permission mode <mode> at resume`), preserving the item's actual `done` or
-  `in progress` status. For a still-running agent the mode is diagnostic only.
+  `in progress` status.
   It also stops on other `CronCreate` jobs in the session, and on a dirty
   tree that is not the work of the single in-flight item.
-- **Every background agent gets a watchdog.** `~/.claude/bin/agent-watchdog`
-  watches the agent's transcript. Its path is the `output_file` named on that
-  Agent launch's acknowledgement. It is not derived from the scratchpad, because
-  after `/clear` the task path can stay under the launch session while the
-  scratchpad moves. If the transcript is silent for `--stall-minutes` while the
-  agent is unfinished, the watchdog exits 2. The loop then logs a `STALL` line
-  and sends a push notification. A stall does not stop the loop: once someone
-  answers the prompt, the agent's completion notice resumes it. A launch with no
-  `output_file` logs the reason, sends one notification and waits unwatched.
+- **Each command runs in a fresh subagent.** Every `/todo-next` and
+  `/todo-checkpoint` is dispatched to a fresh foreground Opus subagent, so the
+  loop's own context holds gates and result lines rather than about 47KB of
+  command text plus each item's diffs and reviews. The subagent ends with one
+  `LOOP-RESULT` line, and the loop checks every field against the tracker and
+  git before acting; a missing, malformed or contradicted line is a stop.
+  Accepted residual risk: there is no watchdog (the operator's choice on
+  2026-11-11, mirroring `/refactor-loop`), so a nested implementer or reviewer
+  stuck on a permission prompt goes undetected. Auto mode, the preflight mode
+  check and `cron-auto-mode-gate.py` are the guard.
 - **An item abandoned by an earlier run is recovered, not a stop.** A session
   that hits its usage limit mid-item leaves the row `in progress`. The next run
   checks with `~/.claude/bin/todo-agent-live` that no agent in any session is
   still writing for that item. It then runs `/todo-checkpoint` on whatever was
   left, which either commits the work or writes `## Corrections` for a retry.
-  That recovery FAIL does not count toward `--max-fails`.
+  That recovery FAIL does not count toward `--max-fails`. `--stall-minutes`
+  (default 20) is how long an agent's transcript must be silent before that
+  check counts it as no longer live.
 - Every event is appended to `.local/TODO-LOOP.log`. Every stop names its
   evidence, leaves the tree untouched and sends a notification.
 - **Every plan it will touch passes `plan-loop-check`**, at preflight and again

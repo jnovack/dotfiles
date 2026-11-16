@@ -15,9 +15,10 @@ it cannot decide from this file is a **stop**, not a guess.
 first implementer as a background agent and ended its turn to await the completion
 notice. The agent ran a compound shell command, hit a permission prompt
 (`acceptEdits` mode), and waited seven hours for an answer nobody was there to
-give. Nothing noticed. Three rules below exist because of that night: preflight
-refuses a permission mode that prompts, every background agent gets a watchdog,
-and every stall and stop sends a push notification.
+give. Nothing noticed. Two rules below exist because of that night: preflight
+refuses a permission mode that prompts, and every stop sends a push notification.
+The per-agent watchdog added after that night was dropped on 2026-11-11, when the
+commands moved into dispatched subagents (see §Dispatching next and checkpoint).
 
 On 2026-10-30 the loop ran in auto mode and still stopped at its first checkpoint. A
 plan's gate said "in a disposable scratch copy" without naming a command. The agent
@@ -33,16 +34,15 @@ touch now passes `~/.claude/bin/plan-loop-check` before the loop relies on it, a
   queue has no eligible `ready` item.
 - `--max-fails K` — consecutive checkpoint FAILs of one item before stopping.
   Default `2`, which allows one retry against the `## Corrections` section.
-- `--stall-minutes M` — transcript silence after which a background agent counts as
-  stalled. Default `20`.
+- `--stall-minutes M` — transcript silence after which `todo-agent-live` counts an
+  earlier run's agent as no longer live. Default `20`.
 - `--check` — run Preflight only, print its result and the planned queue, and change
   nothing. Run it before scheduling, so a failing check surfaces while you are still
   at the keyboard rather than at 3am.
 
 `<sp>` below is the session scratchpad directory from the system prompt. No
 scratchpad listed → stop: the permission-mode and liveness checks take it as their
-argument. The watchdog does not use it; it arms on the path each Agent launch
-returns.
+argument.
 
 ---
 
@@ -65,8 +65,8 @@ returns.
   Every other `stash` form stays forbidden, and the stop procedure's "do not stash"
   is unchanged.
 - Never work around a failing test, a denied command, or a spec Constraint. Stop.
-- Do not wrap this in `/loop` or schedule wakeups. Agent completion notices and
-  watchdog exits resume the loop.
+- Do not wrap this in `/loop` or schedule wakeups. Dispatch results and completion
+  notices resume the loop.
 
 ---
 
@@ -79,23 +79,22 @@ Run once, before the first cycle. Any failure is a stop (with `--check`, a repor
    - `default`, `acceptEdits` or `plan` → stop. Name the mode and tell the operator
      to restart the session in auto mode. These modes prompt for any command
      outside the allowlist, and an unattended prompt is a stall.
-   - `unknown` (no mode-bearing record found) → log a `WARN` line and continue; the
-     watchdog is the backstop. The observed cause is a session whose only prompt was a
-     slash command, which has been seen to record no mode; a changed transcript format or a missing
+   - `unknown` (no mode-bearing record found) → log a `WARN` line and continue. The
+     observed cause is a session whose only prompt was a slash command, which has
+     been seen to record no mode; a changed transcript format or a missing
      transcript gives the same result. The helper reports the newest *recorded*
-     mode, not the live Shift+Tab state, so it can be stale. It is rechecked at each
-     agent completion (see Waiting on background agents). A first agent can stall
-     before any completion arrives, so the watchdog stays required.
+     mode, not the live Shift+Tab state, so it can be stale. It is rechecked when
+     each dispatch returns (see §Dispatching next and checkpoint).
      **Warning budget:** at most one unknown `WARN` per loop run, this one included.
-     Later unknown results continue silently, except as mode detail in a stall or
-     error notification. Reset the budget at the run's `BEGIN`; after compaction
+     Later unknown results continue silently, except as mode detail in an error
+     notification. Reset the budget at the run's `BEGIN`; after compaction
      restore it from this run's log records, as described by the completion check.
      For an actual run, write its `BEGIN` before its first unknown `WARN`. With
      `--check`, print the diagnostic only: do not append `BEGIN` or `WARN` or
      change the log; the preflight-only check remains read-only.
    - Helper missing or not executable → stop.
-2. **Helpers.** `~/.claude/bin/agent-watchdog`, `~/.claude/bin/plan-loop-check` and
-   `~/.claude/bin/todo-agent-live` exist and are executable.
+2. **Helpers.** `~/.claude/bin/claude-permission-mode`, `~/.claude/bin/plan-loop-check`
+   and `~/.claude/bin/todo-agent-live` exist and are executable.
 3. **No other scheduled jobs.** Run `CronList`. Any job in this session → stop and
    list it. On 2026-10-21 a 5:25am `git autocommit` job shared the session with the
    chain. If an item had been half-written at 5:25, that job would have committed it.
@@ -141,7 +140,7 @@ take the first row of this table that matches.
 | No `done` or `in progress` row, and the tree is clean | Step 1 |
 | More than one `done` or `in progress` row | Stop and list them |
 | One `done` or `in progress` row, and the liveness check finds a live agent for it | Stop. Another session is still working the item, and taking it over would race that agent's writes to the tree |
-| One `done` or `in progress` row whose last line in the log is a `STALL` | Stop. An earlier run paged the operator about that agent, which may still be waiting for their answer. Once it is gone, the operator runs `/todo-checkpoint <id>` by hand |
+| One `done` or `in progress` row whose last line in the log is a `STALL` | Stop. An earlier run paged the operator about that agent, which may still be waiting for their answer. Once it is gone, the operator runs `/todo-checkpoint <id>` by hand (only logs written by an older, stall-paging version of this loop contain `STALL`) |
 | Exactly one `done` row. The tree is clean, or dirty only with that item's work (files its plan's Steps or Placement name, their tests and docs) | Step 3 for that ID. Its implementer finished but was never checkpointed |
 | Exactly one `in progress` row whose plan carries `## Corrections` | Step 2 as a retry of that ID. The FAIL count starts at 0: it counts only failures seen inside this run |
 | Exactly one `in progress` row with no `## Corrections`. The tree is clean, or dirty only with that item's work | Step 3 for that ID, as a **recovery checkpoint** (below). Its run was abandoned mid-item |
@@ -179,89 +178,128 @@ decides as usual:
 
 ---
 
-## Waiting on background agents
+## Dispatching next and checkpoint
 
-`/todo-next` spawns an implementer and a reviewer, and `/todo-checkpoint` may spawn a
-reviewer. When an Agent call returns a launch acknowledgement instead of a result,
-the agent is running in the background. Every time that happens:
+Every `/todo-next` and `/todo-checkpoint` this loop runs (cycle steps 2 and 3, which
+the Entry point's retry, `done` and recovery rows also reach) is dispatched to a fresh
+subagent, never run in this session. Inline Skill runs load `todo-next.md` (14,755
+bytes) and `todo-checkpoint.md` (32,260 bytes), about 47KB of command text per item,
+plus each item's diffs, review reports and adjudication. REFACTOR-LOOPCTX-01 fixed the
+same growth in `/refactor-loop`, whose session reached about 126k tokens by phase 5 on
+2026-11-09 and degraded late-run judgment. A fresh subagent per command keeps this
+session to gates, result lines and checks.
 
-1. **Arm the watchdog** for this launch with `run_in_background`. First clear
-   this launch's task ID, so a launch never inherits the previous agent's ID.
-   Then take the nonempty path on the launch acknowledgement's `output_file:`
-   line and pass it as one shell-quoted argument:
+**Accepted residual risk.** The dispatch has no watchdog, by the operator's choice on
+2026-11-11, mirroring `/refactor-loop`. The command's own implementer and reviewer run
+nested inside the dispatch, out of this session's sight, so one stuck on a permission
+prompt is not detected: that is the 2026-10-21 failure. Preflight's permission-mode
+refusal and the `cron-auto-mode-gate.py` hook are the remaining guards, which is why
+the session must run in auto mode.
 
-   ```bash
-   ~/.claude/bin/agent-watchdog '<output_file>' <M*60>
-   ```
+### Before each dispatch: freshness and snapshot
 
-   The angle brackets are placeholders, not shell syntax. Use literal shell
-   quoting for the actual path, escaping embedded single quotes if needed, so
-   spaces, dollar signs and backticks remain data. Do not include the
-   `output_file:` label, the newline, surrounding
-   prose or the warning that follows the path. Keep the returned task ID with this
-   launch only.
+Run these immediately before every dispatch, including a FAIL retry and the recovery
+checkpoint. Select's gate alone misses those entry points, and a checkpoint's
+`## Corrections` can change the plan after Select checked it.
 
-   Never derive the path from `<sp>`, the current session, the `agentId` or an
-   earlier launch, and never search other session directories. The returned path
-   is authoritative, because the observed layout breaks any derived one. On
-   2026-11-05, after `/clear` (session `7b57720e`), the agent's task path stayed
-   under the process's first session (`7cbf2f0f`), while the scratchpad and
-   transcript moved to the new session. The derived `<sp>/../tasks/<agentId>.output`
-   did not exist there, so the helper exited 66 and the agent ran unwatched. Do not
-   read or tail the output file; the acknowledgement says the same. The helper follows the
-   symlink, reads the completion metadata beside its target and checks transcript
-   age itself.
+1. **Row.** "Row" prints exactly one line for `<ID>`. For `next` it reads `ready`, or
+   `in progress` with a `## Corrections` heading in the plan (a retry from step 4 or
+   the Entry point's Corrections row). For `checkpoint` it reads `done`, or
+   `in progress` only as the Entry point's recovery checkpoint.
+2. **Files.** `.local/todos/<ID>.spec.md` and `.local/todos/<ID>.plan.md` exist, and
+   neither `.local/completed/<ID>.spec.md` nor `.local/completed/<ID>.plan.md` does.
+   A stale archive must not satisfy a later retirement check.
+3. **Loop safety.** `~/.claude/bin/plan-loop-check .local/todos/<ID>.plan.md` passes.
+   On failure, stop quoting every `FAIL` line, as in Select.
+4. **Snapshot.** Write "Status snapshot" to `<sp>/todo-status-base.txt` and require
+   "Duplicate IDs" to print nothing. For a checkpoint, also write "Pre-dispatch HEAD"
+   to `<sp>/todo-pre-head.txt`.
 
-   If the acknowledgement has no `output_file:` line, or the line is empty, do not
-   launch the helper, and do not guess a path or invent a task ID. Apply the
-   **Running agents** diagnostics below before logging or notifying. Log the missing
-   field with the item and agent role, notify once for this launch, and continue at
-   step 2 unwatched. This launch has no task ID.
-2. Append a `WAIT` line to the log, then end the turn. Start nothing else.
-3. **Resume on whichever arrives first.** Match the event to its launch record
-   first. Ignore an already-handled completion before any `TaskStop`, mode check
-   or continuation. A late watchdog exit for an already-completed launch or an
-   explicitly stopped watchdog only updates that launch's exit record: ignore
-   it without another diagnostic, notification or continuation. `TaskStop`
-   applies only to a watchdog this launch armed that
-   has neither exited nor already been stopped. A successful `TaskStop` disarms
-   its task ID immediately; do not wait for a later exit notice to disarm it.
-   - **Agent completion notice.** If this launch has a watchdog task ID and its
-     exit has not arrived and it has not already been stopped, `TaskStop` that ID
-     and disarm it. Otherwise make no stop call: a
-     direct result, a missing-field launch and an exited watchdog have nothing to
-     stop. Then run the **completion mode check** (below) and, if it passes,
-     continue the running skill exactly where its Agent call left off. For
-     example, `/todo-next` continues at "After the subagent returns". A genuine
-     completion is handled once: a later duplicate or late notice for the same
-     launch is not another continuation, mode check or `WARN`.
-   - **Watchdog exit 0 (finished).** The helper has exited, so there is nothing to
-     stop. The completion notice is due or already handled. If it was handled,
-     ignore the exit. Otherwise end the turn and wait for it; the mode check runs
-     on the notice, not here, so one completion never checks or notifies twice.
-   - **Watchdog exit 2 (stalled).** The agent has written nothing for `M` minutes,
-     almost always because a permission prompt or an API error is waiting on a
-     human. Apply the **Running agents** diagnostics below, then append a
-     `STALL` line and send `PushNotification` with that mode detail, for example
-     `todo-loop: <ID> implementer silent 20m — likely a permission prompt`. Then end
-     the turn without re-arming the watchdog and without a `TaskStop` for it. Do
-     not stop the loop and do not touch the tree. The agent is still alive, and
-     when the operator answers it, its completion notice resumes the loop. Send one
-     notification per stall.
-   - **Watchdog exit 64 or 66** (bad arguments, or no transcript). Apply the
-     **Running agents** diagnostics below, then log the exit with that detail,
-     notify once, and keep waiting for the completion notice, unwatched. The helper
-     has exited, so make no stop call for it. This does not mean the agent stopped.
+Missing or failed evidence stops; the loop never repairs the commands' bookkeeping to
+make a check pass. The two snapshot files belong to this dispatch: they survive an
+asynchronous wait and context compaction, and are never rewritten when its completion
+arrives.
 
-**Completion mode check.** Before continuing a skill after a *finished* agent, run
-`~/.claude/bin/claude-permission-mode <sp>` (the real scratchpad argument; never
-fall back to another session or guess a mode).
+### Dispatch
+
+Use the Agent tool with `subagent_type: general-purpose` and `model: opus`, in the
+foreground. Never use the `fork` subagent type, and never run either command with the
+Skill tool in this session. The `description` names the ID with spaces around it,
+`TODO <ID> — loop next` or `TODO <ID> — loop checkpoint`, so the Entry point's
+`todo-agent-live` check finds a dispatch an earlier session left running. Pass the
+matching prompt, verbatim except the placeholders.
+
+For `/todo-next`:
+
+```text
+Invoke the Skill tool with skill "todo-next" and args "<ID>", and follow that command to its end in this repository.
+- You run inside /todo-loop with no operator. Never ask a question; if the command would need an answer, stop and report it in the result line.
+- The command spawns its own subagents (implementer, reviewer). If you cannot spawn one, stop and report it. Never implement or review inline yourself.
+- Do not run git add, git commit, git autocommit, git push, git reset, git checkout, git clean, or any git stash form except the exact `git stash create` the command itself requires, and do not touch any live service.
+- Ignore the command's closing advice to the operator (which command to run next). Do not act on it.
+- Return at most ten summary lines, including blockers; omit raw diffs and review reports.
+- Distinguish a legitimate no-change review skip from a missing required spawn. Only the latter stops. Emit outcome=done only after the entire command, including its review/adjudication and bookkeeping, has finished.
+- End your reply with exactly one line in this grammar, as the last line:
+  LOOP-RESULT next id=<ID> outcome=<done|blocked|stop>
+  LOOP-RESULT stop reason=<one line>
+```
+
+For `/todo-checkpoint`:
+
+```text
+Invoke the Skill tool with skill "todo-checkpoint" and args "<ID>", and follow that command to its end in this repository.
+- You run inside /todo-loop with no operator. Never ask a question; if the command would need an answer, stop and report it in the result line.
+- The command spawns its own reviewer. If you cannot spawn it, stop and report it. Never review inline yourself.
+- Run `git autocommit` only where the command's own commit step instructs it. Run no other git write: no git add, git commit, git push, git reset, git checkout, git clean, and no git stash form except the exact `git stash create` the command requires. If the commit fails or its guard skips it, do not retry and do not follow the advice to run it by hand; report it in the result line.
+- Ignore the command's closing advice to the operator (which command to run next). Do not act on it.
+- Return at most ten summary lines, including any TODO IDs the review tracked and any next-item status changes; omit raw diffs and review reports.
+- A legitimate skip of an unchanged delta's reviewer is allowed. A missing required reviewer stops. Emit the checkpoint result only after commit handling and fix-ahead finish, never immediately upon retirement.
+- End your reply with exactly one line in this grammar, as the last line:
+  LOOP-RESULT checkpoint id=<ID> overall=<PASS|WARN|FAIL> commit=<sha|nothing|skipped|failed|n/a> demoted=<ID[,ID...]|none>
+  LOOP-RESULT stop reason=<one line>
+```
+
+The commit rule differs from `/refactor-loop` on purpose. There the orchestrator
+commits, so its prompt bans `git autocommit`. Here `/todo-checkpoint` commits on PASS
+or WARN as its own file instructs, so its prompt permits exactly that commit; banning
+it would leave every retired item uncommitted and the next item building on a dirty
+tree.
+
+`commit=` maps one-to-one onto `todo-checkpoint.md`'s Commit row: `<sha>` for a SHA,
+`nothing` for `NOTHING TO COMMIT`, `skipped` for `SKIPPED`, `failed` for `FAILED`, and
+`n/a` for FAIL, whose report has no Commit row. `demoted=` lists every item the
+checkpoint's fix-ahead moved back to `planned` or `spec'd`: the next ready item and
+each dependent citing the retired ID can all move. An `unattended: no` finding is not
+a demotion. The subagent's summary and result line are the only command output this
+session sees; no later step relies on either command's own text.
+
+### A launch acknowledgement instead of a result
+
+If the Agent call returns a launch acknowledgement rather than the subagent's reply,
+log `WAIT <ID> <next|checkpoint> <launch id>` (the agent ID the acknowledgement names),
+end the turn and start nothing else. The dispatch runs unwatched, as in
+`/refactor-loop`: there is nothing to arm and nothing to stop later.
+
+Resume on the completion notice for that launch. Bind it to the recorded launch ID,
+target ID and role, not to whichever TODO ID was mentioned last: a nested agent's
+completion inside the dispatch is not the dispatch result and never advances the
+cycle. Handle a completion once. A duplicate or late notice for a launch already
+handled is ignored, with no second mode check, `WARN`, verification or continuation.
+After compaction, the log's `WAIT` line and the snapshot files from "Before each
+dispatch" carry this state; use them, never a fresh snapshot.
+
+### Completion mode check
+
+After every dispatch returns, directly or by its completion notice, and before acting
+on its result, run `~/.claude/bin/claude-permission-mode <sp>` (the real scratchpad
+argument; never fall back to another session or guess a mode). The command's nested
+implementer and reviewer now return inside the dispatch, out of this session's sight,
+so a mode change mid-dispatch is caught only when the dispatch returns.
 
 - `auto`, `bypassPermissions` or `dontAsk` → continue.
 - `default`, `acceptEdits` or `plan` → stop with reason
   `permission mode <mode> at resume`, and tell the operator to restart the session in
-  auto mode. The stop's watchdog cleanup applies only to a watchdog still running
-  (never an unset or stale task ID), and the completed agent is never stopped.
+  auto mode. The completed dispatch is never stopped.
 - `unknown` → continue. Log an unknown-mode `WARN` only if this run has not yet
   logged one. Keep that fact in run state; after compaction, inspect records since
   the most recent `BEGIN` in `.local/TODO-LOOP.log`, not just a fixed-size tail.
@@ -276,17 +314,73 @@ do not force either into the other, and do not roll back work. The Entry point
 table resumes the item: `done` goes to checkpoint, and `in progress` goes through
 its existing Corrections, liveness and recovery rules.
 
-**Running agents.** For watchdog exit 2, 64 or 66, and for the missing-field
-degraded wait, no completed agent is continuing. Run the helper only for
-diagnostics and add the mode (or `mode unavailable`) to the existing `STALL` or
-error log line and notification. Do **not** stop on a prompting mode (the agent is
-still alive), keep the single notification, do not re-arm, and keep waiting for
-the completion notice. Do not synthesize a watchdog exit when no helper started.
+### After each dispatch: verify, then act
 
-An Agent call that returns its result directly needs no watchdog, records no task
-ID and has no `WAIT` cycle. It takes the same completion mode check, after every
-direct Agent return within either running TODO skill and before that skill's
-post-Agent continuation, not only a top-level Skill return.
+Parse the last non-empty line of the reply. It must match one of the `LOOP-RESULT`
+forms exactly, and its form must be the dispatched command's (`next` or `checkpoint`)
+or `stop`. A `next` or `checkpoint` line's `id` must equal the dispatched ID; the
+`stop` form carries none. On a checkpoint line, `overall=FAIL` requires `commit=n/a`,
+`overall=PASS|WARN` forbids it, and a `demoted=` list that names an ID twice is
+malformed. A missing, unparseable or mismatched line stops, quoting it or the reply's
+last paragraph.
+
+Then check every field against disk and git before acting on it:
+
+| Field | Check |
+| --- | --- |
+| `next … outcome=done` | "Row" reads `done`, and the spec and plan are still under `.local/todos/` |
+| `next … outcome=blocked\|stop`, or `stop …` | None: stop, quoting the line and the summary |
+| `overall=PASS\|WARN` | "Row" prints nothing, and "Completed files" lists both `.local/completed/<ID>.spec.md` and `.local/completed/<ID>.plan.md` |
+| `overall=FAIL` | "Row" reads `in progress`, and "Corrections" finds a `## Corrections` heading in `.local/todos/<ID>.plan.md` |
+| `commit=<sha>` | The claimed value is hexadecimal and "Claimed SHA" resolves it unambiguously to current HEAD; "HEAD parent" equals `<sp>/todo-pre-head.txt`; "Tree" prints nothing |
+| `commit=nothing` | "Baseline" from the archived plan, `<sp>/todo-pre-head.txt` and current HEAD are all equal; "Tree" prints nothing |
+| `commit=skipped\|failed` | None: step 4 stops on it |
+| `commit=n/a` | Only with `overall=FAIL` (the parse rule above) |
+| `demoted=` | Among IDs present in both `<sp>/todo-status-base.txt` and "Status now", those whose status is now `planned` or `spec'd` and differs from the snapshot equal the listed IDs exactly; `none` means that set is empty |
+
+Any disagreement stops, and so does a "Duplicate IDs" line after the dispatch: never
+collapse two rows into one status. A retired item simply disappears from "Status now"
+and is not a demotion, and a `raw` row the review added is new rather than changed. A SHA that
+does not resolve, resolves to an older commit, or whose parent is not the recorded
+pre-dispatch HEAD cannot satisfy a commit claim, so an old commit never passes for a
+new one.
+
+PASS and WARN share the retirement check: `/todo-checkpoint` persists no verdict
+beyond the retirement itself, so which of the two it was rests on the dispatch's
+result line and summary, not on disk evidence. Log it as reported; never claim the
+tracker proves it.
+
+`<sp>` is the session scratchpad. Substitute every placeholder before running:
+
+```bash
+# Status snapshot (before every dispatch): one "ID|Status" line per row,
+# keyed by ID so Order renumbering and summary edits never show as changes
+awk -F'|' '/^\| [0-9]/ {gsub(/^ +| +$/, "", $4); gsub(/^ +| +$/, "", $5); print $4 "|" $5}' .local/TODO.md | sort > <sp>/todo-status-base.txt
+# Duplicate IDs (before and after the dispatch; prints nothing when every ID is unique)
+awk -F'|' '/^\| [0-9]/ {gsub(/^ +| +$/, "", $4); print $4}' .local/TODO.md | sort | uniq -d
+# Pre-dispatch HEAD (before a checkpoint dispatch)
+git rev-parse HEAD > <sp>/todo-pre-head.txt
+# Status now (after the dispatch)
+awk -F'|' '/^\| [0-9]/ {gsub(/^ +| +$/, "", $4); gsub(/^ +| +$/, "", $5); print $4 "|" $5}' .local/TODO.md | sort
+# Row
+grep -F '| <ID> |' .local/TODO.md
+# Corrections
+grep -n '^## Corrections' .local/todos/<ID>.plan.md
+# Completed files
+ls .local/completed/<ID>.spec.md .local/completed/<ID>.plan.md
+# Baseline (archived plan)
+grep -m 1 '^baseline:' .local/completed/<ID>.plan.md
+# Claimed SHA
+git rev-parse --verify --quiet '<sha>^{commit}'
+# Last commit, tree, HEAD, HEAD parent
+git log -1 --format='%h %s'
+git status --porcelain
+git rev-parse HEAD
+git rev-parse HEAD^
+```
+
+The commands' own skip-review paths stay valid: an inability to spawn stops only when
+a spawn was required, not when the command legitimately skips it.
 
 ---
 
@@ -306,35 +400,41 @@ post-Agent continuation, not only a top-level Skill return.
      the previous checkpoint's fix-ahead. The queue is serial, so the loop does not
      skip past it.
 
-2. **Implement.** Log `START <ID> <model>`, or `RETRY <ID>` on a retry. Run
-   `/todo-next <ID>` with the Skill tool and follow it to its end, including its own
-   review and adjudication. Wait on its agents as described above.
-   - If it stops without dispatching (a blocker, a missing spec or plan) → stop.
-   - When it returns, the row must read `done`. Anything else → stop.
+2. **Implement.** Log `START <ID> <model>`, or `RETRY <ID>` on a retry. Dispatch
+   `/todo-next <ID>` as described in §Dispatching next and checkpoint, and verify its
+   result line there.
+   - `outcome=blocked`, a `stop` result, or any failed check → stop.
+   - `outcome=done` continues only once "Row" reads `done`.
 
-3. **Checkpoint.** Run `/todo-checkpoint <ID>` with the Skill tool, waiting on any
-   reviewer it spawns. From its report, note the **Overall** result, the **Commit**
-   row and the **Next-item plan** row.
+3. **Checkpoint.** Dispatch `/todo-checkpoint <ID>` the same way and verify its result
+   line. Its verified `overall`, `commit` and `demoted` fields are all step 4 reads;
+   the checkpoint's own report never reaches this session.
 
-4. **Decide.** The checkpoint report is a claim; check it against git.
-   - **PASS or WARN, Commit shows a SHA.** `git log -1 --format='%h %s'` must match
-     the reported SHA, and `git status --porcelain` must be empty. If either fails →
-     stop. Otherwise log the result, reset the FAIL count, count the item as
-     retired, and go to step 1.
-   - **PASS or WARN, NOTHING TO COMMIT.** Read `baseline:` from
-     `.local/completed/<ID>.plan.md`. If `git rev-parse HEAD` equals it, the item
-     genuinely changed nothing: log that and go to step 1. Otherwise → stop.
-     Something other than the checkpoint moved HEAD.
-   - **Commit FAILED** → stop. The checkpoint has already skipped fix-ahead, so the
-     next item never runs on an uncommitted tree.
-   - **FAIL** → increment the FAIL count for `<ID>`, unless this was a recovery
-     checkpoint (see Entry point). At `--max-fails` → stop. Otherwise go to step 2
-     as a retry. `/todo-next <ID>` picks up the `## Corrections` section the
-     checkpoint wrote.
-   - **Next-item plan moved an item back to `planned` or `spec'd`** → log a
-     `DEMOTED` line. Step 1 will not select it, and it needs the operator's
-     `/todo-ready`.
-   - **Anything else**, including a missing report or a denied tool call → stop.
+4. **Decide.** Act only on a result line that passed every check in §After each
+   dispatch. First log one `DEMOTED <ID>` line for each ID in a verified `demoted=`
+   list (none for `demoted=none`). Step 1 will not select a demoted item, and it needs
+   the operator's `/todo-ready`. Log demotions before branching: the success branches
+   below return straight to step 1, and logging placed after them would never run.
+   - **`overall=PASS|WARN commit=<sha>`.** The checks proved the SHA is the new HEAD
+     on top of the pre-dispatch HEAD and the tree is clean. Log the reported verdict
+     with `git log -1 --format='%h %s'`, reset the FAIL count, count the item as
+     retired, and go to step 1, which enforces `--max-items`.
+   - **`overall=PASS|WARN commit=nothing`.** The checks proved the archived
+     `baseline:`, the pre-dispatch HEAD and HEAD are equal and the tree is clean: the
+     item genuinely changed nothing. Log that, reset the FAIL count, count the item
+     as retired, and go to step 1. A moved HEAD, a dirty tree, or a missing or
+     different archived `baseline:` (compare the SHA after the `baseline:` label that
+     "Baseline" prints) has already stopped at the checks: something other than the
+     checkpoint changed the repository, or the item's bookkeeping is wrong.
+   - **`commit=skipped` or `commit=failed`** → stop, even though the checkpoint has
+     already retired the item. It skipped fix-ahead, so the next item never runs on
+     an uncommitted tree. Never re-dispatch the checkpoint for that absent row.
+   - **`overall=FAIL commit=n/a`** → increment the FAIL count for `<ID>`, unless this
+     was a recovery checkpoint (see Entry point). At `--max-fails` → stop. Otherwise
+     go to step 2 as a retry. `/todo-next <ID>` picks up the `## Corrections` section
+     the checkpoint wrote.
+   - **Anything else**, including a missing or unparseable result line or a denied
+     tool call → stop.
 
 ---
 
@@ -349,8 +449,7 @@ acting.
 2026-10-21T00:21:08-04:00  BEGIN   mode=unknown max-items=- max-fails=2 stall=20m entry=step1
 2026-10-21T00:21:09-04:00  WARN    permission mode unknown (no mode-bearing record); continuing
 2026-10-21T00:21:12-04:00  START   FIX-TMPLBRACE-01  sonnet
-2026-10-21T00:21:33-04:00  WAIT    FIX-TMPLBRACE-01  implementer
-2026-10-21T00:41:40-04:00  STALL   FIX-TMPLBRACE-01  implementer silent 20m  mode=default
+2026-10-21T00:21:33-04:00  WAIT    FIX-TMPLBRACE-01  next  a7f3e91c
 2026-10-21T07:23:40-04:00  PASS    FIX-TMPLBRACE-01  a1b2c3d  fix: stop substituting the brace-less $NAME form
 2026-10-21T07:58:02-04:00  FAIL    FIX-TMPLSTRICT-01  1/2  C1, C2
 2026-10-21T12:03:35-04:00  RECOVER FEAT-WAITRETRY-01  in progress, no Corrections; agent finished (usage limit)
@@ -370,13 +469,15 @@ Stop on any of the following:
 - An item whose model is external, or a `/todo-next` blocker.
 - An item whose plan fails `plan-loop-check`.
 - A preflight failure, or an entry-point state the table sends to stop.
-- A prompting permission mode (`default`, `acceptEdits`, `plan`) at an agent
-  completion (`permission mode <mode> at resume`), or a mode helper that is
-  missing or failing there.
+- A prompting permission mode (`default`, `acceptEdits`, `plan`) when a dispatch
+  returns (`permission mode <mode> at resume`), or a mode helper that is missing or
+  failing there.
+- A dispatch result line that is missing, malformed, names another ID or command,
+  or disagrees with its disk or git check.
 - A denied tool call.
 - Any step that needs an action this file does not list.
 
-Never improvise past a stop. A stall is **not** a stop: the agent is still alive.
+Never improvise past a stop.
 
 To stop:
 
@@ -384,14 +485,11 @@ To stop:
    failing criterion, the denied command.
 2. Leave the tree exactly as it is. Do not revert, stash, reset or clean anything,
    because the operator needs the evidence.
-3. `TaskStop` any watchdog still running: one that a launch armed and that has
-   neither exited nor already been stopped. Disarm its ID when stopped. With
-   none recorded, or each already exited/stopped, make no stop call.
-4. File every deferred item and open decision in `.local/TODO.md` with the
+3. File every deferred item and open decision in `.local/TODO.md` with the
    `todo-add` skill.
-5. Send `PushNotification` with one line, for example
+4. Send `PushNotification` with one line, for example
    `todo-loop stopped: FIX-TMPLSTRICT-01 failed 2/2; 1 item committed`.
-6. Report:
+5. Report:
 
 ```text
 ═══════════════════════════════════════
@@ -399,7 +497,6 @@ To stop:
 ═══════════════════════════════════════
  Items retired this run   <ID — sha subject, one per line, or none>
  Last checkpoint          <ID> — PASS / WARN / FAIL
- Stalls                   <ID role minutes, or none>
  Stop reason              <condition, with the evidence>
  Tree                     clean / dirty — <what is uncommitted>
  Queue                    <next eligible ready item, or the preparation step>
@@ -437,5 +534,4 @@ Before you leave:
    Confirm the actual next-run time with `CronList`.
 5. Leave the session open and idle, and schedule nothing else in it (preflight stops
    on any other job). The job is session-only and fires only between turns.
-6. With Remote Control connected, stall and stop notifications reach your phone, so
-   a stall costs `--stall-minutes` instead of the night.
+6. With Remote Control connected, stop notifications reach your phone.

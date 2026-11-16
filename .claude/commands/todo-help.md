@@ -148,10 +148,11 @@ COMMANDS
     each on a clean committed HEAD. A FAIL retries once on the
     Corrections. Preflight refuses a prompting permission mode
     (run in auto), other scheduled jobs and a foreign dirty tree,
-    and runs plan-loop-check on every plan it will touch. Every
-    background agent gets a watchdog: silence for
-    --stall-minutes sends a push notification. Logs to
-    .local/TODO-LOOP.log. Never marks items ready, never pushes.
+    and runs plan-loop-check on every plan it will touch. Each
+    /todo-next and /todo-checkpoint runs in a fresh subagent
+    whose result line is checked against the tracker and git.
+    Logs to .local/TODO-LOOP.log. Never marks items ready, never
+    pushes.
     Run --check first; only READY TO SCHEDULE means it should
     finish unattended. Then fire once via CronCreate.
 
