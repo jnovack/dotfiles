@@ -50,12 +50,17 @@ Machine-local additions live outside the repo:
 The canonical files load those local companions natively, so there is no
 generated merged file to maintain.
 
-`sync.sh` also links four directories under `~/.claude` into this repo:
+`sync.sh` also links five directories under `~/.claude` into this repo:
 
 - `~/.claude/bin` -> `.claude/bin`
 - `~/.claude/commands` -> `.claude/commands`
 - `~/.claude/hooks` -> `.claude/hooks`
 - `~/.claude/skills` -> `.claude/skills`
+- `~/.claude/output-styles` -> `.claude/output-styles`
+
+`.claude/skills/synced/` is written by Claude Code's account skill sync, holds
+organization-internal skills, and is gitignored so it never reaches this
+repo's history.
 
 It creates `~/.claude` first. A link that already points at the canonical
 directory is reported as such and left alone. A real file or directory, a

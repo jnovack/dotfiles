@@ -7,6 +7,7 @@ and CODEX_HOME overrides, so neither sync.sh nor sync-skills.sh nor
 lib/common.sh can write settings, skills, state or logs outside the fixture.
 """
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -15,7 +16,7 @@ import unittest
 
 REPO = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 SYNC = os.path.join(REPO, "sync.sh")
-DIRS = ("bin", "commands", "hooks", "skills")
+DIRS = ("bin", "commands", "hooks", "skills", "output-styles")
 FILES = (".zshrc", ".gitconfig", ".p10k.zsh", ".tmux.conf")
 ISOLATED = (
     "CODEX_HOME",
@@ -88,18 +89,30 @@ class SyncCase(unittest.TestCase):
 
 
 class DirectoryLinks(SyncCase):
-    def test_fresh_home_links_four_dirs(self):  # T1
+    def test_fresh_home_links_canonical_dirs(self):  # T1
         code, out = self.sync()
         self.assertEqual(code, 0, out)
         self.assertTrue(os.path.isdir(self.claude) and not os.path.islink(self.claude))
         for name in DIRS:
             self.assertTrue(os.path.islink(self.dest(name)), name)
             self.assertEqual(os.readlink(self.dest(name)), self.src(name))
+        # DIRS is a hand-kept copy of sync.sh's CANONICAL_DIRS. Every other test
+        # loops DIRS, so a dir added to sync.sh alone would go untested: compare
+        # what sync.sh actually linked against DIRS.
+        linked = {n for n in os.listdir(self.claude) if os.path.islink(self.dest(n))}
+        self.assertEqual(linked, set(DIRS))
         for name in ("CLAUDE.md", "docs", "templates", "PLAN.templating-machine.md"):
             self.assertFalse(os.path.lexists(self.dest(name)), name)
         for name in FILES:
             self.assertEqual(os.readlink(os.path.join(self.home, name)), os.path.join(REPO, name))
         self.assertTrue(os.path.isdir(os.path.join(self.home, ".codex", "skills")))
+
+    def test_readme_lists_every_canonical_dir(self):
+        # README.md documents the linked dirs by hand, a third copy of the list;
+        # T1 ties DIRS to sync.sh, this ties README.md to DIRS.
+        with open(os.path.join(REPO, "README.md")) as fh:
+            listed = set(re.findall(r"^- `~/\.claude/([\w-]+)` -> `\.claude/\1`$", fh.read(), re.M))
+        self.assertEqual(listed, set(DIRS))
 
     def test_second_run_is_idempotent(self):  # T2
         self.assertEqual(self.sync()[0], 0)
@@ -131,7 +144,7 @@ class DirectoryLinks(SyncCase):
         self.assertNotIn("Move machine-specific changes", out)
         self.assertNotIn("bin.local", out)
         self.assertNotIn("commands.local", out)
-        for name in ("hooks", "skills"):
+        for name in ("hooks", "skills", "output-styles"):
             self.assertEqual(os.readlink(self.dest(name)), self.src(name))
 
     def test_foreign_dir_symlink_is_refused(self):  # T4
@@ -178,6 +191,46 @@ class DirectoryLinks(SyncCase):
     def test_ln_failure_is_reported_for_file(self):  # T6
         self.assert_ln_failure_reported(os.path.join(self.home, ".zshrc"))
 
+    # output-styles is the newest canonical dir: guard that it gets the same
+    # refuse-don't-replace treatment, so a user's own ~/.claude/output-styles
+    # is never clobbered, while other links still proceed.
+    def test_output_styles_real_dir_is_refused(self):
+        os.makedirs(self.dest("output-styles"))
+        with open(os.path.join(self.dest("output-styles"), "mine.md"), "w") as fh:
+            fh.write("keep")
+        code, out = self.sync()
+        self.assertNotEqual(code, 0, out)
+        self.assertIn("Refusing to replace %s" % self.dest("output-styles"), out)
+        self.assertFalse(os.path.islink(self.dest("output-styles")))
+        with open(os.path.join(self.dest("output-styles"), "mine.md")) as fh:
+            self.assertEqual(fh.read(), "keep")
+        self.assertEqual(os.readlink(self.dest("skills")), self.src("skills"))
+
+    def test_output_styles_foreign_and_dangling_links_are_refused(self):
+        os.makedirs(self.claude)
+        for target in (os.path.join(self.home, "foreign"), os.path.join(self.home, "gone")):
+            with self.subTest(target=os.path.basename(target)):
+                if target.endswith("foreign"):
+                    os.makedirs(target)
+                if os.path.lexists(self.dest("output-styles")):
+                    os.remove(self.dest("output-styles"))
+                os.symlink(target, self.dest("output-styles"))
+                code, out = self.sync()
+                self.assertNotEqual(code, 0, out)
+                self.assertEqual(os.readlink(self.dest("output-styles")), target)
+                self.assertIn("Refusing to replace %s" % self.dest("output-styles"), out)
+
+    def test_output_styles_missing_source_is_refused(self):
+        repo = self.minimal_checkout(omit_dir="output-styles")
+        code, out = self.sync(repo=repo)
+        self.assertNotEqual(code, 0, out)
+        self.assertIn("Canonical source %s is missing" % os.path.join(repo, ".claude", "output-styles"), out)
+        self.assertFalse(os.path.lexists(self.dest("output-styles")))
+        self.assertEqual(os.readlink(self.dest("skills")), os.path.join(repo, ".claude", "skills"))
+
+    def test_ln_failure_is_reported_for_output_styles(self):
+        self.assert_ln_failure_reported(self.dest("output-styles"))
+
     def test_uncreatable_parent(self):  # T7
         with open(self.claude, "w") as fh:
             fh.write("not a dir")
@@ -199,7 +252,7 @@ class DirectoryLinks(SyncCase):
         self.assertIn("Canonical source %s is missing" % os.path.join(repo, ".claude", "bin"), out)
         self.assertNotIn("Linked %s " % self.dest("bin"), out)
         self.assertFalse(os.path.lexists(self.dest("bin")))
-        for name in ("commands", "hooks", "skills"):
+        for name in ("commands", "hooks", "skills", "output-styles"):
             self.assertEqual(os.readlink(self.dest(name)), os.path.join(repo, ".claude", name))
 
     def test_existing_link_to_missing_source_is_not_canonical(self):  # review R1

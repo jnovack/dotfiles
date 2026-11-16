@@ -2,3 +2,5 @@
 __pycache__/
 code/android/src/templates/.gradle/
 code/android/src/templates/build/
+# Written by Claude Code's account skill sync; holds org-internal skills.
+.claude/skills/synced/

@@ -18,10 +18,13 @@ CANONICAL_FILES="
 # has broken hooks and no loop helpers. ~/.claude/CLAUDE.md is deliberately not
 # listed: claude-templates assemble generates it. .claude/docs, templates and
 # PLAN.templating-machine.md are left out because nothing loads them from ~/.claude.
+# ~/.claude/output-styles is linked so the repo's output styles (/output-style)
+# load in every session.
 CANONICAL_DIRS="
 .claude/bin
 .claude/commands
 .claude/hooks
+.claude/output-styles
 .claude/skills
 "
 

@@ -1,0 +1,3 @@
+# Written by Claude Code's account skill sync; holds org-internal skills.
+# Never index it: the graph would copy that content into its database.
+/.claude/skills/synced/
