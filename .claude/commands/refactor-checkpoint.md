@@ -369,6 +369,9 @@ bookkeeping below.
 **On PASS or WARN**, append one Session Log row, as terse decision lines:
 `| YYYY-MM-DD | Phase N — checkpoint | [model] | Review | PASS/WARN; [exact validation commands and results, including any "not run: <reason>"] |`.
 Its Status is `Review`, so a later checkpoint skips it when looking for the phase row.
+Begin the Notes with the bare word `PASS` or `WARN` — never the `PASS/WARN`
+placeholder — then `;`: `/refactor-loop` reads the verdict from the start of this
+cell (§Checkpoint verdict row there).
 
 **On PASS:** confirm every row in the phase's `### Step Index` and its Phase Map row are
 marked `Complete` in `.local/REFACTOR.<kebab>.md`. If either was missed, update it now.

@@ -53,8 +53,10 @@ Run once, before the first cycle:
 
 1. `git status --porcelain`. The tree must be clean, or dirty only with this
    refactor's own uncommitted phase work (files in the current phase's **Files to
-   modify** plus `.local/COMMIT-MSG.txt`). Anything else → stop: `git autocommit`
-   runs `git add -A` and would sweep unrelated operator edits into a phase commit.
+   modify** plus `.local/COMMIT-MSG.txt`; for the dirty-tree checkpointed entry
+   below, the current phase is the newest `Complete` one). Anything else → stop:
+   `git autocommit` runs `git add -A` and would sweep unrelated operator edits into
+   a phase commit.
 2. The tracking file exists and has a `## Phase Map`.
 3. `command -v codex` succeeds, and `codex exec --help` lists both `-s` and `-o`. If
    either is missing, stop rather than guess at flags.
@@ -71,9 +73,11 @@ Run once, before the first cycle:
    stop (a missing gate is not a pass). Then, with the Phase Map and the entry point
    below, build the list of phases this run may touch and gate each one (§Phase
    safety gate), without duplicates:
-   - the **entry phase**: the phase whose checkpoint or repair work runs first,
-     even when it is already `Complete` and only awaiting its checkpoint, or the
-     `In progress` phase with Corrections (its `/refactor-next` retry runs first);
+   - the **entry phase**: the phase whose checkpoint, handoff or repair work runs
+     first, even when it is already `Complete` and only awaiting its checkpoint or
+     handoff, or the `In progress` phase with Corrections (its `/refactor-next`
+     retry runs first). The step-4 entry needs this: step 4 has no gate of its own,
+     and that entry skips step 2's gate rerun;
    - then every incomplete phase this run may execute, up to `--through`.
 
    If the first phase in that list fails, stop and quote every `FAIL` line. If only
@@ -103,20 +107,52 @@ or live operation. The loop never edits a phase's `**Unattended:**` field, its
 has retired, the file is `.local/completed/REFACTOR.<kebab>.completed.md`, and there
 is no successor to gate.
 
+### Checkpoint verdict row
+
+A **checkpoint verdict row** for phase N is a Session Log row with Status `Review`
+and phase cell exactly `Phase <N> — checkpoint`, whose Notes cell, with its
+leading and trailing padding trimmed, matches `^(PASS|WARN)[;.:, ]`. Its verdict
+is that word. Trim both sides: the cell's trailing pad would otherwise let a bare
+`| PASS |` pass as `PASS` plus a space.
+Matching is case-sensitive; a separator is required, and a tab is not a space.
+After dispatch, require this verdict to equal `overall=`. At entry, read the
+verdict from disk; there is no previous result line to require or invent.
+The unfilled template `PASS/WARN`, `PASSED` and `WARNING` are not verdict rows.
+`/refactor-checkpoint` prescribes `PASS;` or `WARN;`, but on 2026-11-16 two
+checkpoint subagents in a row wrote `PASS.`, and a `;`-only match stopped the
+loop after each one. The separator carries nothing: Status and the phase cell
+identify the row, and the word carries the verdict. Do not narrow the separator
+set again.
+
 ### Entry point
 
 | State at start | Begin at |
 | --- | --- |
-| Every phase up to `--through` is `Complete`, the `--through` phase has a `Phase N — checkpoint` PASS/WARN row in the Session Log, and the tree is clean | Stop: nothing to do |
+| Every phase up to `--through` is `Complete`, the `--through` phase has a checkpoint verdict row (§Checkpoint verdict row) in the Session Log, and the tree is clean | Stop: nothing to do |
 | No phase `Complete` yet | Step 6 |
 | A phase `In progress` with a `### Corrections` section | Dispatch `/refactor-next <kebab>` (§Dispatching checkpoint and next; see §Around every `/refactor-next`; it executes the Corrections), then step 2. The FAIL count starts at 0: it counts only failures observed inside this loop, never one inherited from before it started |
-| The newest `Complete` phase already has a checkpoint PASS/WARN row, the tree is clean, and the next phase is `Not started` | Step 6 — its handoff was already committed |
+| The newest `Complete` phase already has a checkpoint verdict row (§Checkpoint verdict row), the tree is clean, and the next phase is `Not started` | Step 6 — its handoff was already committed |
+| The newest `Complete` phase has a checkpoint verdict row (§Checkpoint verdict row) after its latest execution row; that execution is also the latest execution in the Session Log (ignoring `Review` and `Checkpoint failed` rows) and is `Complete`; its Phase Map row and every Step Index row are `Complete`; it has no `### Corrections`; its live index row is `active`; the next phase is `Not started`; and the tree is dirty | `.local/COMMIT-MSG.txt` present → step 4 with `PHASE` = that phase, `retired=no` and the FAIL count at 0. Absent → stop: a dirty tree with no commit message, as at step 5 |
 | Anything else | Step 2 |
 
 At entry, a phase whose latest execution row (ignoring `Review` and
 `Checkpoint failed` rows) is `Partial` is an unresolved implementer blocker or
 partial run: stop, even when the phase has Corrections. Only an ordinary checkpoint
 failure with Corrections keeps the retry in the table above.
+
+The dirty-tree checkpointed row is the state a stop between steps 2 and 4 leaves
+behind. It begins at step 4, not step 2, because a second checkpoint would repeat
+the Opus review and the next-phase plan audit to no purpose. It does not begin at
+step 5, because `$refactor-handoff` leaves no mark on disk, and
+`.local/COMMIT-MSG.txt` was written earlier by `/refactor-next`. Nothing proves
+the handoff ran, and in the usual case it did not. Entering at step 5 would commit
+the phase with no handoff review. If an operator already ran the handoff by hand,
+it runs again: one extra Codex job, and no review is skipped without evidence. A
+`Partial` latest execution row still stops, per the paragraph above.
+The row also repeats the after-dispatch `overall=PASS|WARN` disk checks (Phase
+Map and Step Index `Complete`, no Corrections, active index row) and requires the
+verdict row to follow the latest execution, so a surviving old review row cannot
+vouch for a later execution or for contradictory bookkeeping.
 
 ---
 
@@ -220,7 +256,7 @@ the index cannot confirm retirement alone, because retirement removes its row.
 
 | Result line | Required on disk | Then |
 | --- | --- | --- |
-| `checkpoint … overall=PASS\|WARN` | A fresh row with Status `Review` whose phase cell is exactly `Phase <N> — checkpoint` and whose Notes start with the same verdict followed by `;`. Review adjudication and next-plan audit rows cannot satisfy this. The Phase Map row and every Step Index row of the phase are `Complete` and its `### Corrections` is gone. `retired=yes` also requires the live tracking file absent, the archive present, every Phase Map row `Complete` and the index row absent; `retired=no` requires the live tracking file and an active index row | Step 4 |
+| `checkpoint … overall=PASS\|WARN` | A fresh checkpoint verdict row for phase `<N>` (§Checkpoint verdict row) whose verdict equals `overall=`. Review adjudication and next-plan audit rows cannot satisfy this. The Phase Map row and every Step Index row of the phase are `Complete` and its `### Corrections` is gone. `retired=yes` also requires the live tracking file absent, the archive present, every Phase Map row `Complete` and the index row absent; `retired=no` requires the live tracking file and an active index row | Step 4 |
 | `checkpoint … overall=FAIL retired=no` | A fresh row whose phase cell starts `Phase <N> —` with Status exactly `Checkpoint failed`; the phase `In progress` in the Phase Map, a `### Corrections` section present and the index row `blocked` | Step 3 |
 | `next … outcome=complete` | The latest fresh execution row for the phase (ignore `Review` and `Checkpoint failed`) is `Complete`, so a later `Partial` fails this check. The Phase Map row and every Step Index row are `Complete`, the index row is active with a Phases count equal to the completed Phase Map rows, and the summary reports no blocker | Step 2 |
 | `next … outcome=codex-prompt` | The phase's Model is `Codex`; the canonical prompt was absent before dispatch and now exists and contains the selected phase's full `## Phase <N> — <title>` header line, matched as a whole line (`grep -Fx`) so `Phase 1` never matches `Phase 10`. No execution row is required yet. Keep `BASE` for the post-Codex execution checks | Step 6: run Codex. Entry or step 3 retry: stop with the prompt path |
