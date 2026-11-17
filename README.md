@@ -221,6 +221,15 @@ Shared personal skills live in `.codex/skills/`:
 - `todo-closeout`
 - `todo-design-review`
 
+You don't type these by hand. The Claude skill `codex-handoff` triggers when you
+mention Codex alongside a TODO, a refactor phase or a handoff ("hand off to
+codex", "have codex prep it", "pass to codex"). It picks the skill for the
+current boundary: `$todo-design-review` after `/todo-plan`, `$todo-closeout`
+after a passing `/todo-checkpoint`, or `$refactor-handoff` before
+`/refactor-next`. Then it runs `codex exec` in a haiku subagent and verifies the
+result. Design-review questions come back to you, and your answers resume the
+same Codex session.
+
 `sync.sh` also runs `sync-skills.sh`, which links each skill into
 `${CODEX_HOME:-$HOME/.codex}/skills`. It leaves built-in skills and other local
 skills alone. Identical existing copies are backed up outside the skills

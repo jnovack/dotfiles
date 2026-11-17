@@ -440,6 +440,9 @@ Run one Codex job and report its result. Do not interpret or act on what Codex s
 4. Reply with: the contents of <job>/codex-exit.txt, the full contents of <job>/codex-last.txt, and every line of <job>/codex-out.txt that contains "ERROR:".
 ```
 
+The `codex-handoff` skill (`.claude/skills/codex-handoff/`) runs attended
+handoffs with this same dispatch prompt; change the two together.
+
 **The exit file is the evidence.** The subagent's reply is a convenience: a probe on
 2026-11-09 showed a haiku subagent returning before its Monitor wait finished. The
 orchestrator classifies the current-job files itself, never paths named only in the
